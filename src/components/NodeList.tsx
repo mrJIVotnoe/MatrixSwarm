@@ -8,6 +8,14 @@ interface Node {
   status: string;
   load: number;
   temperature: number;
+  trust_score: number;
+  benchmark?: {
+    cpu_score: number;
+    ram_score: number;
+    is_vm: boolean;
+    verified_at: string;
+  };
+  privacy_mode: "public" | "matrix" | "i2p";
 }
 
 export const NodeList: React.FC<{ nodes: Node[] }> = ({ nodes }) => {
@@ -28,12 +36,20 @@ export const NodeList: React.FC<{ nodes: Node[] }> = ({ nodes }) => {
                   <p className="text-[10px] text-cyan-400 font-bold">{node.id}</p>
                   <p className="text-[8px] text-gray-500">{node.address}</p>
                 </div>
-                <span className={`text-[8px] px-1 border ${node.status === 'online' ? 'border-green-900 text-green-400' : 'border-red-900 text-red-400'} uppercase`}>
-                  {node.status}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`text-[8px] px-1 border ${node.status === 'online' ? 'border-green-900 text-green-400' : 'border-red-900 text-red-400'} uppercase`}>
+                    {node.status}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] text-gray-500 uppercase">Trust:</span>
+                    <span className={`text-[8px] font-bold ${node.trust_score > 70 ? 'text-green-400' : node.trust_score > 30 ? 'text-yellow-400' : 'text-red-400'}`}>
+                      {node.trust_score}%
+                    </span>
+                  </div>
+                </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2 mb-2">
                 <div className="flex items-center gap-1">
                   <Cpu className="w-2 h-2 text-cyan-900" />
                   <span className="text-[8px] text-gray-400 uppercase">{node.ai_tier}</span>
@@ -46,6 +62,19 @@ export const NodeList: React.FC<{ nodes: Node[] }> = ({ nodes }) => {
                   <Thermometer className="w-2 h-2 text-cyan-900" />
                   <span className={`text-[8px] ${node.temperature > 45 ? 'text-red-400' : 'text-gray-400'}`}>{node.temperature}°C</span>
                 </div>
+              </div>
+
+              {node.benchmark && (
+                <div className="mt-2 pt-2 border-t border-cyan-900/10 flex justify-between items-center text-[7px] uppercase tracking-widest text-cyan-900">
+                  <span>CPU: {node.benchmark.cpu_score} | RAM: {node.benchmark.ram_score}</span>
+                  <span className={node.benchmark.is_vm ? "text-yellow-900" : "text-green-900"}>
+                    {node.benchmark.is_vm ? "VM_DETECTED" : "PHYSICAL_HW"}
+                  </span>
+                </div>
+              )}
+              
+              <div className="mt-1 flex justify-end">
+                <span className="text-[6px] text-cyan-900 uppercase tracking-tighter">Mode: {node.privacy_mode}</span>
               </div>
             </div>
           ))

@@ -5,17 +5,17 @@ import cors from "cors";
 import morgan from "morgan";
 import { v4 as uuidv4 } from "uuid";
 import * as admin from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
 // Initialize Firebase Admin
-admin.initializeApp({
-  projectId: firebaseConfig.projectId,
-});
+admin.initializeApp();
 
-const db = getFirestore();
+const db = getFirestore(firebaseConfig.firestoreDatabaseId);
+const authAdmin = getAuth();
 
 // Types
 interface Task {
@@ -44,6 +44,15 @@ interface Node {
   status: "online" | "overheated" | "offline";
   last_heartbeat: Timestamp;
   temperature: number;
+  token?: string;
+  trust_score: number;
+  benchmark?: {
+    cpu_score: number;
+    ram_score: number;
+    is_vm: boolean;
+    verified_at: Timestamp;
+  };
+  privacy_mode: "public" | "matrix" | "i2p";
 }
 
 const TASK_REQUIREMENTS: Record<string, { minRamMb: number; aiTier: string }> = {
@@ -79,7 +88,13 @@ setInterval(async () => {
     
     const batch = db.batch();
     staleNodes.forEach(doc => {
-      batch.update(doc.ref, { status: "offline" });
+      const data = doc.data() as Node;
+      // Decrease trust score for unexpected offline
+      const newTrustScore = Math.max(0, (data.trust_score || 50) - 5);
+      batch.update(doc.ref, { 
+        status: "offline",
+        trust_score: newTrustScore
+      });
     });
 
     // Delete very old nodes
@@ -202,10 +217,46 @@ async function startServer() {
   app.use(morgan("dev"));
   app.use(express.json());
 
+  // Auth Middleware
+  const verifyAuth = async (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized: Missing token" });
+    }
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = await authAdmin.verifyIdToken(idToken);
+      req.user = decodedToken;
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Unauthorized: Invalid token" });
+    }
+  };
+
+  // Node Token Middleware
+  const verifyNodeToken = async (req: any, res: any, next: any) => {
+    const nodeId = req.params.nodeId || req.body.node_id;
+    const nodeToken = req.headers["x-node-token"];
+    
+    if (!nodeId || !nodeToken) {
+      return res.status(401).json({ error: "Unauthorized: Missing node credentials" });
+    }
+
+    try {
+      const nodeDoc = await db.collection("nodes").doc(nodeId).get();
+      if (!nodeDoc.exists || nodeDoc.data()?.token !== nodeToken) {
+        return res.status(401).json({ error: "Unauthorized: Invalid node token" });
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ error: "Auth check failed" });
+    }
+  };
+
   // API Routes
   const api = express.Router();
 
-  api.post("/task", async (req, res) => {
+  api.post("/task", verifyAuth, async (req, res) => {
     const { type = "generic", payload = {}, priority = 5 } = req.body;
     const taskId = uuidv4().slice(0, 12);
     
@@ -246,14 +297,24 @@ async function startServer() {
   });
 
   api.post("/node/register", async (req, res) => {
-    const { node_id, address, capabilities = ["generic"], ram_mb = 4000, cpu_cores = 4, ai_capable = false } = req.body;
+    const { 
+      node_id, 
+      address, 
+      capabilities = ["generic"], 
+      ram_mb = 4000, 
+      cpu_cores = 4, 
+      ai_capable = false,
+      privacy_mode = "public"
+    } = req.body;
     const id = node_id || uuidv4().slice(0, 8);
+    const token = uuidv4(); // Generate unique node token
     const aiTier = calculateAiTier(ram_mb, ai_capable);
     
     try {
       const now = Timestamp.now();
       await db.collection("nodes").doc(id).set({
         id,
+        token, // Store token
         address: address || req.ip,
         capabilities,
         ram_mb,
@@ -263,18 +324,40 @@ async function startServer() {
         load: 0,
         status: "online",
         temperature: 0,
-        last_heartbeat: now
+        last_heartbeat: now,
+        trust_score: 50, // Initial trust score
+        privacy_mode
       }, { merge: true });
       
       broadcastStatus();
-      res.status(201).json({ success: true, nodeId: id, aiTier });
+      res.status(201).json({ success: true, nodeId: id, aiTier, token });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to register node" });
     }
   });
 
-  api.post("/node/:nodeId/heartbeat", async (req, res) => {
+  api.post("/node/:nodeId/benchmark", verifyNodeToken, async (req, res) => {
+    const { cpu_score, ram_score, is_vm } = req.body;
+    try {
+      const now = Timestamp.now();
+      await db.collection("nodes").doc(req.params.nodeId).update({
+        benchmark: {
+          cpu_score,
+          ram_score,
+          is_vm,
+          verified_at: now
+        },
+        // Increase trust score after successful benchmark
+        trust_score: FieldValue.increment(10)
+      });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Benchmark update failed" });
+    }
+  });
+
+  api.post("/node/:nodeId/heartbeat", verifyNodeToken, async (req, res) => {
     const { load = 0, temperature = 0 } = req.body;
     const status = temperature > 50 ? "overheated" : "online";
     
@@ -297,7 +380,7 @@ async function startServer() {
     }
   });
 
-  api.get("/node/:nodeId/task", async (req, res) => {
+  api.get("/node/:nodeId/task", verifyNodeToken, async (req, res) => {
     try {
       const nodeDoc = await db.collection("nodes").doc(req.params.nodeId).get();
       if (!nodeDoc.exists) return res.status(404).json({ error: "Node not found" });
@@ -361,7 +444,8 @@ async function startServer() {
       const nodeId = data?.assigned_node;
       if (nodeId) {
         await db.collection("nodes").doc(nodeId).update({
-          load: FieldValue.increment(-20)
+          load: FieldValue.increment(-20),
+          trust_score: FieldValue.increment(2) // Reward for successful completion
         });
       }
       
@@ -378,11 +462,20 @@ async function startServer() {
       const doc = await taskRef.get();
       if (!doc.exists) return res.status(404).json({ error: "Task not found" });
 
+      const data = doc.data();
       await taskRef.update({
         status: "failed",
         error: req.body.error || "Unknown error",
         updated_at: Timestamp.now()
       });
+
+      const nodeId = data?.assigned_node;
+      if (nodeId) {
+        await db.collection("nodes").doc(nodeId).update({
+          trust_score: FieldValue.increment(-5) // Penalty for failure
+        });
+      }
+
       broadcastStatus();
       res.json({ success: true });
     } catch (err) {

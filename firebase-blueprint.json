@@ -34,7 +34,18 @@
         "load": { "type": "integer", "description": "Current CPU load percentage" },
         "status": { "type": "string", "enum": ["online", "overheated", "offline"] },
         "temperature": { "type": "integer", "description": "Current temperature in Celsius" },
-        "last_heartbeat": { "type": "string", "format": "date-time" }
+        "last_heartbeat": { "type": "string", "format": "date-time" },
+        "trust_score": { "type": "integer", "description": "Reputation score 0-100" },
+        "benchmark": {
+          "type": "object",
+          "properties": {
+            "cpu_score": { "type": "integer" },
+            "ram_score": { "type": "integer" },
+            "is_vm": { "type": "boolean" },
+            "verified_at": { "type": "string", "format": "date-time" }
+          }
+        },
+        "privacy_mode": { "type": "string", "enum": ["public", "matrix", "i2p"] }
       },
       "required": ["id", "status", "last_heartbeat"]
     }

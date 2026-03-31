@@ -5,8 +5,9 @@ import { motion } from "motion/react";
 import { TaskForm } from "./TaskForm";
 import { TaskHistory } from "./TaskHistory";
 import { NodeList } from "./NodeList";
+import { User } from "../firebase";
 
-export const SwarmMonitor: React.FC = () => {
+export const SwarmMonitor: React.FC<{ user: User | null }> = ({ user }) => {
   const [status, setStatus] = useState<SwarmStatus | null>(null);
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
@@ -14,6 +15,15 @@ export const SwarmMonitor: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [matrixStatus, setMatrixStatus] = useState<"connected" | "syncing" | "offline">("syncing");
+  const [token, setToken] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then(setToken);
+    } else {
+      setToken(undefined);
+    }
+  }, [user]);
 
   const updateStatus = async () => {
     try {
@@ -198,7 +208,7 @@ export const SwarmMonitor: React.FC = () => {
             </div>
           </div>
 
-          <TaskForm onTaskCreated={updateStatus} />
+          <TaskForm onTaskCreated={updateStatus} authToken={token} />
           <TaskHistory tasks={recentTasks} />
         </div>
 

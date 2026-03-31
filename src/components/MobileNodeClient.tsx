@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Cpu, Zap, Activity, Thermometer, ShieldCheck, Globe, Loader2, Smartphone, LogOut } from "lucide-react";
+import { Cpu, Zap, Activity, Thermometer, ShieldCheck, Globe, Loader2, Smartphone, LogOut, Gauge } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { runBenchmark, BenchmarkResult } from "../swarm/benchmark";
 
 interface NodeInfo {
   nodeId: string;
   aiTier: string;
+  token: string;
 }
 
 export const MobileNodeClient: React.FC = () => {
@@ -15,6 +17,8 @@ export const MobileNodeClient: React.FC = () => {
   const [load, setLoad] = useState(0);
   const [temp, setTemp] = useState(32);
   const [matrixConnected, setMatrixConnected] = useState(false);
+  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | null>(null);
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
   const heartbeatInterval = useRef<any>(null);
   const taskPollInterval = useRef<any>(null);
 
@@ -33,11 +37,16 @@ export const MobileNodeClient: React.FC = () => {
       const info = JSON.parse(saved);
       setNodeInfo(info);
       setIsJoined(true);
-      startNodeLoops(info.nodeId);
+      startNodeLoops(info.nodeId, info.token);
     }
   }, []);
 
   const joinSwarm = async () => {
+    setIsBenchmarking(true);
+    const benchmark = await runBenchmark();
+    setBenchmarkResult(benchmark);
+    setIsBenchmarking(false);
+
     try {
       const res = await fetch("/api/v1/node/register", {
         method: "POST",
@@ -46,16 +55,28 @@ export const MobileNodeClient: React.FC = () => {
           capabilities: ["generic", "text_classification"],
           ram_mb: 4000,
           cpu_cores: 8,
-          ai_capable: true
+          ai_capable: true,
+          privacy_mode: "public"
         })
       });
       const data = await res.json();
       if (data.success) {
-        const info = { nodeId: data.nodeId, aiTier: data.aiTier };
+        const info = { nodeId: data.nodeId, aiTier: data.aiTier, token: data.token };
         setNodeInfo(info);
         setIsJoined(true);
         localStorage.setItem("MATRIX_NODE_INFO", JSON.stringify(info));
-        startNodeLoops(data.nodeId);
+        
+        // Upload benchmark results
+        await fetch(`/api/v1/node/${data.nodeId}/benchmark`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-node-token": data.token
+          },
+          body: JSON.stringify(benchmark)
+        });
+
+        startNodeLoops(data.nodeId, data.token);
       }
     } catch (err) {
       console.error("JOIN_FAILED", err);
@@ -70,7 +91,7 @@ export const MobileNodeClient: React.FC = () => {
     if (taskPollInterval.current) clearInterval(taskPollInterval.current);
   };
 
-  const startNodeLoops = (id: string) => {
+  const startNodeLoops = (id: string, token: string) => {
     // Heartbeat
     heartbeatInterval.current = setInterval(async () => {
       const newLoad = Math.floor(Math.random() * 30);
@@ -80,7 +101,10 @@ export const MobileNodeClient: React.FC = () => {
       try {
         await fetch(`/api/v1/node/${id}/heartbeat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "x-node-token": token
+          },
           body: JSON.stringify({ load: newLoad, temperature: newTemp })
         });
       } catch (err) {
@@ -92,7 +116,9 @@ export const MobileNodeClient: React.FC = () => {
     taskPollInterval.current = setInterval(async () => {
       if (status === "working") return;
       try {
-        const res = await fetch(`/api/v1/node/${id}/task`);
+        const res = await fetch(`/api/v1/node/${id}/task`, {
+          headers: { "x-node-token": token }
+        });
         const { task } = await res.json();
         if (task) {
           handleTask(task);
@@ -167,9 +193,17 @@ export const MobileNodeClient: React.FC = () => {
               </div>
               <button 
                 onClick={joinSwarm}
-                className="w-full max-w-xs mx-auto bg-cyan-400 text-black font-bold py-4 rounded-sm hover:bg-cyan-300 transition-all uppercase tracking-widest shadow-[0_0_20px_rgba(34,211,238,0.3)]"
+                disabled={isBenchmarking}
+                className="w-full max-w-xs mx-auto bg-cyan-400 text-black font-bold py-4 rounded-sm hover:bg-cyan-300 disabled:bg-cyan-900 disabled:text-cyan-400 transition-all uppercase tracking-widest shadow-[0_0_20px_rgba(34,211,238,0.3)] flex items-center justify-center gap-2"
               >
-                Connect_to_Swarm
+                {isBenchmarking ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Benchmarking...
+                  </>
+                ) : (
+                  "Connect_to_Swarm"
+                )}
               </button>
             </motion.div>
           ) : (

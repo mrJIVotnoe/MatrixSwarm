@@ -74,10 +74,11 @@ service cloud.firestore {
     }
 
     function isValidNode(data) {
-      return hasRequiredFields(['id', 'status', 'last_heartbeat']) &&
+      return hasRequiredFields(['id', 'status', 'last_heartbeat', 'token']) &&
              data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
              data.status in ['online', 'overheated', 'offline'] &&
-             data.last_heartbeat is timestamp;
+             data.last_heartbeat is timestamp &&
+             data.token is string && data.token.size() > 0 && data.token.size() < 100;
     }
 
     // ===============================================================

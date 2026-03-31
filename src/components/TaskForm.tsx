@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createTask } from "../services/swarmService";
 import { Send, Loader2, Database } from "lucide-react";
 
-export const TaskForm: React.FC<{ onTaskCreated: () => void }> = ({ onTaskCreated }) => {
+export const TaskForm: React.FC<{ onTaskCreated: () => void; authToken?: string }> = ({ onTaskCreated, authToken }) => {
   const [type, setType] = useState("generic");
   const [priority, setPriority] = useState(5);
   const [payload, setPayload] = useState("");
@@ -23,7 +23,7 @@ export const TaskForm: React.FC<{ onTaskCreated: () => void }> = ({ onTaskCreate
         }
       }
       
-      await createTask(type, parsedPayload, priority);
+      await createTask(type, parsedPayload, priority, authToken);
       setMessage("TASK_QUEUED_SUCCESSFULLY");
       setPayload("");
       onTaskCreated();

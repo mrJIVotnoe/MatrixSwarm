@@ -1,5 +1,9 @@
 {
   "name": "MatrixSwarm",
-  "description": "Decentralized network for private communication and distributed computing using legacy devices.",
-  "requestFramePermissions": []
+  "description": "Decentralized P2P Node Orchestrator with Matrix-inspired security and Proof-of-Compute incentives.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
 }

@@ -26,11 +26,15 @@ export const fetchSwarmStatus = async (): Promise<SwarmStatus> => {
   }
 };
 
-export const createTask = async (type: string, payload: any, priority: number = 5) => {
+export const createTask = async (type: string, payload: any, priority: number = 5, authToken?: string) => {
   try {
+    const headers: any = { "Content-Type": "application/json" };
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
     const response = await fetch("/api/v1/task", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ type, payload, priority }),
     });
     if (!response.ok) throw new Error(`HTTP_ERROR: ${response.status}`);
