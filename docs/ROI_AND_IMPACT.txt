@@ -1,0 +1,44 @@
+
+---
+
+# 📊 ROI для инвесторов
+
+## Exit Strategy
+
+**Вариант 1: Acquisition (3-5 лет)**
+- Покупка крупным privacy-проектом
+- Оценка: $5-10M
+- ROI: **20-40x**
+
+**Вариант 2: Sustainable Non-Profit**
+- Гранты + донаты
+- Impact-focused
+- ROI: **Social + Tax benefits**
+
+**Вариант 3: Token Model (опционально)**
+- Governance token
+- Community ownership
+- ROI: **Variable**
+
+---
+
+# 🌍 Социальный Impact
+
+## Измеримые результаты
+
+| Метрика | Цель 2028 |
+|---------|-----------|
+| Спасённых устройств | 100,000+ |
+| Снижение e-waste | 50 тонн |
+| Пользователей с приватностью | 50,000+ |
+| Сэкономлено на облаках | $5M+ |
+| CO₂ не выброшено | 200 тонн |
+
+## UN SDG Alignment
+- ♻️ **Goal 12**: Responsible Consumption
+- 🔐 **Goal 16**: Peace & Justice (Privacy)
+- 🌐 **Goal 9**: Industry Innovation
+
+---
+
+# 🗺️ Roadmap

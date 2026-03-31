@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: tasks
+    // Document ID: taskId (string)
+    // Fields:
+    //   - id: string (required)
+    //   - type: string (required)
+    //   - payload: map (optional)
+    //   - priority: number (optional)
+    //   - status: string (required, enum: pending, running, completed, failed)
+    //   - created_at: timestamp (required)
+    //   - updated_at: timestamp (optional)
+    //   - assigned_node: string (optional)
+    //   - result: map (optional)
+    //   - error: string (optional)
+    //   - attempts: number (optional)
+    //
+    // Collection: nodes
+    // Document ID: nodeId (string)
+    // Fields:
+    //   - id: string (required)
+    //   - address: string (optional)
+    //   - capabilities: list (optional)
+    //   - ram_mb: number (optional)
+    //   - cpu_cores: number (optional)
+    //   - ai_capable: bool (optional)
+    //   - ai_tier: string (optional, enum: none, slm_1.5b, slm_3b, llm)
+    //   - load: number (optional)
+    //   - status: string (required, enum: online, overheated, offline)
+    //   - temperature: number (optional)
+    //   - last_heartbeat: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (request.auth.token.email == "newjiv@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidTask(data) {
+      return hasRequiredFields(['id', 'type', 'status', 'created_at']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.type is string && data.type.size() > 0 && data.type.size() < 50 &&
+             data.status in ['pending', 'running', 'completed', 'failed'] &&
+             data.created_at is timestamp;
+    }
+
+    function isValidNode(data) {
+      return hasRequiredFields(['id', 'status', 'last_heartbeat']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.status in ['online', 'overheated', 'offline'] &&
+             data.last_heartbeat is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+
+    match /tasks/{taskId} {
+      // Allow authenticated users to read tasks
+      allow read: if isAuthenticated();
+      
+      // Allow creation of tasks with validation
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      
+      // Allow updates with validation (server-side logic mostly handles this)
+      allow update: if isAuthenticated() && isValidTask(request.resource.data);
+      
+      // Only admins can delete tasks
+      allow delete: if isAdmin();
+    }
+
+    match /nodes/{nodeId} {
+      // Allow authenticated users to read nodes
+      allow read: if isAuthenticated();
+      
+      // Allow registration and heartbeat updates
+      allow create: if isAuthenticated() && isValidNode(request.resource.data);
+      allow update: if isAuthenticated() && isValidNode(request.resource.data);
+      
+      // Only admins can delete nodes
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

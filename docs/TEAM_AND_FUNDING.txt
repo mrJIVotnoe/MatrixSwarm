@@ -1,0 +1,39 @@
+
+---
+
+# 🏆 Конкурентные преимущества
+
+| Feature | MatrixSwarm | Synapse | Cloud |
+|---------|-------------|---------|-------|
+| Ресурсы | **50 МБ** | 1.5 ГБ | N/A |
+| Приватность | **E2EE+TOR** | E2EE | ❌ |
+| Цена | **Бесплатно** | Бесплатно | $10-50/мес |
+| Экология | **♻️ Реюз** | ❌ | ❌ |
+| Offline | **Mesh** | ❌ | ❌ |
+
+---
+
+# 👥 Команда
+
+## Основатели
+- **Алексей** — Visionary, Architecture
+- **[Ваше имя]** — CTO, Development
+- **[Имя]** — CPO, Product
+
+## Advisors
+- Privacy-эксперты
+- Open-source maintainers
+- Eco-activists
+
+## Community
+- 10+ контрибьюторов
+- Active Matrix room
+- GitHub organization
+
+---
+
+# 💵 Запрос финансирования
+
+## Seed Round: **$250,000**
+
+### Распределение

@@ -1,0 +1,36 @@
+{
+  "name": "MatrixSwarm",
+  "description": "Децентрализованная сеть приватного общения",
+  "repository": "https://github.com/matrixswarm/matrixswarm",
+  "logo": "https://raw.githubusercontent.com/matrixswarm/matrixswarm/main/docs/images/logo.png",
+  "keywords": ["matrix", "privacy", "decentralized", "self-hosted"],
+  "env": {
+    "SECRET_KEY": {
+      "description": "Секретный ключ для Flask",
+      "generator": "secret"
+    },
+    "FLASK_ENV": {
+      "description": "Окружение Flask",
+      "value": "production"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "hobby"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql",
+      "options": {
+        "version": "14"
+      }
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A unit of work to be processed by a swarm node",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique task identifier" },
+        "type": { "type": "string", "description": "Type of operation (generic, llm_7b, etc)" },
+        "payload": { "type": "object", "description": "Input data for the task" },
+        "priority": { "type": "integer", "description": "Priority level 1-10" },
+        "status": { "type": "string", "enum": ["pending", "running", "completed", "failed"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "assigned_node": { "type": "string", "description": "ID of the node processing this task" },
+        "result": { "type": "object", "description": "Output data after completion" },
+        "error": { "type": "string", "description": "Error message if failed" },
+        "attempts": { "type": "integer", "description": "Number of times this task was attempted" }
+      },
+      "required": ["id", "type", "status", "created_at"]
+    },
+    "Node": {
+      "title": "Node",
+      "description": "A compute node in the decentralized swarm",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique node identifier" },
+        "address": { "type": "string", "description": "Network address or IP" },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "ram_mb": { "type": "integer" },
+        "cpu_cores": { "type": "integer" },
+        "ai_capable": { "type": "boolean" },
+        "ai_tier": { "type": "string", "enum": ["none", "slm_1.5b", "slm_3b", "llm"] },
+        "load": { "type": "integer", "description": "Current CPU load percentage" },
+        "status": { "type": "string", "enum": ["online", "overheated", "offline"] },
+        "temperature": { "type": "integer", "description": "Current temperature in Celsius" },
+        "last_heartbeat": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "status", "last_heartbeat"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Collection of tasks in the swarm"
+    },
+    "/nodes/{nodeId}": {
+      "schema": "Node",
+      "description": "Registry of active and inactive nodes"
+    }
+  }
+}
