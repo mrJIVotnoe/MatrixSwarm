@@ -1,532 +1,152 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import path from "path";
 import cors from "cors";
-import morgan from "morgan";
 import { v4 as uuidv4 } from "uuid";
-import * as admin from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
-import { WebSocketServer, WebSocket } from "ws";
-import { createServer } from "http";
-import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
-// Initialize Firebase Admin
-admin.initializeApp();
-
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
-const authAdmin = getAuth();
-
-// Types
-interface Task {
-  id: string;
-  type: string;
-  payload: any;
-  priority: number;
-  status: "pending" | "running" | "completed" | "failed";
-  created_at: Timestamp;
-  updated_at: Timestamp;
-  assigned_node: string | null;
-  result: any;
-  error: string | null;
-  attempts: number;
-}
-
-interface Node {
-  id: string;
-  address: string;
-  capabilities: string[];
-  ram_mb: number;
-  cpu_cores: number;
-  ai_capable: boolean;
-  ai_tier: "none" | "slm_1.5b" | "slm_3b" | "llm";
-  load: number;
-  status: "online" | "overheated" | "offline";
-  last_heartbeat: Timestamp;
-  temperature: number;
-  token?: string;
-  trust_score: number;
-  benchmark?: {
-    cpu_score: number;
-    ram_score: number;
-    is_vm: boolean;
-    verified_at: Timestamp;
-  };
-  privacy_mode: "public" | "matrix" | "i2p";
-}
-
-const TASK_REQUIREMENTS: Record<string, { minRamMb: number; aiTier: string }> = {
-  generic: { minRamMb: 0, aiTier: "none" },
-  text_classification: { minRamMb: 1500, aiTier: "slm" },
-  speech_to_text: { minRamMb: 2000, aiTier: "slm" },
-  "llm_1.5b": { minRamMb: 2000, aiTier: "slm" },
-  "llm_3b": { minRamMb: 3500, aiTier: "slm" },
-  "llm_7b": { minRamMb: 5000, aiTier: "llm" },
-  "llm_8b": { minRamMb: 6000, aiTier: "llm" },
-  image_processing: { minRamMb: 2000, aiTier: "slm" },
-  video_transcode: { minRamMb: 3000, aiTier: "slm" },
-  file_storage: { minRamMb: 0, aiTier: "none" },
+// In-memory database for the Swarm Prototype
+const db = {
+  nodes: new Map<string, any>(),
+  tasks: new Map<string, any>()
 };
-
-// Cleanup intervals
-const NODE_TIMEOUT_MS = 30000; // 30 seconds
-const TASK_PRUNE_AGE_MS = 300000; // 5 minutes
-const TASK_WATCHDOG_TIMEOUT_MS = 120000; // 2 minutes
-
-setInterval(async () => {
-  try {
-    const now = Timestamp.now();
-    const thirtySecondsAgo = Timestamp.fromMillis(now.toMillis() - NODE_TIMEOUT_MS);
-    const fiveMinutesAgo = Timestamp.fromMillis(now.toMillis() - TASK_PRUNE_AGE_MS);
-    const twoMinutesAgo = Timestamp.fromMillis(now.toMillis() - TASK_WATCHDOG_TIMEOUT_MS);
-
-    // Cleanup stale nodes
-    const staleNodes = await db.collection("nodes")
-      .where("status", "!=", "offline")
-      .where("last_heartbeat", "<", thirtySecondsAgo)
-      .get();
-    
-    const batch = db.batch();
-    staleNodes.forEach(doc => {
-      const data = doc.data() as Node;
-      // Decrease trust score for unexpected offline
-      const newTrustScore = Math.max(0, (data.trust_score || 50) - 5);
-      batch.update(doc.ref, { 
-        status: "offline",
-        trust_score: newTrustScore
-      });
-    });
-
-    // Delete very old nodes
-    const veryOldNodes = await db.collection("nodes")
-      .where("last_heartbeat", "<", Timestamp.fromMillis(now.toMillis() - 3600000))
-      .get();
-    veryOldNodes.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // Re-queue tasks stuck in 'running' state for too long (Watchdog)
-    const stuckTasks = await db.collection("tasks")
-      .where("status", "==", "running")
-      .where("updated_at", "<", twoMinutesAgo)
-      .get();
-    
-    if (!stuckTasks.empty) {
-      console.log(`[WATCHDOG] Re-queued ${stuckTasks.size} stuck tasks.`);
-      stuckTasks.forEach(doc => {
-        batch.update(doc.ref, { 
-          status: "pending", 
-          assigned_node: null, 
-          updated_at: now 
-        });
-      });
-    }
-
-    // Prune old completed/failed tasks
-    const oldTasks = await db.collection("tasks")
-      .where("status", "in", ["completed", "failed"])
-      .where("created_at", "<", fiveMinutesAgo)
-      .get();
-    oldTasks.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
-    if (!stuckTasks.empty) broadcastStatus();
-  } catch (err) {
-    console.error("[SYSTEM] Cleanup error:", err);
-  }
-}, 10000);
-
-// WebSocket Broadcasting
-let wss: WebSocketServer;
-
-async function getSwarmStatus() {
-  const tasksSnapshot = await db.collection("tasks").get();
-  const nodesSnapshot = await db.collection("nodes").get();
-
-  const taskStats: any = { pending: 0, running: 0, completed: 0, failed: 0 };
-  tasksSnapshot.forEach(doc => {
-    const data = doc.data();
-    taskStats[data.status] = (taskStats[data.status] || 0) + 1;
-  });
-
-  const nodesByTier: any = { none: 0, "slm_1.5b": 0, "slm_3b": 0, llm: 0 };
-  let onlineNodes = 0;
-  let overheatedNodes = 0;
-
-  nodesSnapshot.forEach(doc => {
-    const data = doc.data();
-    if (data.status === "online") onlineNodes++;
-    if (data.status === "overheated") overheatedNodes++;
-    nodesByTier[data.ai_tier] = (nodesByTier[data.ai_tier] || 0) + 1;
-  });
-
-  return {
-    totalTasks: tasksSnapshot.size,
-    pendingTasks: taskStats.pending,
-    runningTasks: taskStats.running,
-    completedTasks: taskStats.completed,
-    failedTasks: taskStats.failed,
-    totalNodes: nodesSnapshot.size,
-    onlineNodes,
-    overheatedNodes,
-    nodesByAiTier: nodesByTier,
-  };
-}
-
-async function broadcastStatus() {
-  if (!wss) return;
-  try {
-    const status = await getSwarmStatus();
-    const message = JSON.stringify({ type: "SWARM_STATUS", data: status });
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
-  } catch (err) {
-    console.error("[WS] Broadcast error:", err);
-  }
-}
-
-function calculateAiTier(ramMb: number, aiCapable: boolean): "none" | "slm_1.5b" | "slm_3b" | "llm" {
-  if (!aiCapable || ramMb < 2000) return "none";
-  if (ramMb < 3500) return "slm_1.5b";
-  if (ramMb < 5000) return "slm_3b";
-  return "llm";
-}
-
-function canHandleTask(node: any, taskType: string): boolean {
-  const req = TASK_REQUIREMENTS[taskType] || TASK_REQUIREMENTS.generic;
-  if (node.ram_mb < req.minRamMb) return false;
-  
-  if (req.aiTier === "llm" && node.ai_tier !== "llm") return false;
-  if (req.aiTier === "slm" && !["slm_1.5b", "slm_3b", "llm"].includes(node.ai_tier)) return false;
-  
-  if (req.aiTier !== "none" && node.temperature > 45) return false;
-  
-  return true;
-}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(cors());
-  app.use(morgan("dev"));
   app.use(express.json());
 
-  // Auth Middleware
-  const verifyAuth = async (req: any, res: any, next: any) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Unauthorized: Missing token" });
-    }
-    const idToken = authHeader.split("Bearer ")[1];
-    try {
-      const decodedToken = await authAdmin.verifyIdToken(idToken);
-      req.user = decodedToken;
-      next();
-    } catch (err) {
-      res.status(401).json({ error: "Unauthorized: Invalid token" });
-    }
-  };
+  // --- API ROUTES ---
 
-  // Node Token Middleware
-  const verifyNodeToken = async (req: any, res: any, next: any) => {
-    const nodeId = req.params.nodeId || req.body.node_id;
-    const nodeToken = req.headers["x-node-token"];
+  // 1. Swarm Status
+  app.get("/api/v1/swarm/status", (req, res) => {
+    const nodes = Array.from(db.nodes.values());
+    const tasks = Array.from(db.tasks.values());
     
-    if (!nodeId || !nodeToken) {
-      return res.status(401).json({ error: "Unauthorized: Missing node credentials" });
-    }
-
-    try {
-      const nodeDoc = await db.collection("nodes").doc(nodeId).get();
-      if (!nodeDoc.exists || nodeDoc.data()?.token !== nodeToken) {
-        return res.status(401).json({ error: "Unauthorized: Invalid node token" });
-      }
-      next();
-    } catch (err) {
-      res.status(500).json({ error: "Auth check failed" });
-    }
-  };
-
-  // API Routes
-  const api = express.Router();
-
-  api.post("/task", verifyAuth, async (req, res) => {
-    const { type = "generic", payload = {}, priority = 5 } = req.body;
-    const taskId = uuidv4().slice(0, 12);
+    const nodesByAiTier = {
+      none: 0,
+      "slm_1.5b": 0,
+      "slm_3b": 0,
+      llm: 0
+    };
     
-    try {
-      const now = Timestamp.now();
-      await db.collection("tasks").doc(taskId).set({
+    nodes.forEach(n => {
+      if (n.power_rating === "llm") nodesByAiTier.llm++;
+      else if (n.power_rating === "slm_3b") nodesByAiTier["slm_3b"]++;
+      else if (n.power_rating === "slm_1.5b") nodesByAiTier["slm_1.5b"]++;
+      else nodesByAiTier.none++;
+    });
+
+    res.json({
+      totalTasks: tasks.length,
+      pendingTasks: tasks.filter(t => t.status === 'pending').length,
+      runningTasks: tasks.filter(t => t.status === 'assigned').length,
+      completedTasks: tasks.filter(t => t.status === 'completed').length,
+      failedTasks: tasks.filter(t => t.status === 'failed').length,
+      totalNodes: nodes.length,
+      onlineNodes: nodes.filter(n => n.status === 'online').length,
+      overheatedNodes: nodes.filter(n => n.status === 'overheated').length,
+      nodesByAiTier
+    });
+  });
+
+  // 1.5 Recent Tasks
+  app.get("/api/v1/tasks/recent", (req, res) => {
+    const tasks = Array.from(db.tasks.values()).slice(-20).reverse();
+    res.json(tasks);
+  });
+
+  // 2. Node Registration (The Symbiote connects here)
+  app.post("/api/v1/nodes/register", (req, res) => {
+    const id = uuidv4();
+    const token = uuidv4();
+    
+    const node = {
+      id,
+      address: req.ip || req.socket.remoteAddress || "unknown",
+      capabilities: req.body.capabilities || [],
+      ram_mb: req.body.ram_mb || 1024,
+      cpu_cores: req.body.cpu_cores || 1,
+      power_rating: req.body.power_rating || "unknown",
+      status: "online",
+      last_heartbeat: Date.now(),
+      trust_score: 50, // Initial trust score
+      token
+    };
+
+    db.nodes.set(id, node);
+    console.log(`[SWARM] New node registered: ${id} (${node.power_rating})`);
+    
+    res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
+  });
+
+  // 3. Node Heartbeat & Task Polling
+  app.post("/api/v1/nodes/:nodeId/heartbeat", (req, res) => {
+    const { nodeId } = req.params;
+    const node = db.nodes.get(nodeId);
+    
+    if (!node) {
+      return res.status(404).json({ error: "Node not found in the Swarm." });
+    }
+
+    node.last_heartbeat = Date.now();
+    node.status = "online";
+    db.nodes.set(nodeId, node);
+
+    // Simulate assigning a routing task randomly (20% chance per heartbeat)
+    let assignedTask = null;
+    if (Math.random() < 0.2) {
+      const taskId = uuidv4();
+      const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
+      
+      // Advanced ByeDPI strategies based on user's list
+      const strategies = [
+        { name: "split_host", params: "--split 1+s --auto=torst --drop-sack --no-domain --cache-ttl 1500" },
+        { name: "fake_sni", params: "--fake -1 --ttl 8 --tfo --no-domain" },
+        { name: "disorder_oob", params: "--disorder 3 --split 2+s --tlsrec 1+s --fake -1 --ttl 6 --auto=torst,redirect --tfo --cache-ttl 3600 --mod-http hcsmix --drop-sack --tls-sni tracker.opentrackr.org --timeout 5 --no-domain --def-ttl 8" },
+        { name: "udp_fake", params: "--proto=udp --pf=443 --tls-sni=www.youtube.com --fake-data=':\\xC2\\x00\\x00\\x00\\x01\\x14\\x2E\\xE3\\xE3\\x5F...' --udp-fake=25 --auto=torst --split=3 --oob=5 --tlsrec=2+s --disorder=2 --cache-ttl=7200 --timeout=10 --mod-http=hcsmix --tfo --no-domain --fake=-1 --ttl=8" },
+        { name: "tls_record_fragmentation", params: "--tlsrec 1 --oob 3 --timeout 7 --no-domain" },
+        { name: "http_mix", params: "-s1 -q1 -Y -Ar -s5 -o1+s -At -f-1 -r1+s -As -s1 -o1+s -s-1 -An" }
+      ];
+      
+      const selectedStrategy = strategies[Math.floor(Math.random() * strategies.length)];
+
+      assignedTask = {
         id: taskId,
-        type,
-        payload,
-        priority,
-        status: "pending",
-        created_at: now,
-        updated_at: now,
-        assigned_node: null,
-        attempts: 0
-      });
-      broadcastStatus();
-      res.status(201).json({ success: true, taskId });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to create task" });
+        type: "byedpi_routing",
+        target: targets[Math.floor(Math.random() * targets.length)],
+        strategy: selectedStrategy.name,
+        params: selectedStrategy.params
+      };
+      db.tasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
     }
+
+    res.json({ status: "acknowledged", task: assignedTask, trust_score: node.trust_score });
   });
 
-  api.get("/task/:taskId", async (req, res) => {
-    try {
-      const doc = await db.collection("tasks").doc(req.params.taskId).get();
-      if (!doc.exists) return res.status(404).json({ error: "Task not found" });
-      const data = doc.data();
-      if (data) {
-        data.created_at = data.created_at?.toDate().toISOString();
-        data.updated_at = data.updated_at?.toDate().toISOString();
-      }
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: "Database error" });
-    }
-  });
-
-  api.post("/node/register", async (req, res) => {
-    const { 
-      node_id, 
-      address, 
-      capabilities = ["generic"], 
-      ram_mb = 4000, 
-      cpu_cores = 4, 
-      ai_capable = false,
-      privacy_mode = "public"
-    } = req.body;
-    const id = node_id || uuidv4().slice(0, 8);
-    const token = uuidv4(); // Generate unique node token
-    const aiTier = calculateAiTier(ram_mb, ai_capable);
+  // 3.5 Task Completion
+  app.post("/api/v1/nodes/:nodeId/tasks/:taskId/complete", (req, res) => {
+    const { nodeId, taskId } = req.params;
+    const task = db.tasks.get(taskId);
+    const node = db.nodes.get(nodeId);
     
-    try {
-      const now = Timestamp.now();
-      await db.collection("nodes").doc(id).set({
-        id,
-        token, // Store token
-        address: address || req.ip,
-        capabilities,
-        ram_mb,
-        cpu_cores,
-        ai_capable,
-        ai_tier: aiTier,
-        load: 0,
-        status: "online",
-        temperature: 0,
-        last_heartbeat: now,
-        trust_score: 50, // Initial trust score
-        privacy_mode
-      }, { merge: true });
+    if (task && node) {
+      task.status = "completed";
+      db.tasks.set(taskId, task);
       
-      broadcastStatus();
-      res.status(201).json({ success: true, nodeId: id, aiTier, token });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to register node" });
+      // Increase trust score for successful routing
+      node.trust_score += 1;
+      db.nodes.set(nodeId, node);
     }
+    res.json({ status: "success", trust_score: node?.trust_score });
   });
 
-  api.post("/node/:nodeId/benchmark", verifyNodeToken, async (req, res) => {
-    const { cpu_score, ram_score, is_vm } = req.body;
-    try {
-      const now = Timestamp.now();
-      await db.collection("nodes").doc(req.params.nodeId).update({
-        benchmark: {
-          cpu_score,
-          ram_score,
-          is_vm,
-          verified_at: now
-        },
-        // Increase trust score after successful benchmark
-        trust_score: FieldValue.increment(10)
-      });
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Benchmark update failed" });
-    }
+  // 4. Get all nodes (For dashboard)
+  app.get("/api/v1/nodes", (req, res) => {
+    res.json(Array.from(db.nodes.values()));
   });
 
-  api.post("/node/:nodeId/heartbeat", verifyNodeToken, async (req, res) => {
-    const { load = 0, temperature = 0 } = req.body;
-    const status = temperature > 50 ? "overheated" : "online";
-    
-    try {
-      const docRef = db.collection("nodes").doc(req.params.nodeId);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Node not found" });
-
-      await docRef.update({
-        last_heartbeat: Timestamp.now(),
-        load,
-        temperature,
-        status
-      });
-      
-      broadcastStatus();
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Heartbeat failed" });
-    }
-  });
-
-  api.get("/node/:nodeId/task", verifyNodeToken, async (req, res) => {
-    try {
-      const nodeDoc = await db.collection("nodes").doc(req.params.nodeId).get();
-      if (!nodeDoc.exists) return res.status(404).json({ error: "Node not found" });
-      
-      const node = nodeDoc.data();
-      if (node?.status !== "online") return res.status(400).json({ error: `Node status: ${node?.status}` });
-      if (node?.temperature > 45) return res.status(400).json({ error: "Node overheated" });
-
-      // Find pending tasks
-      const tasksSnapshot = await db.collection("tasks")
-        .where("status", "==", "pending")
-        .get();
-      
-      // Sort in memory to avoid index requirement for composite query
-      const sortedTasks = tasksSnapshot.docs
-        .map(doc => doc.data())
-        .sort((a, b) => {
-          if (b.priority !== a.priority) return b.priority - a.priority;
-          return a.created_at.toMillis() - b.created_at.toMillis();
-        });
-      
-      let suitableTask = null;
-      for (const t of sortedTasks) {
-        if (canHandleTask(node, t.type)) {
-          suitableTask = t;
-          break;
-        }
-      }
-
-      if (!suitableTask) return res.json({ task: null });
-
-      // Assign task
-      await db.collection("tasks").doc(suitableTask.id).update({
-        status: "running",
-        assigned_node: node?.id,
-        attempts: FieldValue.increment(1),
-        updated_at: Timestamp.now()
-      });
-
-      broadcastStatus();
-      res.json({ task: suitableTask });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Task retrieval failed" });
-    }
-  });
-
-  api.post("/task/:taskId/complete", async (req, res) => {
-    try {
-      const taskRef = db.collection("tasks").doc(req.params.taskId);
-      const doc = await taskRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Task not found" });
-      
-      const data = doc.data();
-      await taskRef.update({
-        status: "completed",
-        result: req.body.result,
-        updated_at: Timestamp.now()
-      });
-      
-      const nodeId = data?.assigned_node;
-      if (nodeId) {
-        await db.collection("nodes").doc(nodeId).update({
-          load: FieldValue.increment(-20),
-          trust_score: FieldValue.increment(2) // Reward for successful completion
-        });
-      }
-      
-      broadcastStatus();
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Completion failed" });
-    }
-  });
-
-  api.post("/task/:taskId/fail", async (req, res) => {
-    try {
-      const taskRef = db.collection("tasks").doc(req.params.taskId);
-      const doc = await taskRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Task not found" });
-
-      const data = doc.data();
-      await taskRef.update({
-        status: "failed",
-        error: req.body.error || "Unknown error",
-        updated_at: Timestamp.now()
-      });
-
-      const nodeId = data?.assigned_node;
-      if (nodeId) {
-        await db.collection("nodes").doc(nodeId).update({
-          trust_score: FieldValue.increment(-5) // Penalty for failure
-        });
-      }
-
-      broadcastStatus();
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Failure report failed" });
-    }
-  });
-
-  api.get("/swarm/status", async (req, res) => {
-    try {
-      const status = await getSwarmStatus();
-      res.json(status);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Status retrieval failed" });
-    }
-  });
-
-  api.get("/nodes", async (req, res) => {
-    try {
-      const result = await db.collection("nodes").orderBy("last_heartbeat", "desc").get();
-      const nodes: any[] = [];
-      result.forEach(doc => {
-        const data = doc.data();
-        data.last_heartbeat = data.last_heartbeat?.toDate().toISOString();
-        nodes.push(data);
-      });
-      res.json(nodes);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch nodes" });
-    }
-  });
-
-  api.get("/tasks/recent", async (req, res) => {
-    try {
-      const result = await db.collection("tasks").orderBy("created_at", "desc").limit(10).get();
-      const tasks: any[] = [];
-      result.forEach(doc => {
-        const data = doc.data();
-        data.created_at = data.created_at?.toDate().toISOString();
-        data.updated_at = data.updated_at?.toDate().toISOString();
-        tasks.push(data);
-      });
-      res.json(tasks);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch recent tasks" });
-    }
-  });
-
-  app.use("/api/v1", api);
-
-  // Vite middleware for development
+  // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -534,27 +154,19 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static("dist"));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile("/app/applet/dist/index.html");
     });
   }
 
-  const server = createServer(app);
-  
-  // Setup WebSocket Server
-  wss = new WebSocketServer({ server });
-  wss.on("connection", (ws) => {
-    console.log("[WS] Client connected");
-    broadcastStatus(); // Send initial status
-    ws.on("close", () => console.log("[WS] Client disconnected"));
-  });
-
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[SWARM CORE] Server running on port ${PORT}`);
+  }).on('error', (err) => {
+    console.error('[SWARM CORE] Server failed to start:', err);
   });
 }
 
-startServer();
-
+startServer().catch(err => {
+  console.error('[SWARM CORE] Fatal error during startup:', err);
+});

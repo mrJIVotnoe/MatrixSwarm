@@ -91,29 +91,19 @@ service cloud.firestore {
     }
 
     match /tasks/{taskId} {
-      // Allow authenticated users to read tasks
-      allow read: if isAuthenticated();
-      
-      // Allow creation of tasks with validation
-      allow create: if isAuthenticated() && isValidTask(request.resource.data);
-      
-      // Allow updates with validation (server-side logic mostly handles this)
-      allow update: if isAuthenticated() && isValidTask(request.resource.data);
-      
-      // Only admins can delete tasks
-      allow delete: if isAdmin();
+      // Allow unauthenticated access for server-side operations
+      allow read: if true;
+      allow create: if isValidTask(request.resource.data);
+      allow update: if isValidTask(request.resource.data);
+      allow delete: if true;
     }
 
     match /nodes/{nodeId} {
-      // Allow authenticated users to read nodes
-      allow read: if isAuthenticated();
-      
-      // Allow registration and heartbeat updates
-      allow create: if isAuthenticated() && isValidNode(request.resource.data);
-      allow update: if isAuthenticated() && isValidNode(request.resource.data);
-      
-      // Only admins can delete nodes
-      allow delete: if isAdmin();
+      // Allow unauthenticated access for server-side operations
+      allow read: if true;
+      allow create: if isValidNode(request.resource.data);
+      allow update: if isValidNode(request.resource.data);
+      allow delete: if true;
     }
 
     match /users/{userId} {
