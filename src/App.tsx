@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SwarmSymbiote, SymbioteStatus } from './swarm/Symbiote';
 import { fetchSwarmStatus, fetchNodes, fetchRecentTasks, SwarmStatus } from './services/swarmService';
-import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock } from 'lucide-react';
+import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -12,6 +12,7 @@ function App() {
   const [swarmStats, setSwarmStats] = useState<SwarmStatus | null>(null);
   const [nodes, setNodes] = useState<any[]>([]);
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [commissarIntel, setCommissarIntel] = useState<Record<string, any>>({});
   const [trustScore, setTrustScore] = useState<number>(50);
   const [showCanon, setShowCanon] = useState(false);
   
@@ -54,6 +55,11 @@ function App() {
 
         const t = await fetchRecentTasks();
         setRecentTasks(t);
+
+        const intelRes = await fetch('/api/v1/commissar/intelligence');
+        if (intelRes.ok) {
+          setCommissarIntel(await intelRes.json());
+        }
       } catch (err) {
         // console.error(err);
       }
@@ -145,7 +151,7 @@ function App() {
               </div>
               <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
                 <Terminal className="w-4 h-4" />
-                ЛОКАЛЬНЫЙ УЗЕЛ (СИМБИОНТ)
+                ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)
               </h2>
               
               <div className="space-y-4 relative z-10">
@@ -244,52 +250,78 @@ function App() {
 
           </div>
 
-          {/* Middle Column: Node Map */}
-          <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex flex-col">
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-              <Server className="w-4 h-4" />
-              ТОПОЛОГИЯ ГРАЖДАН (NODES)
-            </h2>
-            <div className="flex-1 bg-neutral-950 border border-emerald-500/10 p-4 overflow-y-auto max-h-[500px]">
-              {nodes.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-emerald-600 text-xs">
-                  ОЖИДАНИЕ ДАННЫХ ОТ ЯДРА...
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {nodes.map(node => (
-                    <motion.div 
-                      key={node.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className={`p-3 border text-xs flex flex-col gap-2 ${
-                        node.status === 'online' 
-                          ? 'border-emerald-500/30 bg-emerald-500/5' 
-                          : 'border-red-500/30 bg-red-500/5'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-emerald-400 truncate" title={node.id}>
-                          {node.id.substring(0,6)}
-                        </span>
-                        {node.status === 'online' ? (
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981] animate-pulse" />
-                        ) : (
-                          <div className="w-2 h-2 rounded-full bg-red-500" />
-                        )}
-                      </div>
-                      <div className="text-emerald-600/70 flex justify-between">
-                        <span>{node.power_rating}</span>
-                        <span>T:{node.trust_score}</span>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+          {/* Middle Column: Node Map & Commissar Intel */}
+          <div className="space-y-6 flex flex-col">
+            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex flex-col flex-1">
+              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
+                <Server className="w-4 h-4" />
+                ТОПОЛОГИЯ ГРАЖДАН (NODES)
+              </h2>
+              <div className="flex-1 bg-neutral-950 border border-emerald-500/10 p-4 overflow-y-auto max-h-[300px]">
+                {nodes.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-emerald-600 text-xs">
+                    ОЖИДАНИЕ ДАННЫХ ОТ ЯДРА...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {nodes.map(node => (
+                      <motion.div 
+                        key={node.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`p-3 border text-xs flex flex-col gap-2 ${
+                          node.status === 'online' 
+                            ? 'border-emerald-500/30 bg-emerald-500/5' 
+                            : 'border-red-500/30 bg-red-500/5'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-emerald-400 truncate" title={node.id}>
+                            {node.id.substring(0,6)}
+                          </span>
+                          {node.status === 'online' ? (
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981] animate-pulse" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                          )}
+                        </div>
+                        <div className="text-emerald-600/70 flex justify-between">
+                          <span>{node.power_rating}</span>
+                          <span>T:{node.trust_score}</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="mt-4 text-xs text-emerald-600 flex gap-4">
-              <span className="flex items-center gap-1"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div> Online</span>
-              <span className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-full"></div> Offline/Overheated</span>
+
+            {/* Commissar Intelligence */}
+            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex-1">
+              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
+                <BrainCircuit className="w-4 h-4" />
+                ЛОГИКА КОМИССАРА (WAGGLE DANCE)
+              </h2>
+              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                {Object.keys(commissarIntel).length === 0 ? (
+                  <p className="text-xs text-emerald-600">Сбор телеметрии от E.S.C.A.P.E. клиентов...</p>
+                ) : (
+                  Object.entries(commissarIntel).map(([isp, data]: [string, any]) => (
+                    <div key={isp} className="text-xs border-l-2 border-emerald-500 pl-3 py-1 bg-neutral-950 p-2">
+                      <div className="flex justify-between text-emerald-400 mb-1">
+                        <span className="font-bold uppercase">{isp}</span>
+                        <span className="text-emerald-500">{(data.successRate * 100).toFixed(0)}% УСПЕХ</span>
+                      </div>
+                      <p className="text-emerald-600 truncate" title={data.strategy_name}>
+                        ОПТИМАЛЬНАЯ СТРАТЕГИЯ: <span className="text-emerald-300">{data.strategy_name}</span>
+                      </p>
+                      <p className="text-emerald-600/50 mt-1">
+                        Средняя задержка: {Math.round(data.avgLatency)}ms
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
@@ -315,7 +347,7 @@ function App() {
                         </span>
                       </div>
                       <p className="text-emerald-600 truncate" title={task.params}>
-                        {task.strategy}
+                        {task.strategy} <span className="opacity-50">({task.isp})</span>
                       </p>
                     </div>
                   ))

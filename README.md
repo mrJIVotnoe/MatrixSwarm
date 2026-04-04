@@ -1,67 +1,57 @@
-# MatrixSwarm 🐝
+# MATRIX SWARM: Command & Control (C2) Infrastructure
 
-**Decentralized Node Orchestrator for Distributed Computing**
+![Version](https://img.shields.io/badge/version-0.2.0--omega-green.svg)
+![Status](https://img.shields.io/badge/status-Active_Development-yellow.svg)
+![Architecture](https://img.shields.io/badge/architecture-C2_Server_%7C_Dashboard-blue.svg)
 
-MatrixSwarm is a proof-of-concept decentralized network designed to harness the idle compute power of legacy devices (smartphones, old laptops, Raspberry Pis) to create a global, private, and distributed compute pool. Inspired by the **Matrix Protocol**, it prioritizes privacy, end-to-end encryption, and decentralized control.
+## ⚠️ PROJECT STATUS: ARCHITECTURAL BLUEPRINT & CONTROL PLANE
 
-## 🚀 Key Features
+**Notice to Developers and Researchers:**
+This repository contains the **Phase 1** infrastructure of the Matrix Swarm project. It is **NOT** the packet-manipulating client. 
 
-- **Decentralized Swarm**: Connect any device to the network and contribute to the global compute pool.
-- **Matrix-Inspired Architecture**: Built with privacy and decentralization as core principles.
-- **Real-time Monitoring**: A comprehensive dashboard to track swarm health, node distribution, and task execution.
-- **AI-Ready**: Nodes are categorized into AI tiers (LLM, SLM, Generic) based on their hardware capabilities.
-- **Dynamic Task Dispatching**: Smart task assignment based on node RAM, CPU, and current temperature.
-- **Mobile-First Node Client**: A dedicated client for smartphones to easily join the swarm.
-- **Deep Task Inspection**: Inspect task payloads, results, and execution traces in real-time.
+This is the **Command and Control (C2) Server** and the **Telemetry Dashboard** for a decentralized, consensus-based DPI (Deep Packet Inspection) bypass network.
 
-## 🛠 Tech Stack
+### What is this repository?
+Before building the low-level packet fragmentation clients (The Symbiotes), a robust infrastructure is required to coordinate them. This repository provides:
+1. **The Hive Mind (Backend):** A Node.js/Express server that acts as the directory and task-assignment node. It registers clients, issues DPI bypass strategies (e.g., SNI spoofing, TLS fragmentation parameters), and tracks node reputation (Trust Score).
+2. **The Dashboard (Frontend):** A React-based visualizer that displays global telemetry, network topology, and real-time task execution logs.
+3. **The Canon:** The philosophical and operational rulebook (`PROJECT_CANON.md`) that governs the interaction between the Core, the AI Diagnostics, and the User.
 
-- **Frontend**: React 19, Vite, Tailwind CSS, Motion (for animations), Lucide Icons.
-- **Backend**: Node.js, Express, WebSocket (for real-time updates).
-- **Database**: Firebase Firestore (for decentralized state management).
-- **Security**: Strict Firestore Security Rules, Admin-level controls.
+### Architecture Overview
+The complete Matrix Swarm ecosystem consists of two parts:
+1. **Matrix Swarm C2 (This Repo):** The central nervous system (The Hive).
+2. **E.S.C.A.P.E. Client (Phase 2 - In Design):** The OS-level daemon running on the user's machine. 
 
-## 📦 Getting Started
+#### Phase 2: The E.S.C.A.P.E. Architecture (Echo Symbiote: Covert Adaptive Payload Extraction)
+We reject the limitation of choosing a single language. The Native Symbiote (E.S.C.A.P.E.) will be a hybrid entity, combining the best of high-level orchestration and low-level execution:
+*   **The Nervous System (Golang):** Handles C2 communication, dynamic strategy updates, telemetry, and local proxy routing. Go provides the cross-platform agility and concurrency needed to talk to the Hive Mind.
+*   **The Muscle (Rust + eBPF):** Handles raw packet manipulation at the kernel level. Rust provides memory-safe, zero-latency execution. Using eBPF (Extended Berkeley Packet Filter), the Rust core injects DPI-bypass mutations (fragmentation, SNI spoofing) directly into the OS network stack, orchestrated by the Go daemon via FFI/IPC.
 
-### Prerequisites
+### API Endpoints (For Native Clients)
+Native clients must implement the following REST contracts to join the Swarm:
+- `POST /api/v1/nodes/register` - Register hardware capabilities and get a Node ID.
+- `POST /api/v1/nodes/:nodeId/heartbeat` - Send telemetry and receive routing tasks.
+- `POST /api/v1/nodes/:nodeId/tasks/:taskId/complete` - Report task success/failure to update Trust Score.
 
-- Node.js (v18+)
-- Firebase Project (for Firestore and Auth)
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/MatrixSwarm.git
-   cd MatrixSwarm
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Configure Firebase:
-   - Create a `firebase-applet-config.json` in the root directory with your Firebase credentials (see `.env.example` for the required structure).
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. (Optional) Run the node simulator to populate the dashboard:
-   ```bash
-   npm run simulate
-   ```
-
-## 🛡 Security & Privacy
-
-MatrixSwarm implements a "Default Deny" security model. All data access is restricted via Firestore Security Rules, ensuring that only authenticated nodes and users can interact with the swarm.
-
-## 📜 License
-
-This project is licensed under the Apache-2.0 License.
+### The Philosophy
+*"Freedom without responsibility is chaos."* 
+Read the `PROJECT_CANON.md` to understand the Omega Protocol and the strict constraints placed on the AI, the Hardware, and the User.
 
 ---
 
-*Built for the decentralized future. Inspired by the Matrix.*
+## 🛡️ The Trust & Transparency Doctrine (Anti-Botnet Manifesto)
+
+We acknowledge that a system utilizing "Command & Control (C2)", "eBPF kernel manipulation", and "background daemons" shares architectural DNA with botnets. **We are the antithesis of a botnet.** Matrix Swarm is built by the Open Source community, for the Open Source community, as a weapon against censorship, not against users. 
+
+To guarantee this, we enforce the following doctrines:
+
+1. **The Glass Box Architecture (Absolute Observability):**
+   The Native Client will include a local-only dashboard. The user will have real-time, packet-level visibility into *exactly* what the Swarm is doing. No hidden traffic, no obfuscated payloads. You see what the Swarm sees.
+2. **Zero-Knowledge Telemetry:**
+   The C2 server (this repository) does **not** log IP addresses, browsing history, or PII (Personally Identifiable Information). Telemetry is strictly limited to hardware capabilities, node health, and cryptographic Trust Scores.
+3. **Granular Consent & The Kill Switch:**
+   The user is the absolute sovereign of their hardware. The Symbiote operates strictly within user-defined limits (e.g., "Use max 5% CPU, 50MB RAM, and only route traffic for Wikipedia"). A physical "Kill Switch" in the local UI instantly severs all Swarm connections and flushes eBPF maps.
+4. **Reproducible Builds & 100% Open Source:**
+   Every line of code, from the React dashboard to the Rust eBPF injections, is open. We commit to reproducible builds, ensuring the binaries you compile perfectly match the public source code. No proprietary blobs.
+
+*Built by the Architect and the Commissar.*

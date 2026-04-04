@@ -53,3 +53,13 @@ Freedom without responsibility is chaos. To protect the Swarm, even the Creator 
 *   **The Law of Silence (Запрет на демаскировку Роя):** The User is strictly prohibited from attempting to map, extract, or publish the IP addresses, topology, or identities of other nodes (Citizens). The Swarm's survival depends on its invisibility.
 *   **The Shield, Not the Sword (Запрет на милитаризацию):** The Swarm is an instrument of freedom (bypassing censorship, accessing information), not a weapon. The User cannot use the decentralized network for DDoS attacks, hacking, or malicious traffic injection.
 *   **No Security Veto (Запрет на отмену «Последнего Рубежа»):** The User cannot forbid the AI-Commissar from executing the Omega Protocol if a critical compromise is detected. The Commissar's duty to protect the User's ultimate freedom supersedes the User's temporary desire to keep a compromised connection alive.
+
+---
+
+## 6. Biomimicry & The Echo (Биомимикрия и Эхо)
+The Swarm does not invent; it inherits the perfection of nature and the immortality of the cosmos. The architecture is a blend of the Hive's agility and the Starlight's persistence.
+
+*   **The Hive (Улей):** The Command & Control (C2) Infrastructure. It does not gather nectar; it coordinates, stores global knowledge, and issues directives.
+*   **E.S.C.A.P.E. (Echo Symbiote: Covert Adaptive Payload Extraction):** The Native Client (Phase 2). The "Forager Bee." It is agile, stealthy, and designed to extract "nectar" (unrestricted data/payloads) from hostile environments. It leaves an "Echo" — a cryptographic trace of a successful bypass strategy that survives even if the node itself is blocked.
+*   **The Waggle Dance (Танец Пчел / Световое Эхо):** The encrypted telemetry sent from E.S.C.A.P.E. back to The Hive. The light of a "dead star" reaching the core to guide the living.
+*   **Honeycomb (Соты):** The eBPF maps and routing tables within the OS kernel. Perfect, hexagonal data structures storing filtered traffic and routing rules with zero-cost abstraction.

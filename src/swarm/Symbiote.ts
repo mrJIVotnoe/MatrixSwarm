@@ -13,6 +13,7 @@ export class SwarmSymbiote {
   public nodeId: string | null = null;
   public hardwareStats = { cores: 1, ram: 2 };
   public trustScore: number = 50;
+  public isp: string = "BrowserISP"; // Simulated ISP for web clients
 
   constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {}
 
@@ -76,7 +77,11 @@ export class SwarmSymbiote {
     setInterval(async () => {
       if (this.nodeId && this.status === "connected") {
         try {
-          const res = await fetch(`/api/v1/nodes/${this.nodeId}/heartbeat`, { method: 'POST' });
+          const res = await fetch(`/api/v1/nodes/${this.nodeId}/heartbeat`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isp: this.isp })
+          });
           const data = await res.json();
           
           if (data.trust_score !== undefined) {
@@ -97,6 +102,7 @@ export class SwarmSymbiote {
   private async handleTask(task: any) {
     this.onUpdate(this.status, `[BYEDPI] Получена задача: ${task.target}`);
     
+    const startTime = Date.now();
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Log the advanced strategy parameters
@@ -104,16 +110,26 @@ export class SwarmSymbiote {
     this.onUpdate(this.status, `> ${task.params}`);
     
     await new Promise(resolve => setTimeout(resolve, 2500));
+    const latency_ms = Date.now() - startTime;
+    const success = Math.random() > 0.1; // 90% success rate for browser node
     
     try {
-      const res = await fetch(`/api/v1/nodes/${this.nodeId}/tasks/${task.id}/complete`, { method: 'POST' });
+      const res = await fetch(`/api/v1/nodes/${this.nodeId}/tasks/${task.id}/complete`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success, latency_ms })
+      });
       const data = await res.json();
       
       if (data.trust_score !== undefined) {
         this.trustScore = data.trust_score;
       }
       
-      this.onUpdate(this.status, `[BYEDPI] Обход успешен. Репутация повышена: ${this.trustScore}`, this.trustScore);
+      if (success) {
+        this.onUpdate(this.status, `[BYEDPI] Обход успешен (${latency_ms}ms). Репутация повышена: ${this.trustScore}`, this.trustScore);
+      } else {
+        this.onUpdate(this.status, `[BYEDPI] Обход не удался. Репутация понижена: ${this.trustScore}`, this.trustScore);
+      }
     } catch (e) {
       this.onUpdate(this.status, `[BYEDPI] Ошибка при отправке отчета о выполнении задачи.`);
     }

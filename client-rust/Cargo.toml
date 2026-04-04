@@ -1,0 +1,13 @@
+[package]
+name = "escape_engine"
+version = "0.1.0"
+edition = "2021"
+description = "E.S.C.A.P.E. DPI Evasion Engine (The Muscle)"
+
+[lib]
+# 'cdylib' is required to compile a dynamic library (.so, .dll, .dylib) for Go to link against via CGO
+# 'rlib' allows it to be used as a standard Rust library as well
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc = "0.2"

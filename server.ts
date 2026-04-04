@@ -2,12 +2,11 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
+import { getDb } from "./src/db.js";
+import { Commissar } from "./src/commissar.js";
 
-// In-memory database for the Swarm Prototype
-const db = {
-  nodes: new Map<string, any>(),
-  tasks: new Map<string, any>()
-};
+// In-memory fallback for tasks (since they are ephemeral)
+const activeTasks = new Map<string, any>();
 
 async function startServer() {
   const app = express();
@@ -16,12 +15,15 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Initialize DB
+  const db = await getDb();
+
   // --- API ROUTES ---
 
   // 1. Swarm Status
-  app.get("/api/v1/swarm/status", (req, res) => {
-    const nodes = Array.from(db.nodes.values());
-    const tasks = Array.from(db.tasks.values());
+  app.get("/api/v1/swarm/status", async (req, res) => {
+    const nodes = await db.all('SELECT * FROM nodes');
+    const tasks = Array.from(activeTasks.values());
     
     const nodesByAiTier = {
       none: 0,
@@ -52,46 +54,56 @@ async function startServer() {
 
   // 1.5 Recent Tasks
   app.get("/api/v1/tasks/recent", (req, res) => {
-    const tasks = Array.from(db.tasks.values()).slice(-20).reverse();
+    const tasks = Array.from(activeTasks.values()).slice(-20).reverse();
     res.json(tasks);
   });
 
+  // 1.6 Commissar Intelligence (Best Strategies per ISP)
+  app.get("/api/v1/commissar/intelligence", async (req, res) => {
+    const bestStrategies = await Commissar.analyzeTelemetry();
+    res.json(Object.fromEntries(bestStrategies));
+  });
+
   // 2. Node Registration (The Symbiote connects here)
-  app.post("/api/v1/nodes/register", (req, res) => {
+  app.post("/api/v1/nodes/register", async (req, res) => {
     const id = uuidv4();
     const token = uuidv4();
     
     const node = {
       id,
       address: req.ip || req.socket.remoteAddress || "unknown",
-      capabilities: req.body.capabilities || [],
+      capabilities: JSON.stringify(req.body.capabilities || []),
       ram_mb: req.body.ram_mb || 1024,
       cpu_cores: req.body.cpu_cores || 1,
       power_rating: req.body.power_rating || "unknown",
       status: "online",
       last_heartbeat: Date.now(),
-      trust_score: 50, // Initial trust score
+      trust_score: 50,
       token
     };
 
-    db.nodes.set(id, node);
+    await db.run(`
+      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token]);
+
     console.log(`[SWARM] New node registered: ${id} (${node.power_rating})`);
     
     res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
   });
 
   // 3. Node Heartbeat & Task Polling
-  app.post("/api/v1/nodes/:nodeId/heartbeat", (req, res) => {
+  app.post("/api/v1/nodes/:nodeId/heartbeat", async (req, res) => {
     const { nodeId } = req.params;
-    const node = db.nodes.get(nodeId);
+    const isp = req.body.isp || "unknown_isp"; // Client should send their ISP
+
+    const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
     
     if (!node) {
       return res.status(404).json({ error: "Node not found in the Swarm." });
     }
 
-    node.last_heartbeat = Date.now();
-    node.status = "online";
-    db.nodes.set(nodeId, node);
+    await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
 
     // Simulate assigning a routing task randomly (20% chance per heartbeat)
     let assignedTask = null;
@@ -99,51 +111,57 @@ async function startServer() {
       const taskId = uuidv4();
       const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
       
-      // Advanced ByeDPI strategies based on user's list
-      const strategies = [
-        { name: "split_host", params: "--split 1+s --auto=torst --drop-sack --no-domain --cache-ttl 1500" },
-        { name: "fake_sni", params: "--fake -1 --ttl 8 --tfo --no-domain" },
-        { name: "disorder_oob", params: "--disorder 3 --split 2+s --tlsrec 1+s --fake -1 --ttl 6 --auto=torst,redirect --tfo --cache-ttl 3600 --mod-http hcsmix --drop-sack --tls-sni tracker.opentrackr.org --timeout 5 --no-domain --def-ttl 8" },
-        { name: "udp_fake", params: "--proto=udp --pf=443 --tls-sni=www.youtube.com --fake-data=':\\xC2\\x00\\x00\\x00\\x01\\x14\\x2E\\xE3\\xE3\\x5F...' --udp-fake=25 --auto=torst --split=3 --oob=5 --tlsrec=2+s --disorder=2 --cache-ttl=7200 --timeout=10 --mod-http=hcsmix --tfo --no-domain --fake=-1 --ttl=8" },
-        { name: "tls_record_fragmentation", params: "--tlsrec 1 --oob 3 --timeout 7 --no-domain" },
-        { name: "http_mix", params: "-s1 -q1 -Y -Ar -s5 -o1+s -At -f-1 -r1+s -As -s1 -o1+s -s-1 -An" }
-      ];
-      
-      const selectedStrategy = strategies[Math.floor(Math.random() * strategies.length)];
+      // Commissar decides the best strategy for this ISP
+      const selectedStrategy = await Commissar.getRecommendedStrategy(isp);
 
       assignedTask = {
         id: taskId,
         type: "byedpi_routing",
         target: targets[Math.floor(Math.random() * targets.length)],
         strategy: selectedStrategy.name,
-        params: selectedStrategy.params
+        params: selectedStrategy.params,
+        isp: isp
       };
-      db.tasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+      activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
     }
 
     res.json({ status: "acknowledged", task: assignedTask, trust_score: node.trust_score });
   });
 
-  // 3.5 Task Completion
-  app.post("/api/v1/nodes/:nodeId/tasks/:taskId/complete", (req, res) => {
+  // 3.5 Task Completion & Telemetry (The Waggle Dance)
+  app.post("/api/v1/nodes/:nodeId/tasks/:taskId/complete", async (req, res) => {
     const { nodeId, taskId } = req.params;
-    const task = db.tasks.get(taskId);
-    const node = db.nodes.get(nodeId);
+    const { success, latency_ms } = req.body;
+    
+    const task = activeTasks.get(taskId);
+    const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
     
     if (task && node) {
-      task.status = "completed";
-      db.tasks.set(taskId, task);
+      task.status = success ? "completed" : "failed";
+      activeTasks.set(taskId, task);
       
+      // Record Telemetry (The Echo / Waggle Dance)
+      await db.run(`
+        INSERT INTO telemetry (id, node_id, strategy_name, target, success, latency_ms, timestamp, isp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [uuidv4(), nodeId, task.strategy, task.target, success ? 1 : 0, latency_ms || 0, Date.now(), task.isp]);
+
       // Increase trust score for successful routing
-      node.trust_score += 1;
-      db.nodes.set(nodeId, node);
+      if (success) {
+        await db.run('UPDATE nodes SET trust_score = trust_score + 1 WHERE id = ?', [nodeId]);
+      } else {
+        await db.run('UPDATE nodes SET trust_score = trust_score - 1 WHERE id = ?', [nodeId]);
+      }
     }
-    res.json({ status: "success", trust_score: node?.trust_score });
+    
+    const updatedNode = await db.get('SELECT trust_score FROM nodes WHERE id = ?', [nodeId]);
+    res.json({ status: "success", trust_score: updatedNode?.trust_score });
   });
 
   // 4. Get all nodes (For dashboard)
-  app.get("/api/v1/nodes", (req, res) => {
-    res.json(Array.from(db.nodes.values()));
+  app.get("/api/v1/nodes", async (req, res) => {
+    const nodes = await db.all('SELECT * FROM nodes');
+    res.json(nodes);
   });
 
   // --- VITE MIDDLEWARE ---
