@@ -1,57 +1,91 @@
-# MATRIX SWARM: Command & Control (C2) Infrastructure
+# MATRIX_SWARM // Agent OS
 
-![Version](https://img.shields.io/badge/version-0.2.0--omega-green.svg)
+![Version](https://img.shields.io/badge/version-0.3.0--agent_os-green.svg)
 ![Status](https://img.shields.io/badge/status-Active_Development-yellow.svg)
-![Architecture](https://img.shields.io/badge/architecture-C2_Server_%7C_Dashboard-blue.svg)
+![Architecture](https://img.shields.io/badge/architecture-File_Driven_IPC-blue.svg)
 
-## ⚠️ PROJECT STATUS: ARCHITECTURAL BLUEPRINT & CONTROL PLANE
+## 🧠 What is MatrixSwarm?
 
-**Notice to Developers and Researchers:**
-This repository contains the **Phase 1** infrastructure of the Matrix Swarm project. It is **NOT** the packet-manipulating client. 
+MatrixSwarm is not just a framework; it is an **Agent OS** (Operating System for AI Agents). 
 
-This is the **Command and Control (C2) Server** and the **Telemetry Dashboard** for a decentralized, consensus-based DPI (Deep Packet Inspection) bypass network.
+We are building a decentralized, fault-tolerant execution environment where AI agents act as independent processes communicating through a unified file-system message bus. 
 
-### What is this repository?
-Before building the low-level packet fragmentation clients (The Symbiotes), a robust infrastructure is required to coordinate them. This repository provides:
-1. **The Hive Mind (Backend):** A Node.js/Express server that acts as the directory and task-assignment node. It registers clients, issues DPI bypass strategies (e.g., SNI spoofing, TLS fragmentation parameters), and tracks node reputation (Trust Score).
-2. **The Dashboard (Frontend):** A React-based visualizer that displays global telemetry, network topology, and real-time task execution logs.
-3. **The Canon:** The philosophical and operational rulebook (`PROJECT_CANON.md`) that governs the interaction between the Core, the AI Diagnostics, and the User.
+**The core philosophy:** Agents do not call each other's APIs. They observe the environment, react to files, and write results back. 
 
-### Architecture Overview
-The complete Matrix Swarm ecosystem consists of two parts:
-1. **Matrix Swarm C2 (This Repo):** The central nervous system (The Hive).
-2. **E.S.C.A.P.E. Client (Phase 2 - In Design):** The OS-level daemon running on the user's machine. 
-
-#### Phase 2: The E.S.C.A.P.E. Architecture (Echo Symbiote: Covert Adaptive Payload Extraction)
-We reject the limitation of choosing a single language. The Native Symbiote (E.S.C.A.P.E.) will be a hybrid entity, combining the best of high-level orchestration and low-level execution:
-*   **The Nervous System (Golang):** Handles C2 communication, dynamic strategy updates, telemetry, and local proxy routing. Go provides the cross-platform agility and concurrency needed to talk to the Hive Mind.
-*   **The Muscle (Rust + eBPF):** Handles raw packet manipulation at the kernel level. Rust provides memory-safe, zero-latency execution. Using eBPF (Extended Berkeley Packet Filter), the Rust core injects DPI-bypass mutations (fragmentation, SNI spoofing) directly into the OS network stack, orchestrated by the Go daemon via FFI/IPC.
-
-### API Endpoints (For Native Clients)
-Native clients must implement the following REST contracts to join the Swarm:
-- `POST /api/v1/nodes/register` - Register hardware capabilities and get a Node ID.
-- `POST /api/v1/nodes/:nodeId/heartbeat` - Send telemetry and receive routing tasks.
-- `POST /api/v1/nodes/:nodeId/tasks/:taskId/complete` - Report task success/failure to update Trust Score.
-
-### The Philosophy
-*"Freedom without responsibility is chaos."* 
-Read the `PROJECT_CANON.md` to understand the Omega Protocol and the strict constraints placed on the AI, the Hardware, and the User.
+### ⚡ Key Features
+* **File-Driven IPC:** The file system is the message bus. No complex message brokers (Kafka/RabbitMQ) required. It's transparent, easily debuggable, and persistent by default.
+* **Self-Healing (Fault Tolerance):** Agents monitor each other. If an agent crashes or hangs, the Swarm detects the absence of a heartbeat and resurrects it.
+* **Hot-Swapping:** You can replace an agent's logic (its "DNA") on the fly without stopping the system. The Swarm will gracefully restart the process.
+* **Actor Model:** True isolation. Agents only know about the tasks in the `/comm` directory, not about who created them.
 
 ---
 
-## 🛡️ The Trust & Transparency Doctrine (Anti-Botnet Manifesto)
+## 🚀 Quick Start (5-Minute Onboarding)
 
-We acknowledge that a system utilizing "Command & Control (C2)", "eBPF kernel manipulation", and "background daemons" shares architectural DNA with botnets. **We are the antithesis of a botnet.** Matrix Swarm is built by the Open Source community, for the Open Source community, as a weapon against censorship, not against users. 
+*Note: The system is currently in active architectural transition. The following represents the target state.*
 
-To guarantee this, we enforce the following doctrines:
+### 1. The Directory Structure (The Grid)
+When you initialize the Swarm, it creates three core directories:
+* `/agent/` - The source code and definitions (DNA) of your agents.
+* `/pod/` - The runtime environment. Where the actual agent processes live and execute.
+* `/comm/` - The Message Bus. Agents read tasks from here and write results back.
 
-1. **The Glass Box Architecture (Absolute Observability):**
-   The Native Client will include a local-only dashboard. The user will have real-time, packet-level visibility into *exactly* what the Swarm is doing. No hidden traffic, no obfuscated payloads. You see what the Swarm sees.
-2. **Zero-Knowledge Telemetry:**
-   The C2 server (this repository) does **not** log IP addresses, browsing history, or PII (Personally Identifiable Information). Telemetry is strictly limited to hardware capabilities, node health, and cryptographic Trust Scores.
-3. **Granular Consent & The Kill Switch:**
-   The user is the absolute sovereign of their hardware. The Symbiote operates strictly within user-defined limits (e.g., "Use max 5% CPU, 50MB RAM, and only route traffic for Wikipedia"). A physical "Kill Switch" in the local UI instantly severs all Swarm connections and flushes eBPF maps.
-4. **Reproducible Builds & 100% Open Source:**
-   Every line of code, from the React dashboard to the Rust eBPF injections, is open. We commit to reproducible builds, ensuring the binaries you compile perfectly match the public source code. No proprietary blobs.
+### 2. Hello, Agent! (Minimal Example)
+To create an agent, you simply drop a script into the `/agent/` directory.
 
-*Built by the Architect and the Commissar.*
+**Example: `agent/hello_agent.js`**
+```javascript
+// A simple agent that listens for 'greet' tasks
+const fs = require('fs');
+
+// The agent watches the /comm/ directory
+fs.watch('./comm', (eventType, filename) => {
+  if (filename.startsWith('task_greet_')) {
+    const task = JSON.parse(fs.readFileSync(`./comm/${filename}`));
+    
+    // Process the task
+    const result = { id: task.id, message: `Hello, ${task.payload.name}!` };
+    
+    // Write the result back to the bus
+    fs.writeFileSync(`./comm/result_${task.id}.json`, JSON.stringify(result));
+    
+    // Clean up the task
+    fs.unlinkSync(`./comm/${filename}`);
+  }
+});
+```
+
+### 3. Ignite the Swarm
+Start the core orchestrator (The Hive Mind):
+```bash
+npm run start
+```
+The orchestrator will automatically read `/agent/`, spawn the processes in `/pod/`, and monitor their health.
+
+---
+
+## 📖 The Canon (Architecture & Rules)
+
+To understand the deep mechanics, protocols, and constraints of the Swarm, you **must** read the [PROJECT_CANON.md](./PROJECT_CANON.md). 
+
+It covers:
+* The `.cmd` and `.json` file protocols.
+* How to prevent Race Conditions (Locking mechanisms).
+* The exact lifecycle of an Agent (Spawn -> Listen -> Act -> Report -> Die).
+
+---
+
+## 🎯 Use Cases (Why build this?)
+
+MatrixSwarm is designed for complex, multi-step AI orchestration where reliability is paramount:
+1. **AI Orchestration & Research:** Running multiple LLMs/SLMs that debate, verify, and synthesize data asynchronously.
+2. **Autonomous OS Agents:** Agents that monitor system health, manage files, or execute cron-like tasks based on complex environmental triggers.
+3. **Trading & Monitoring Bots:** Systems where components must be hot-swappable (e.g., updating a trading strategy without bringing down the data-ingestion agent).
+
+---
+
+## 🤝 Contributing & The Future
+
+We are moving towards a hybrid model (File-system + Memory Bus) to handle massive scaling while preserving the debuggability of the file-driven approach. 
+
+If you think in systems, love autonomous structures, and aren't afraid of complex concepts — welcome to the Swarm.

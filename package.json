@@ -10,6 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "start": "node server.ts",
+    "os": "tsx src/os/Orchestrator.ts",
     "simulate": "tsx swarm/node_simulator.ts"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "firebase": "^12.11.0",
     "firebase-admin": "^13.7.0",
     "lucide-react": "^0.546.0",
+    "matrix-js-sdk": "^41.3.0-rc.0",
     "morgan": "^1.10.1",
     "motion": "^12.38.0",
     "react": "^19.0.0",
