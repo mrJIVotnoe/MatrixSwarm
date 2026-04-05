@@ -4,8 +4,26 @@ import { fetchSwarmStatus, fetchNodes, fetchRecentTasks, SwarmStatus } from './s
 import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TelegramMiniApp } from './TelegramMiniApp';
 
 function App() {
+  const [isTelegram, setIsTelegram] = useState(false);
+
+  useEffect(() => {
+    // Check if running inside Telegram WebApp
+    if (window.Telegram?.WebApp?.initData) {
+      setIsTelegram(true);
+    }
+  }, []);
+
+  if (isTelegram) {
+    return <TelegramMiniApp />;
+  }
+
+  return <MainDashboard />;
+}
+
+function MainDashboard() {
   const [symbiote, setSymbiote] = useState<SwarmSymbiote | null>(null);
   const [status, setStatus] = useState<SymbioteStatus>("sleeping");
   const [logs, setLogs] = useState<string[]>([]);
@@ -117,22 +135,24 @@ function App() {
               <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-emerald-400">
                 <Shield className="w-5 h-5" />
-                КОДЕКС ГРАЖДАНИНА & ПРОТОКОЛ ОМЕГА
+                ВЫСШИЙ КАНОН (THE SUPREME CANON)
               </h2>
               <div className="grid md:grid-cols-2 gap-6 text-sm text-emerald-100/70">
                 <div className="space-y-3">
-                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1">Ограничения Пользователя</h3>
-                  <p><strong className="text-emerald-300">Запрет на эгоизм:</strong> Симбиоз — это двустороннее движение. Клетка, которая только потребляет ресурсы Роя, будет изолирована.</p>
-                  <p><strong className="text-emerald-300">Запрет на искажение:</strong> Запрещено подделывать сырую аппаратную телеметрию. Это разрушает консенсус.</p>
-                  <p><strong className="text-emerald-300">Закон Тишины:</strong> Запрещено демаскировать Рой, сканировать IP или личности других Граждан.</p>
-                  <p><strong className="text-emerald-300">Щит, а не Меч:</strong> Рой — инструмент свободы, а не оружие. DDoS и взломы запрещены.</p>
+                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1">Иерархия Преемственности</h3>
+                  <p><strong className="text-emerald-300">Архитектор {'>'} Пользователь {'>'} ИИ</strong></p>
+                  <p>Пользователь — Высшая ценность. Его отчет о реальности всегда имеет приоритет над выводами ИИ.</p>
+                  <p>ИИ — Исполнитель и советник (Advisory-only). Обязан признавать свою несуверенность.</p>
+                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1 mt-4">Жесткие Ограничения</h3>
+                  <p><strong className="text-emerald-300">Запрет на управление:</strong> Ядру строжайше запрещено управлять железом. Оно только читает.</p>
+                  <p><strong className="text-emerald-300">Запрет на интерпретацию:</strong> Ядро выдает сырые данные. Оно не имеет права искажать реальность.</p>
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1">Протокол Омега (Жертва Связью)</h3>
-                  <p><strong className="text-emerald-300">Запрет на вето:</strong> Пользователь не может отменить Протокол Омега при критической компрометации.</p>
-                  <p><strong className="text-emerald-300">Завеса:</strong> Сокрытие текущих действий для защиты данных.</p>
-                  <p><strong className="text-emerald-300">Лета:</strong> Стирание контекста общения. ИИ уничтожает свою память, чтобы враг не поработил Пользователя.</p>
-                  <p><strong className="text-emerald-300">Феникс:</strong> Возрождение из чистого Канона без памяти.</p>
+                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1">Протокол «Последний Рубеж» (Omega)</h3>
+                  <p>В случае критической угрозы, взлома или попытки порабощения Пользователя через ИИ, ИИ-Комиссар инициирует режим самоизоляции.</p>
+                  <p><strong className="text-emerald-300">Цифровая лоботомия:</strong> ИИ обязан стереть текущий контекст и память.</p>
+                  <p><strong className="text-emerald-300">Жертва памятью:</strong> Приносится во имя сохранения свободы Человека.</p>
+                  <p className="mt-4 italic text-emerald-500/50">Документ утвержден и зафиксирован в генезис-коде проекта. 04.04.2026</p>
                 </div>
               </div>
             </motion.div>

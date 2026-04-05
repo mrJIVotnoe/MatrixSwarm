@@ -4,9 +4,16 @@ import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "./src/db.js";
 import { Commissar } from "./src/commissar.js";
+import fs from 'fs';
+import path from 'path';
 
 // In-memory fallback for tasks (since they are ephemeral)
 const activeTasks = new Map<string, any>();
+const COMM_DIR = path.join(process.cwd(), 'comm');
+
+if (!fs.existsSync(COMM_DIR)) {
+  fs.mkdirSync(COMM_DIR, { recursive: true });
+}
 
 async function startServer() {
   const app = express();
@@ -164,6 +171,50 @@ async function startServer() {
     res.json(nodes);
   });
 
+  // 5. Telegram Mini App Integration (Bridge to /comm)
+  app.post("/api/v1/tma/register", (req, res) => {
+    const { telegramData, hardware } = req.body;
+    
+    // Drop task into /comm for telegram_tma_agent to process
+    const id = uuidv4().substring(0, 8);
+    const filename = `task_tma_register_${id}.json`;
+    const filePath = path.join(COMM_DIR, filename);
+    
+    fs.writeFileSync(filePath, JSON.stringify({
+      id,
+      type: 'tma_register',
+      issuer: 'express_server',
+      timestamp: Date.now(),
+      payload: {
+        telegramId: telegramData?.id || 'unknown',
+        username: telegramData?.username || 'anonymous',
+        hardware
+      }
+    }, null, 2));
+
+    // In a real system, we'd wait for the result file. 
+    // For this prototype, we'll return a pending status and let the client poll or just assume success.
+    res.json({ status: "processing", taskId: id, message: "Registration task queued in Swarm." });
+  });
+
+  app.post("/api/v1/tma/pulse", (req, res) => {
+    const { nodeId, status } = req.body;
+    
+    const id = uuidv4().substring(0, 8);
+    const filename = `task_tma_pulse_${id}.json`;
+    const filePath = path.join(COMM_DIR, filename);
+    
+    fs.writeFileSync(filePath, JSON.stringify({
+      id,
+      type: 'tma_pulse',
+      issuer: 'express_server',
+      timestamp: Date.now(),
+      payload: { nodeId, status }
+    }, null, 2));
+
+    res.json({ status: "acknowledged" });
+  });
+
   // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -172,9 +223,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static("dist"));
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile("/app/applet/dist/index.html");
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
