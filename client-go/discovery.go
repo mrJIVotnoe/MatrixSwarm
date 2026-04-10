@@ -170,9 +170,20 @@ func verifyPeer(addr, nodeID string, claimedScore float64) {
 			log.Printf("[E.S.C.A.P.E. Security] Node %s VERIFIED. TrustScore %.2f is authentic.", nodeID, claimedScore)
 			info.IsVerified = true
 		} else {
-			log.Printf("[E.S.C.A.P.E. Security] ATTACK DETECTED! Node %s failed verification. Dropping TrustScore to 0.", nodeID)
+			log.Printf("[E.S.C.A.P.E. Security] ATTACK DETECTED! Node %s failed verification. Dropping TrustScore to 0 and reporting to Hive.", nodeID)
 			info.TrustScore = 0
 			info.IsVerified = false
+			
+			// Anonymous Report to Hive
+			go func(maliciousID string) {
+				reportData := map[string]string{
+					"targetNodeId": maliciousID,
+					"reason":       "Failed mDNS verification (TrustScore spoofing)",
+				}
+				jsonData, _ := json.Marshal(reportData)
+				url := fmt.Sprintf("%s/api/v1/nodes/%s/report", C2_URL, nodeID, maliciousID)
+				http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+			}(nodeID)
 		}
 		peerStore.peers[addr] = info
 	}

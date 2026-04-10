@@ -5,6 +5,7 @@ import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Ser
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TelegramMiniApp } from './TelegramMiniApp';
+import { Leaderboard } from './components/Leaderboard';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -268,6 +269,8 @@ function MainDashboard() {
               </div>
             </div>
 
+            {/* Global Leaderboard */}
+            <Leaderboard />
           </div>
 
           {/* Middle Column: Node Map & Commissar Intel */}

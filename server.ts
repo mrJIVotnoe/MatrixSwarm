@@ -90,7 +90,7 @@ async function startServer() {
 
   // 1. Swarm Status
   app.get("/api/v1/swarm/status", async (req, res) => {
-    const nodes = await db.all('SELECT * FROM nodes');
+    const nodes = await db.all('SELECT * FROM nodes WHERE is_banned = 0');
     const tasks = Array.from(activeTasks.values());
     
     const nodesByAiTier = {
@@ -132,6 +132,18 @@ async function startServer() {
     res.json(Object.fromEntries(bestStrategies));
   });
 
+  // 1.7 Global Leaderboard (Top 10 Nodes)
+  app.get("/api/v1/swarm/leaderboard", async (req, res) => {
+    const topNodes = await db.all(`
+      SELECT id, power_rating, trust_score, status 
+      FROM nodes 
+      WHERE is_banned = 0 
+      ORDER BY trust_score DESC 
+      LIMIT 10
+    `);
+    res.json(topNodes);
+  });
+
   // 2. Node Registration (The Symbiote connects here)
   app.post("/api/v1/nodes/register", async (req, res) => {
     const id = uuidv4();
@@ -169,6 +181,10 @@ async function startServer() {
     
     if (!node) {
       return res.status(404).json({ error: "Node not found in the Swarm." });
+    }
+
+    if (node.is_banned) {
+      return res.status(403).json({ error: "This node has been banned from the Hive for malicious activity." });
     }
 
     await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
@@ -240,8 +256,33 @@ async function startServer() {
 
   // 4. Get all nodes (For dashboard)
   app.get("/api/v1/nodes", async (req, res) => {
-    const nodes = await db.all('SELECT * FROM nodes');
+    const nodes = await db.all('SELECT * FROM nodes WHERE is_banned = 0');
     res.json(nodes);
+  });
+
+  // 4.5 Report Malicious Node
+  app.post("/api/v1/nodes/:nodeId/report", async (req, res) => {
+    const { nodeId } = req.params;
+    const { targetNodeId, reason } = req.body;
+
+    console.log(`[HIVE] Node ${nodeId} reported node ${targetNodeId} for: ${reason}`);
+
+    // Anonymous reporting logic: 
+    // If a node is reported, we decrease its trust score. 
+    // If it falls below a threshold, or if multiple nodes report it, we ban it.
+    const targetNode = await db.get('SELECT * FROM nodes WHERE id = ?', [targetNodeId]);
+    
+    if (targetNode) {
+      await db.run('UPDATE nodes SET trust_score = trust_score - 10 WHERE id = ?', [targetNodeId]);
+      
+      const updatedNode = await db.get('SELECT trust_score FROM nodes WHERE id = ?', [targetNodeId]);
+      if (updatedNode.trust_score <= 0) {
+        await db.run('UPDATE nodes SET is_banned = 1, status = ? WHERE id = ?', ['banned', targetNodeId]);
+        console.log(`[HIVE] Node ${targetNodeId} has been GLOBALLY BANNED due to low trust score.`);
+      }
+    }
+
+    res.json({ status: "reported", message: "The Hive will investigate." });
   });
 
   // 5. Telegram Mini App Integration (Bridge to /comm)

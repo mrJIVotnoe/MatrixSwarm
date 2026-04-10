@@ -29,7 +29,8 @@ async function initDb(db: Database) {
       status TEXT,
       last_heartbeat INTEGER,
       trust_score INTEGER,
-      token TEXT
+      token TEXT,
+      is_banned INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS strategies (
