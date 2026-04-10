@@ -6,10 +6,29 @@ import { getDb } from "./src/db.js";
 import { Commissar } from "./src/commissar.js";
 import fs from 'fs';
 import path from 'path';
+import { WebSocketServer, WebSocket } from 'ws';
+import { createServer } from 'http';
+import { MatrixService } from "./src/services/matrixService.js";
 
 // In-memory fallback for tasks (since they are ephemeral)
 const activeTasks = new Map<string, any>();
+const connectedNodes = new Map<string, WebSocket>();
 const COMM_DIR = path.join(process.cwd(), 'comm');
+
+let matrixEcho: MatrixService | null = null;
+
+if (process.env.MATRIX_BASE_URL && process.env.MATRIX_ACCESS_TOKEN && process.env.MATRIX_ROOM_ID) {
+  matrixEcho = new MatrixService(
+    process.env.MATRIX_BASE_URL,
+    process.env.MATRIX_ACCESS_TOKEN,
+    process.env.MATRIX_ROOM_ID,
+    process.env.MATRIX_USER_ID,
+    process.env.SWARM_ENCRYPTION_KEY
+  );
+  matrixEcho.start().catch(err => console.error("[HIVE] Matrix Echo failed to start:", err));
+} else {
+  console.warn("[HIVE] Matrix credentials missing. The Echo protocol will be simulated locally.");
+}
 
 if (!fs.existsSync(COMM_DIR)) {
   fs.mkdirSync(COMM_DIR, { recursive: true });
@@ -17,10 +36,52 @@ if (!fs.existsSync(COMM_DIR)) {
 
 async function startServer() {
   const app = express();
+  const server = createServer(app);
+  const wss = new WebSocketServer({ server });
   const PORT = 3000;
 
   app.use(cors());
   app.use(express.json());
+
+  // --- WEBSOCKET LOGIC ---
+  wss.on('connection', (ws) => {
+    let nodeId: string | null = null;
+
+    ws.on('message', async (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        if (data.type === 'auth') {
+          nodeId = data.nodeId;
+          if (nodeId) {
+            connectedNodes.set(nodeId, ws);
+            console.log(`[HIVE] Node ${nodeId} connected via WebSocket`);
+            ws.send(JSON.stringify({ type: 'auth_success', message: 'Connected to the Hive' }));
+          }
+        }
+
+        if (data.type === 'pulse' && nodeId) {
+          // Update last heartbeat in DB
+          const db = await getDb();
+          await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
+        }
+
+        if (data.type === 'task_complete' && nodeId) {
+          // Handle task completion via WS
+          // (Logic similar to the POST route)
+        }
+      } catch (e) {
+        console.error('[HIVE] WS Message Error:', e);
+      }
+    });
+
+    ws.on('close', () => {
+      if (nodeId) {
+        connectedNodes.delete(nodeId);
+        console.log(`[HIVE] Node ${nodeId} disconnected`);
+      }
+    });
+  });
 
   // Initialize DB
   const db = await getDb();
@@ -153,6 +214,18 @@ async function startServer() {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [uuidv4(), nodeId, task.strategy, task.target, success ? 1 : 0, latency_ms || 0, Date.now(), task.isp]);
 
+      // Broadcast to Matrix (The Echo)
+      if (matrixEcho) {
+        matrixEcho.broadcastEcho({
+          type: "echo_telemetry",
+          isp: task.isp,
+          strategy: task.strategy,
+          target: task.target,
+          success: !!success,
+          timestamp: Date.now()
+        }).catch(e => console.error("[HIVE] Matrix broadcast failed"));
+      }
+
       // Increase trust score for successful routing
       if (success) {
         await db.run('UPDATE nodes SET trust_score = trust_score + 1 WHERE id = ?', [nodeId]);
@@ -230,7 +303,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`[SWARM CORE] Server running on port ${PORT}`);
   }).on('error', (err) => {
     console.error('[SWARM CORE] Server failed to start:', err);

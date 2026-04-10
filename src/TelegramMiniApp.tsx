@@ -20,6 +20,8 @@ export function TelegramMiniApp() {
   const [trustScore, setTrustScore] = useState(0);
   const [tasksCompleted, setTasksCompleted] = useState(0);
   const [lastProbe, setLastProbe] = useState<ProbeResult | null>(null);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [matrixStatus, setMatrixStatus] = useState<'offline' | 'connecting' | 'online'>('offline');
 
   useEffect(() => {
     // Initialize Telegram WebApp
@@ -32,6 +34,34 @@ export function TelegramMiniApp() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (status === 'active' && nodeId && !ws) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const socket = new WebSocket(`${protocol}//${window.location.host}`);
+      
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ type: 'auth', nodeId }));
+        setWs(socket);
+        setMatrixStatus('connecting'); // Simulate Matrix connection via Hive bridge
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('[TMA_WS] Received:', data);
+        if (data.type === 'auth_success') {
+          setMatrixStatus('online');
+        }
+      };
+
+      socket.onclose = () => {
+        setWs(null);
+        // Reconnect logic could go here
+      };
+
+      return () => socket.close();
+    }
+  }, [status, nodeId, ws]);
 
   const handleJoinSwarm = async () => {
     setStatus('registering');
@@ -61,8 +91,7 @@ export function TelegramMiniApp() {
         setTrustScore(calculateInitialTrustScore(hardware));
         setStatus('active');
         
-        // Start pulse and diagnostics
-        setInterval(sendPulse, 10000);
+        // Start diagnostics
         setInterval(runDiagnostic, 15000);
       }, 1500);
 
@@ -84,18 +113,16 @@ export function TelegramMiniApp() {
     if (result.success) {
       setTasksCompleted(prev => prev + 1);
       setTrustScore(prev => Math.min(100, prev + 1));
+      
+      // Report via WS if available
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'pulse', nodeId }));
+      }
     }
   };
 
   const sendPulse = async () => {
-    if (!nodeId) return;
-    try {
-      await fetch('/api/v1/tma/pulse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, status: 'online' })
-      });
-    } catch (e) {}
+    // WS handles pulse now
   };
 
   return (
@@ -171,6 +198,12 @@ export function TelegramMiniApp() {
               <div className="flex justify-between">
                 <span className="text-emerald-600">ВЫПОЛНЕНО ЗАДАЧ:</span>
                 <span className="text-emerald-400">{tasksCompleted}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-600">MATRIX ECHO:</span>
+                <span className={`font-bold ${matrixStatus === 'online' ? 'text-emerald-400' : 'text-amber-500'}`}>
+                  {matrixStatus.toUpperCase()}
+                </span>
               </div>
             </div>
 
