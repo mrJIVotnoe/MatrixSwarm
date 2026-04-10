@@ -33,16 +33,27 @@ export class MatrixService {
 
   private encrypt(text: string): string {
     if (!this.swarmKey) return text;
-    return CryptoJS.AES.encrypt(text, this.swarmKey).toString();
+    const key = CryptoJS.SHA256(this.swarmKey);
+    const iv = CryptoJS.lib.WordArray.random(16);
+    const encrypted = CryptoJS.AES.encrypt(text, key, { iv: iv });
+    // Format: iv_hex:ciphertext_base64
+    return iv.toString() + ":" + encrypted.toString();
   }
 
-  private decrypt(ciphertext: string): string {
-    if (!this.swarmKey) return ciphertext;
+  private decrypt(ciphertextWithIv: string): string {
+    if (!this.swarmKey) return ciphertextWithIv;
     try {
-      const bytes = CryptoJS.AES.decrypt(ciphertext, this.swarmKey);
+      const parts = ciphertextWithIv.split(":");
+      if (parts.length !== 2) return "";
+      
+      const iv = CryptoJS.enc.Hex.parse(parts[0]);
+      const ciphertext = parts[1];
+      const key = CryptoJS.SHA256(this.swarmKey);
+      
+      const bytes = CryptoJS.AES.decrypt(ciphertext, key, { iv: iv });
       return bytes.toString(CryptoJS.enc.Utf8);
     } catch (e) {
-      console.error("[MATRIX_ECHO] Decryption failed. Invalid Swarm Key?");
+      console.error("[MATRIX_ECHO] Decryption failed. Invalid Swarm Key or format?");
       return "";
     }
   }
