@@ -23,14 +23,20 @@ func StartGUI() {
 	statsLabel := widget.NewLabel("Bypassed: 0 | Saved: 0 KB")
 	statsLabel.Alignment = fyne.TextAlignCenter
 
-	// Update stats periodically
+	leaderLabel := widget.NewLabel("Leader: Searching...")
+	leaderLabel.Alignment = fyne.TextAlignCenter
+
+	// Update stats and leader status periodically
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
 			stats.RLock()
-			text := fmt.Sprintf("Bypassed: %d | Saved: %d KB", stats.EvasionSuccesses, stats.DataSavedBytes/1024)
+			statsText := fmt.Sprintf("Bypassed: %d | Saved: %d KB", stats.EvasionSuccesses, stats.DataSavedBytes/1024)
 			stats.RUnlock()
-			statsLabel.SetText(text)
+			statsLabel.SetText(statsText)
+
+			leaderText := fmt.Sprintf("Leader: %s | Trust: %.1f", localLeader, trustScore)
+			leaderLabel.SetText(leaderText)
 		}
 	}()
 
@@ -79,6 +85,7 @@ func StartGUI() {
 		widget.NewLabelWithStyle("SWARM CORE", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
 		statusLabel,
 		statsLabel,
+		leaderLabel,
 		container.NewCenter(toggleBtn),
 		container.NewCenter(updateBtn),
 		widget.NewHyperlink("View Roadmap", nil),

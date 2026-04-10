@@ -79,7 +79,10 @@ var (
 	dohResolver  *DoHResolver
 	proxyEnabled = true
 	swarmPublicKey = "swarm-master-public-key-placeholder"
-	stats        = struct {
+	trustScore     = 50.0 // Initial trust score
+	isLeader       = false
+	localLeader    = ""
+	stats          = struct {
 		sync.RWMutex
 		TotalRequests    int64
 		EvasionSuccesses int64
@@ -440,6 +443,12 @@ func startSocks5Proxy() {
 				stats.DataSavedBytes += 1024 // Simulated overhead saved per bypass
 				stats.Unlock()
 
+				// Increase TrustScore on success
+				trustScore += 0.1
+				if trustScore > 100 {
+					trustScore = 100
+				}
+
 				// Hand over to Rust Engine if it's a TCP connection
 				if tcpConn, ok := conn.(*net.TCPConn); ok {
 					file, err := tcpConn.File()
@@ -449,12 +458,15 @@ func startSocks5Proxy() {
 							log.Printf("[E.S.C.A.P.E. Proxy] Engine error: %v. Attempting Mesh Routing...", err)
 							
 							// Mesh Routing Fallback: If local evasion fails, try routing through a peer
-							peers := GetPeers()
-							if len(peers) > 0 {
-								peer := peers[rand.Intn(len(peers))]
-								log.Printf("[E.S.C.A.P.E. Mesh] Routing traffic for %s through peer %s", host, peer)
+							if localLeader != "" && localLeader != "Self" {
+								log.Printf("[E.S.C.A.P.E. Mesh] Routing traffic for %s through elected Leader: %s", host, localLeader)
 								// In real app, we'd wrap the connection in a SOCKS5/HTTP tunnel to the peer
-								// For demo, we just log the intent
+							} else {
+								peers := GetPeers()
+								if len(peers) > 0 {
+									peer := peers[rand.Intn(len(peers))]
+									log.Printf("[E.S.C.A.P.E. Mesh] Routing traffic for %s through random peer %s", host, peer)
+								}
 							}
 						}
 						file.Close() 
