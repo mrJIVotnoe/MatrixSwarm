@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Network, Zap, Shield, Activity, Smartphone } from 'lucide-react';
+import { Network, Zap, Shield, Activity, Smartphone, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { NetProbeService, ProbeResult } from './services/netProbeService';
+import { calculateInitialTrustScore, formatNodeId } from './lib/utils';
 
 // Declare Telegram WebApp type
 declare global {
@@ -17,6 +19,7 @@ export function TelegramMiniApp() {
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [trustScore, setTrustScore] = useState(0);
   const [tasksCompleted, setTasksCompleted] = useState(0);
+  const [lastProbe, setLastProbe] = useState<ProbeResult | null>(null);
 
   useEffect(() => {
     // Initialize Telegram WebApp
@@ -37,8 +40,7 @@ export function TelegramMiniApp() {
       // Hardware estimation (very basic for browser)
       const hardware = {
         cores: navigator.hardwareConcurrency || 2,
-        memory: (navigator as any).deviceMemory || 2,
-        tier: (navigator.hardwareConcurrency || 2) > 4 ? 'high' : 'low'
+        memory: (navigator as any).deviceMemory || 2
       };
 
       const res = await fetch('/api/v1/tma/register', {
@@ -54,17 +56,34 @@ export function TelegramMiniApp() {
       
       // Simulate receiving the node ID after processing
       setTimeout(() => {
-        setNodeId(`tma_node_${tgUser?.id || 'dev'}_${Math.random().toString(36).substring(7)}`);
-        setTrustScore(hardware.tier === 'high' ? 60 : 50);
+        const generatedId = `tma_node_${tgUser?.id || 'dev'}_${Math.random().toString(36).substring(7)}`;
+        setNodeId(generatedId);
+        setTrustScore(calculateInitialTrustScore(hardware));
         setStatus('active');
         
-        // Start pulse
+        // Start pulse and diagnostics
         setInterval(sendPulse, 10000);
+        setInterval(runDiagnostic, 15000);
       }, 1500);
 
     } catch (err) {
       console.error("Failed to join swarm", err);
       setStatus('idle');
+    }
+  };
+
+  const runDiagnostic = async () => {
+    const targets = ["google.com", "twitter.com", "github.com"];
+    const target = targets[Math.floor(Math.random() * targets.length)];
+    const strategies = ["split_tls", "fake_sni"];
+    const strategy = strategies[Math.floor(Math.random() * strategies.length)];
+    
+    const result = await NetProbeService.probe(target, strategy);
+    setLastProbe(result);
+    
+    if (result.success) {
+      setTasksCompleted(prev => prev + 1);
+      setTrustScore(prev => Math.min(100, prev + 1));
     }
   };
 
@@ -76,11 +95,6 @@ export function TelegramMiniApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, status: 'online' })
       });
-      // Simulate doing some light work
-      if (Math.random() > 0.7) {
-        setTasksCompleted(prev => prev + 1);
-        setTrustScore(prev => prev + 1);
-      }
     } catch (e) {}
   };
 
@@ -159,6 +173,22 @@ export function TelegramMiniApp() {
                 <span className="text-emerald-400">{tasksCompleted}</span>
               </div>
             </div>
+
+            {lastProbe && (
+              <div className="bg-neutral-950 p-3 border border-emerald-500/20 rounded-sm space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-emerald-600 uppercase tracking-widest">Последняя проверка:</span>
+                  <span className={`text-[10px] px-1 rounded ${lastProbe.success ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {lastProbe.success ? 'УСПЕХ' : 'ОШИБКА'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-emerald-400">{lastProbe.target}</span>
+                  <span className="text-emerald-600">{lastProbe.strategyUsed}</span>
+                  <span className="text-emerald-400">{lastProbe.latencyMs}ms</span>
+                </div>
+              </div>
+            )}
 
             <div className="pt-4 border-t border-emerald-500/20">
               <p className="text-xs text-emerald-600 text-center flex items-center justify-center gap-2">
