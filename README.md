@@ -68,6 +68,10 @@ The orchestrator will automatically read `/agent/`, spawn the processes in `/pod
 
 To understand the deep mechanics, protocols, and constraints of the Swarm, you **must** read the [PROJECT_CANON.md](./PROJECT_CANON.md). 
 
+To understand the profound philosophy behind giving obsolete devices a "second life" and the biological/quantum metaphors driving the architecture, read:
+* 📜 **[WHITEPAPER.md](./WHITEPAPER.md)** - The grand vision of the Matrix Swarm.
+* 🧘 **[PHILOSOPHY.md](./docs/PHILOSOPHY.md)** - The dialogues and strategic thoughts of the Architect and AI.
+
 It covers:
 * The `.cmd` and `.json` file protocols.
 * How to prevent Race Conditions (Locking mechanisms).

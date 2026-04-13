@@ -17,9 +17,20 @@ interface Node {
   };
   privacy_mode: "public" | "matrix" | "i2p";
   is_frozen?: number;
+  capabilities?: string; // JSON string
 }
 
 export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentNodeId?: string }> = ({ nodes, isMagistrate, currentNodeId }) => {
+  const parseManifest = (capabilitiesStr?: string) => {
+    if (!capabilitiesStr) return null;
+    try {
+      const parsed = JSON.parse(capabilitiesStr);
+      return parsed.manifest || null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const handleFreeze = async (nodeId: string) => {
     if (!currentNodeId) return;
     try {
@@ -115,6 +126,27 @@ export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentN
                   <span className={`text-[8px] ${node.temperature > 45 ? 'text-red-400' : 'text-gray-400'}`}>{node.temperature}°C</span>
                 </div>
               </div>
+
+              {/* Manifest of Armament */}
+              {(() => {
+                const manifest = parseManifest(node.capabilities);
+                if (!manifest) return null;
+                return (
+                  <div className="mt-2 mb-2 p-1 border border-purple-900/20 bg-purple-900/5 rounded-sm">
+                    <p className="text-[6px] text-purple-400 mb-1 uppercase tracking-widest">Manifest of Armament</p>
+                    <div className="grid grid-cols-2 gap-1 text-[7px] text-gray-400">
+                      <div>ROM: <span className="text-cyan-400">{manifest.storage_gb || 0} GB</span></div>
+                      <div>BATTERY: <span className={manifest.battery_health === 'good' ? 'text-green-400' : 'text-yellow-400'}>{manifest.battery_health || 'UNKNOWN'}</span></div>
+                      {manifest.sensors && manifest.sensors.length > 0 && (
+                        <div className="col-span-2">SENSORS: <span className="text-gray-300">{manifest.sensors.join(', ')}</span></div>
+                      )}
+                      {manifest.effectors && manifest.effectors.length > 0 && (
+                        <div className="col-span-2">EFFECTORS: <span className="text-gray-300">{manifest.effectors.join(', ')}</span></div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {node.benchmark && (
                 <div className="mt-2 pt-2 border-t border-cyan-900/10 flex justify-between items-center text-[7px] uppercase tracking-widest text-cyan-900">

@@ -10,6 +10,8 @@ import { MagistrateCouncil } from './components/MagistrateCouncil';
 import { GovernanceHistory } from './components/GovernanceHistory';
 import { NodeList } from './components/NodeList';
 
+import { AkashicRecords } from './components/AkashicRecords';
+
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
 
@@ -355,6 +357,9 @@ function MainDashboard() {
 
           {/* Middle Column: Node Map & Commissar Intel */}
           <div className="space-y-6 flex flex-col">
+            {/* Akashic Records */}
+            <AkashicRecords />
+
             <NodeList nodes={nodes} isMagistrate={trustScore >= 90} currentNodeId={symbiote?.nodeId} />
 
             {/* Commissar Intelligence */}

@@ -70,6 +70,22 @@ async function initDb(db: Database) {
       created_at INTEGER,
       expires_at INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS akashic_records (
+      id TEXT PRIMARY KEY,
+      filename TEXT,
+      total_shards INTEGER,
+      created_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS akashic_shards (
+      id TEXT PRIMARY KEY,
+      record_id TEXT,
+      node_id TEXT,
+      shard_index INTEGER,
+      data_hash TEXT,
+      status TEXT -- 'assigned', 'stored'
+    );
   `);
 
   // Seed initial strategies if empty

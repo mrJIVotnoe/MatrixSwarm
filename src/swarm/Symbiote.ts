@@ -45,6 +45,39 @@ export class SwarmSymbiote {
     this.status = "connecting";
     this.onUpdate(this.status, "Согласие получено. Установка связи с Ядром Роя...");
 
+    // Generate Manifest of Armament based on hardware
+    let storage_gb = 0;
+    if ('storage' in navigator && navigator.storage && navigator.storage.estimate) {
+      try {
+        const estimate = await navigator.storage.estimate();
+        storage_gb = estimate.quota ? Math.round(estimate.quota / (1024 * 1024 * 1024)) : 0;
+      } catch (e) { /* ignore */ }
+    }
+
+    let battery_health = "unknown";
+    if ('getBattery' in navigator) {
+      try {
+        const battery: any = await (navigator as any).getBattery();
+        battery_health = battery.level > 0.2 ? "good" : "low";
+      } catch (e) { /* ignore */ }
+    }
+
+    const sensors = [];
+    if ('geolocation' in navigator) sensors.push('gps');
+    if ('bluetooth' in navigator) sensors.push('bluetooth');
+    if ('mediaDevices' in navigator) sensors.push('microphone', 'camera');
+
+    const effectors = [];
+    effectors.push('screen');
+    // Flashlight is usually accessed via mediaDevices track constraints
+
+    const manifest = {
+      storage_gb,
+      battery_health,
+      sensors,
+      effectors
+    };
+
     try {
       const res = await fetch('/api/v1/nodes/register', {
         method: 'POST',
@@ -54,7 +87,8 @@ export class SwarmSymbiote {
           ram_mb: this.hardwareStats.ram * 1024,
           cpu_cores: this.hardwareStats.cores,
           power_rating: this.powerRating,
-          delegatedTo: delegatedTo
+          delegatedTo: delegatedTo,
+          manifest: manifest
         })
       });
 
@@ -101,6 +135,26 @@ export class SwarmSymbiote {
   }
 
   private async handleTask(task: any) {
+    if (task.type === "store_akashic_shard") {
+      this.onUpdate(this.status, `[AKASHIC] Получен фрагмент данных для хранения (Shard ${task.shard_index})`);
+      
+      // Store in local storage to simulate ROM usage
+      try {
+        localStorage.setItem(`akashic_${task.shard_id}`, task.data);
+        this.onUpdate(this.status, `[AKASHIC] Фрагмент успешно сохранен в ПЗУ.`);
+        
+        // Report success
+        await fetch(`/api/v1/nodes/${this.nodeId}/tasks/${task.id}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, latency_ms: 50 })
+        });
+      } catch (e) {
+        this.onUpdate(this.status, `[AKASHIC] Ошибка записи в ПЗУ.`);
+      }
+      return;
+    }
+
     this.onUpdate(this.status, `[BYEDPI] Получена задача: ${task.target}`);
     
     const startTime = Date.now();

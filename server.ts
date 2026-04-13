@@ -174,12 +174,27 @@ async function startServer() {
   app.post("/api/v1/nodes/register", async (req, res) => {
     const id = uuidv4();
     const token = uuidv4();
-    const { delegatedTo } = req.body;
+    const { delegatedTo, manifest } = req.body;
     
+    // Parse Manifest of Armament if provided
+    const defaultManifest = {
+      storage_gb: 0,
+      battery_health: "unknown",
+      sensors: [],
+      effectors: []
+    };
+    const armamentManifest = manifest || defaultManifest;
+    
+    // Merge capabilities with manifest
+    const fullCapabilities = {
+      roles: req.body.capabilities || [],
+      manifest: armamentManifest
+    };
+
     const node = {
       id,
       address: req.ip || req.socket.remoteAddress || "unknown",
-      capabilities: JSON.stringify(req.body.capabilities || []),
+      capabilities: JSON.stringify(fullCapabilities),
       ram_mb: req.body.ram_mb || 1024,
       cpu_cores: req.body.cpu_cores || 1,
       power_rating: req.body.power_rating || "unknown",
@@ -339,6 +354,71 @@ async function startServer() {
     }
 
     res.json({ status: "reported", message: "The Hive will investigate." });
+  });
+
+  // ==========================================
+  // AKASHIC RECORDS (Distributed ROM)
+  // ==========================================
+
+  app.post("/api/v1/akashic/store", async (req, res) => {
+    const { filename, content } = req.body;
+    if (!filename || !content) {
+      return res.status(400).json({ error: "Filename and content required" });
+    }
+
+    // Split content into shards (e.g., 100 characters per shard for demo)
+    const chunkSize = 100;
+    const shards = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+      shards.push(content.substring(i, i + chunkSize));
+    }
+
+    const recordId = uuidv4();
+    await db.run('INSERT INTO akashic_records (id, filename, total_shards, created_at) VALUES (?, ?, ?, ?)', 
+      [recordId, filename, shards.length, Date.now()]);
+
+    // Find nodes with storage capacity (ROM > 0)
+    const allNodes = await db.all('SELECT * FROM nodes WHERE status = "online" AND is_banned = 0 AND is_frozen = 0');
+    const storageNodes = allNodes.filter(n => {
+      try {
+        const caps = JSON.parse(n.capabilities);
+        return caps.manifest && caps.manifest.storage_gb > 0;
+      } catch (e) { return false; }
+    });
+
+    if (storageNodes.length === 0) {
+      return res.status(503).json({ error: "No nodes with available ROM to store the Akashic Record." });
+    }
+
+    // Assign shards to nodes round-robin
+    for (let i = 0; i < shards.length; i++) {
+      const node = storageNodes[i % storageNodes.length];
+      const shardId = uuidv4();
+      
+      await db.run('INSERT INTO akashic_shards (id, record_id, node_id, shard_index, data_hash, status) VALUES (?, ?, ?, ?, ?, ?)',
+        [shardId, recordId, node.id, i, 'hash_placeholder', 'assigned']);
+
+      // Queue the task for the node
+      const taskId = uuidv4();
+      activeTasks.set(taskId, {
+        id: taskId,
+        type: "store_akashic_shard",
+        record_id: recordId,
+        shard_id: shardId,
+        shard_index: i,
+        data: shards[i],
+        status: "assigned",
+        assigned_to: node.id
+      });
+    }
+
+    console.log(`[AKASHIC] Record ${filename} split into ${shards.length} shards and distributed.`);
+    res.json({ message: "Record distributed to the Swarm", recordId, shards: shards.length });
+  });
+
+  app.get("/api/v1/akashic/records", async (req, res) => {
+    const records = await db.all('SELECT * FROM akashic_records ORDER BY created_at DESC');
+    res.json(records);
   });
 
   // 6. Magistrate Consensus (Governance)
