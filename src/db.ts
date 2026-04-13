@@ -30,8 +30,17 @@ async function initDb(db: Database) {
       last_heartbeat INTEGER,
       trust_score INTEGER,
       token TEXT,
-      is_banned INTEGER DEFAULT 0
+      is_banned INTEGER DEFAULT 0,
+      delegated_to TEXT, -- ID of the Magistrate this node delegates its vote to
+      is_frozen INTEGER DEFAULT 0 -- Emergency freeze status
     );
+
+    // Migration: Ensure is_frozen column exists
+    try {
+      await db.run('ALTER TABLE nodes ADD COLUMN is_frozen INTEGER DEFAULT 0');
+    } catch (e) {
+      // Column probably already exists
+    }
 
     CREATE TABLE IF NOT EXISTS strategies (
       id TEXT PRIMARY KEY,
@@ -48,6 +57,18 @@ async function initDb(db: Database) {
       latency_ms INTEGER,
       timestamp INTEGER,
       isp TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS consensus_proposals (
+      id TEXT PRIMARY KEY,
+      parameter_name TEXT,
+      parameter_value TEXT,
+      proposer_id TEXT,
+      status TEXT, -- 'pending', 'approved', 'rejected'
+      votes_for TEXT, -- JSON array of node IDs
+      votes_against TEXT, -- JSON array of node IDs
+      created_at INTEGER,
+      expires_at INTEGER
     );
   `);
 

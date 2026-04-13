@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -20,12 +24,13 @@ var (
 )
 
 type PeerInfo struct {
-	NodeID     string
-	LastSeen   time.Time
-	TrustScore float64
-	IsLeader   bool
-	IsVerified bool
-	Name       string
+	NodeID       string
+	LastSeen     time.Time
+	TrustScore   float64
+	IsLeader     bool
+	IsMagistrate bool
+	IsVerified   bool
+	Name         string
 }
 
 // StartDiscovery initializes mDNS advertising and periodic discovery
@@ -41,6 +46,7 @@ func StartDiscovery() {
 			fmt.Sprintf("NodeID:%s", nodeID),
 			fmt.Sprintf("TrustScore:%.2f", trustScore),
 			fmt.Sprintf("IsLeader:%v", isLeader),
+			fmt.Sprintf("IsMagistrate:%v", isMagistrate),
 		}
 		service, err := mdns.NewMDNSService(host, "_escape._tcp", "", "", 1081, nil, info)
 		if err != nil {
@@ -109,6 +115,7 @@ func discoverPeers() {
 
 			pTrustScore := 0.0
 			pIsLeader := false
+			pIsMagistrate := false
 			pNodeID := ""
 			for _, field := range entry.InfoFields {
 				if strings.HasPrefix(field, "NodeID:") {
@@ -120,6 +127,9 @@ func discoverPeers() {
 				if strings.HasPrefix(field, "IsLeader:") {
 					fmt.Sscanf(field, "IsLeader:%v", &pIsLeader)
 				}
+				if strings.HasPrefix(field, "IsMagistrate:") {
+					fmt.Sscanf(field, "IsMagistrate:%v", &pIsMagistrate)
+				}
 			}
 
 			peerStore.Lock()
@@ -129,12 +139,13 @@ func discoverPeers() {
 			shouldVerify := !exists || existing.NodeID != pNodeID || (pTrustScore > existing.TrustScore + 5.0)
 
 			peerStore.peers[peerAddr] = PeerInfo{
-				NodeID:     pNodeID,
-				LastSeen:   time.Now(),
-				TrustScore: pTrustScore,
-				IsLeader:   pIsLeader,
-				IsVerified: exists && existing.IsVerified && !shouldVerify,
-				Name:       entry.Name,
+				NodeID:       pNodeID,
+				LastSeen:     time.Now(),
+				TrustScore:   pTrustScore,
+				IsLeader:     pIsLeader,
+				IsMagistrate: pIsMagistrate,
+				IsVerified:   exists && existing.IsVerified && !shouldVerify,
+				Name:         entry.Name,
 			}
 			peerStore.Unlock()
 
@@ -154,6 +165,12 @@ func discoverPeers() {
 }
 
 func verifyPeer(addr, nodeID string, claimedScore float64) {
+	if isMagistrate {
+		log.Printf("[E.S.C.A.P.E. Security] Magistrate Status Active. Auto-verifying Node %s locally.", nodeID)
+		updatePeerVerification(addr, nodeID, claimedScore, true)
+		return
+	}
+
 	log.Printf("[E.S.C.A.P.E. Security] Verifying TrustScore for Node %s via Matrix...", nodeID)
 	
 	// Simulation: Query Matrix/C2 for the real score of this NodeID
@@ -162,9 +179,12 @@ func verifyPeer(addr, nodeID string, claimedScore float64) {
 	// In a real app, we'd call matrixBridge.GetVerifiedScore(nodeID)
 	// For demo: if NodeID contains "MALICIOUS", verification fails
 	isValid := !strings.Contains(strings.ToUpper(nodeID), "MALICIOUS")
-	
+	updatePeerVerification(addr, nodeID, claimedScore, isValid)
+}
+
+func updatePeerVerification(addr, nodeID string, claimedScore float64, isValid bool) {
 	peerStore.Lock()
-	defer peerStore.RUnlock()
+	defer peerStore.Unlock()
 	if info, ok := peerStore.peers[addr]; ok {
 		if isValid {
 			log.Printf("[E.S.C.A.P.E. Security] Node %s VERIFIED. TrustScore %.2f is authentic.", nodeID, claimedScore)
@@ -174,19 +194,44 @@ func verifyPeer(addr, nodeID string, claimedScore float64) {
 			info.TrustScore = 0
 			info.IsVerified = false
 			
-			// Anonymous Report to Hive
-			go func(maliciousID string) {
-				reportData := map[string]string{
-					"targetNodeId": maliciousID,
-					"reason":       "Failed mDNS verification (TrustScore spoofing)",
-				}
-				jsonData, _ := json.Marshal(reportData)
-				url := fmt.Sprintf("%s/api/v1/nodes/%s/report", C2_URL, nodeID, maliciousID)
-				http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-			}(nodeID)
+			// Anonymous Report to Hive with PoW
+			go reportMaliciousNode(nodeID)
 		}
 		peerStore.peers[addr] = info
 	}
+}
+
+func solvePoW(targetNodeId string, timestamp int64, difficulty int) string {
+	challenge := fmt.Sprintf("%s%d", targetNodeId, timestamp)
+	prefix := strings.Repeat("0", difficulty)
+	nonce := 0
+	for {
+		data := fmt.Sprintf("%s%d", challenge, nonce)
+		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
+		if strings.HasPrefix(hash, prefix) {
+			return fmt.Sprintf("%d", nonce)
+		}
+		nonce++
+		if nonce%100000 == 0 {
+			time.Sleep(1 * time.Millisecond) // Prevent CPU hogging
+		}
+	}
+}
+
+func reportMaliciousNode(maliciousID string) {
+	timestamp := time.Now().UnixMilli()
+	log.Printf("[E.S.C.A.P.E. Security] Solving PoW (diff: %d) for report against %s...", powDifficulty, maliciousID)
+	nonce := solvePoW(maliciousID, timestamp, powDifficulty)
+	
+	reportData := map[string]interface{}{
+		"targetNodeId": maliciousID,
+		"reason":       "Failed mDNS verification (TrustScore spoofing)",
+		"nonce":        nonce,
+		"timestamp":    timestamp,
+	}
+	jsonData, _ := json.Marshal(reportData)
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/report", C2_URL, nodeID)
+	http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 }
 
 func isLocalIP(ip net.IP) bool {
@@ -204,18 +249,29 @@ func isLocalIP(ip net.IP) bool {
 	return false
 }
 
-// GetPeers returns a list of currently active peers
+// GetPeers returns a list of currently active peers, prioritizing Magistrates
 func GetPeers() []string {
 	peerStore.RLock()
 	defer peerStore.RUnlock()
 	
-	var list []string
+	var magistrates []string
+	var others []string
 	now := time.Now()
-	for addr, lastSeen := range peerStore.peers {
-		// Only return peers seen in the last 5 minutes
-		if now.Sub(lastSeen) < 5*time.Minute {
-			list = append(list, addr)
+	
+	for addr, info := range peerStore.peers {
+		// Only return peers seen in the last 5 minutes and verified
+		if now.Sub(info.LastSeen) < 5*time.Minute && info.IsVerified {
+			if info.IsMagistrate {
+				magistrates = append(magistrates, addr)
+			} else {
+				others = append(others, addr)
+			}
 		}
 	}
-	return list
+	
+	// If we have Magistrates, they are the "fast lane"
+	if len(magistrates) > 0 {
+		return magistrates
+	}
+	return others
 }

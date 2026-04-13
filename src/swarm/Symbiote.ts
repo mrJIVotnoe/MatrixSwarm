@@ -40,7 +40,7 @@ export class SwarmSymbiote {
     this.onUpdate(this.status, `Оценка завершена: ${this.powerRating}. Ожидание согласия Гражданина.`);
   }
 
-  public async grantConsent() {
+  public async grantConsent(delegatedTo?: string | null) {
     this.consentGranted = true;
     this.status = "connecting";
     this.onUpdate(this.status, "Согласие получено. Установка связи с Ядром Роя...");
@@ -53,7 +53,8 @@ export class SwarmSymbiote {
           capabilities: ['relay', 'byedpi_routing'],
           ram_mb: this.hardwareStats.ram * 1024,
           cpu_cores: this.hardwareStats.cores,
-          power_rating: this.powerRating
+          power_rating: this.powerRating,
+          delegatedTo: delegatedTo
         })
       });
 

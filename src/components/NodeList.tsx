@@ -16,9 +16,56 @@ interface Node {
     verified_at: string;
   };
   privacy_mode: "public" | "matrix" | "i2p";
+  is_frozen?: number;
 }
 
-export const NodeList: React.FC<{ nodes: Node[] }> = ({ nodes }) => {
+export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentNodeId?: string }> = ({ nodes, isMagistrate, currentNodeId }) => {
+  const handleFreeze = async (nodeId: string) => {
+    if (!currentNodeId) return;
+    try {
+      const response = await fetch('/api/v1/consensus/proposals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          nodeId: currentNodeId, 
+          parameterName: 'freeze_node', 
+          parameterValue: nodeId 
+        })
+      });
+      if (response.ok) {
+        alert(`Предложение о заморозке узла ${nodeId} отправлено в Совет.`);
+      } else {
+        const err = await response.json();
+        alert(err.error);
+      }
+    } catch (error) {
+      console.error('Failed to propose freeze:', error);
+    }
+  };
+
+  const handleUnfreeze = async (nodeId: string) => {
+    if (!currentNodeId) return;
+    try {
+      const response = await fetch('/api/v1/consensus/proposals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          nodeId: currentNodeId, 
+          parameterName: 'unfreeze_node', 
+          parameterValue: nodeId 
+        })
+      });
+      if (response.ok) {
+        alert(`Предложение о разморозке узла ${nodeId} отправлено в Совет.`);
+      } else {
+        const err = await response.json();
+        alert(err.error);
+      }
+    } catch (error) {
+      console.error('Failed to propose unfreeze:', error);
+    }
+  };
+
   return (
     <div className="bg-[#11111a] border border-cyan-900/20 p-6 rounded-sm">
       <h2 className="text-lg font-bold text-cyan-400 mb-6 flex items-center gap-2 uppercase tracking-tighter">
@@ -40,6 +87,11 @@ export const NodeList: React.FC<{ nodes: Node[] }> = ({ nodes }) => {
                   <span className={`text-[8px] px-1 border ${node.status === 'online' ? 'border-green-900 text-green-400' : 'border-red-900 text-red-400'} uppercase`}>
                     {node.status}
                   </span>
+                  {node.is_frozen === 1 && (
+                    <span className="text-[8px] px-1 border border-red-500 bg-red-500/20 text-red-500 font-bold uppercase animate-pulse">
+                      FROZEN
+                    </span>
+                  )}
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] text-gray-500 uppercase">Trust:</span>
                     <span className={`text-[8px] font-bold ${node.trust_score > 70 ? 'text-green-400' : node.trust_score > 30 ? 'text-yellow-400' : 'text-red-400'}`}>
@@ -73,8 +125,25 @@ export const NodeList: React.FC<{ nodes: Node[] }> = ({ nodes }) => {
                 </div>
               )}
               
-              <div className="mt-1 flex justify-end">
+              <div className="mt-1 flex justify-between items-center">
                 <span className="text-[6px] text-cyan-900 uppercase tracking-tighter">Mode: {node.privacy_mode}</span>
+                {isMagistrate && node.id !== currentNodeId && (
+                  node.is_frozen === 1 ? (
+                    <button 
+                      onClick={() => handleUnfreeze(node.id)}
+                      className="text-[7px] text-emerald-500/50 hover:text-emerald-500 border border-emerald-900/20 hover:border-emerald-500/50 px-1 rounded transition-all uppercase"
+                    >
+                      Unfreeze
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleFreeze(node.id)}
+                      className="text-[7px] text-red-500/50 hover:text-red-500 border border-red-900/20 hover:border-red-500/50 px-1 rounded transition-all uppercase"
+                    >
+                      Freeze
+                    </button>
+                  )
+                )}
               </div>
             </div>
           ))

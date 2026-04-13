@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import cors from "cors";
+import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "./src/db.js";
 import { Commissar } from "./src/commissar.js";
@@ -16,6 +17,8 @@ const connectedNodes = new Map<string, WebSocket>();
 const COMM_DIR = path.join(process.cwd(), 'comm');
 
 let matrixEcho: MatrixService | null = null;
+let currentPowDifficulty = 4;
+const MAGISTRATE_THRESHOLD = 90;
 
 if (process.env.MATRIX_BASE_URL && process.env.MATRIX_ACCESS_TOKEN && process.env.MATRIX_ROOM_ID) {
   matrixEcho = new MatrixService(
@@ -141,13 +144,37 @@ async function startServer() {
       ORDER BY trust_score DESC 
       LIMIT 10
     `);
-    res.json(topNodes);
+    
+    const allNodes = await db.all('SELECT id, delegated_to FROM nodes WHERE is_banned = 0');
+    const leaderboard = topNodes.map(node => {
+      const delegates = allNodes.filter(n => n.delegated_to === node.id).length;
+      return {
+        ...node,
+        vote_weight: 1 + delegates
+      };
+    });
+    
+    res.json(leaderboard);
+  });
+
+  app.get("/api/v1/swarm/recommendations/magistrates", async (req, res) => {
+    // Recommend top 3 online Magistrates with highest trust scores
+    const recommendations = await db.all(`
+      SELECT id, trust_score, power_rating 
+      FROM nodes 
+      WHERE trust_score >= ? AND status = 'online' AND is_banned = 0
+      ORDER BY trust_score DESC 
+      LIMIT 3
+    `, [MAGISTRATE_THRESHOLD]);
+    
+    res.json(recommendations);
   });
 
   // 2. Node Registration (The Symbiote connects here)
   app.post("/api/v1/nodes/register", async (req, res) => {
     const id = uuidv4();
     const token = uuidv4();
+    const { delegatedTo } = req.body;
     
     const node = {
       id,
@@ -159,15 +186,16 @@ async function startServer() {
       status: "online",
       last_heartbeat: Date.now(),
       trust_score: 50,
-      token
+      token,
+      delegated_to: delegatedTo || null
     };
 
     await db.run(`
-      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token]);
+      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to]);
 
-    console.log(`[SWARM] New node registered: ${id} (${node.power_rating})`);
+    console.log(`[SWARM] New node registered: ${id} (${node.power_rating}) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
     
     res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
   });
@@ -187,6 +215,10 @@ async function startServer() {
       return res.status(403).json({ error: "This node has been banned from the Hive for malicious activity." });
     }
 
+    if (node.is_frozen) {
+      return res.status(403).json({ error: "EMERGENCY: This node has been FROZEN by Magistrate Consensus." });
+    }
+
     await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
 
     // Simulate assigning a routing task randomly (20% chance per heartbeat)
@@ -195,10 +227,11 @@ async function startServer() {
       const taskId = uuidv4();
       const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
       
-      // Commissar decides the best strategy for this ISP
-      const selectedStrategy = await Commissar.getRecommendedStrategy(isp);
+    // Commissar decides the best strategy for this ISP
+    const isMagistrate = node.trust_score >= 90;
+    const selectedStrategy = await Commissar.getRecommendedStrategy(isp, isMagistrate);
 
-      assignedTask = {
+    assignedTask = {
         id: taskId,
         type: "byedpi_routing",
         target: targets[Math.floor(Math.random() * targets.length)],
@@ -209,7 +242,13 @@ async function startServer() {
       activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
     }
 
-    res.json({ status: "acknowledged", task: assignedTask, trust_score: node.trust_score });
+    res.json({ 
+      status: "acknowledged", 
+      task: assignedTask, 
+      trust_score: node.trust_score, 
+      is_magistrate: node.trust_score >= MAGISTRATE_THRESHOLD,
+      pow_difficulty: currentPowDifficulty
+    });
   });
 
   // 3.5 Task Completion & Telemetry (The Waggle Dance)
@@ -220,6 +259,10 @@ async function startServer() {
     const task = activeTasks.get(taskId);
     const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
     
+    if (node && (node.is_banned || node.is_frozen)) {
+      return res.status(403).json({ error: "Node is banned or frozen." });
+    }
+
     if (task && node) {
       task.status = success ? "completed" : "failed";
       activeTasks.set(taskId, task);
@@ -260,12 +303,25 @@ async function startServer() {
     res.json(nodes);
   });
 
-  // 4.5 Report Malicious Node
+  // 4.5 Report Malicious Node (with PoW)
   app.post("/api/v1/nodes/:nodeId/report", async (req, res) => {
     const { nodeId } = req.params;
-    const { targetNodeId, reason } = req.body;
+    const { targetNodeId, reason, nonce, timestamp } = req.body;
 
-    console.log(`[HIVE] Node ${nodeId} reported node ${targetNodeId} for: ${reason}`);
+    // 1. Verify PoW to prevent spam
+    const challenge = `${targetNodeId}${timestamp}`;
+    const hash = crypto.createHash('sha256').update(challenge + nonce).digest('hex');
+    
+    if (!hash.startsWith('0'.repeat(currentPowDifficulty))) {
+      return res.status(400).json({ error: `Invalid Proof of Work. Hive requires difficulty ${currentPowDifficulty}.` });
+    }
+
+    // 2. Check if timestamp is recent (within 5 minutes)
+    if (Date.now() - timestamp > 300000) {
+      return res.status(400).json({ error: "Report challenge expired." });
+    }
+
+    console.log(`[HIVE] Node ${nodeId} reported node ${targetNodeId} for: ${reason} (PoW Verified)`);
 
     // Anonymous reporting logic: 
     // If a node is reported, we decrease its trust score. 
@@ -285,7 +341,179 @@ async function startServer() {
     res.json({ status: "reported", message: "The Hive will investigate." });
   });
 
-  // 5. Telegram Mini App Integration (Bridge to /comm)
+  // 6. Magistrate Consensus (Governance)
+  app.get("/api/v1/consensus/proposals", async (req, res) => {
+    const proposals = await db.all('SELECT * FROM consensus_proposals WHERE status = ?', ['pending']);
+    const allNodes = await db.all('SELECT id, delegated_to FROM nodes WHERE is_banned = 0');
+    const onlineMagistrates = await db.all('SELECT id FROM nodes WHERE trust_score >= ? AND status = ?', [MAGISTRATE_THRESHOLD, 'online']);
+
+    const getWeight = (magId: string) => {
+      const delegates = allNodes.filter(n => n.delegated_to === magId).length;
+      return 1 + delegates;
+    };
+
+    const totalPossibleWeight = onlineMagistrates.reduce((sum, m) => sum + getWeight(m.id), 0);
+    const requiredWeight = Math.ceil(totalPossibleWeight / 2) + 1;
+
+    res.json(proposals.map(p => {
+      const votesFor = JSON.parse(p.votes_for || '[]');
+      const votesAgainst = JSON.parse(p.votes_against || '[]');
+      const weightFor = votesFor.reduce((sum: number, mId: string) => sum + getWeight(mId), 0);
+      const weightAgainst = votesAgainst.reduce((sum: number, mId: string) => sum + getWeight(mId), 0);
+
+      return {
+        ...p,
+        votes_for: votesFor,
+        votes_against: votesAgainst,
+        weight_for: weightFor,
+        weight_against: weightAgainst,
+        required_weight: requiredWeight
+      };
+    }));
+  });
+
+  app.get("/api/v1/consensus/history", async (req, res) => {
+    const history = await db.all('SELECT * FROM consensus_proposals WHERE status != ? ORDER BY created_at DESC LIMIT 50', ['pending']);
+    res.json(history.map(p => ({
+      ...p,
+      votes_for: JSON.parse(p.votes_for || '[]'),
+      votes_against: JSON.parse(p.votes_against || '[]')
+    })));
+  });
+
+  app.post("/api/v1/consensus/proposals", async (req, res) => {
+    const { nodeId, parameterName, parameterValue } = req.body;
+    const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+    
+    if (!node || node.trust_score < MAGISTRATE_THRESHOLD) {
+      return res.status(403).json({ error: "Only Magistrates can propose changes to the Hive." });
+    }
+
+    const id = uuidv4().substring(0, 8);
+    await db.run(`
+      INSERT INTO consensus_proposals (id, parameter_name, parameter_value, proposer_id, status, votes_for, votes_against, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, parameterName, parameterValue, nodeId, 'pending', JSON.stringify([nodeId]), '[]', Date.now(), Date.now() + 86400000]);
+
+    // Telegram Alert for new proposal
+    const alertMsg = `🏛 *СОВЕТ МАГИСТРАТОВ: НОВОЕ ГОЛОСОВАНИЕ*\n\n` +
+                     `🔹 *Параметр:* ${parameterName}\n` +
+                     `🔹 *Новое значение:* ${parameterValue}\n` +
+                     `🔹 *Инициатор:* \`${nodeId.substring(0, 8)}\`\n\n` +
+                     `🔗 [Открыть Dashboard](https://${process.env.VITE_APP_URL || 'swarm-hive.app'})`;
+    
+    // Send to all registered TMA users (simplified for demo)
+    const tmaUsers = await db.all('SELECT telegram_id FROM tma_users');
+    for (const user of tmaUsers) {
+      // In a real app, we'd use a Telegram Bot API call here
+      console.log(`[TELEGRAM_ALERT] To ${user.telegram_id}: ${alertMsg}`);
+    }
+
+    res.json({ id, message: "Consensus proposal broadcasted to the Magistrate Council and Telegram." });
+  });
+
+  app.post("/api/v1/consensus/proposals/:proposalId/vote", async (req, res) => {
+    const { proposalId } = req.params;
+    const { nodeId, vote } = req.body; // vote: 'for' or 'against'
+    
+    const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+    if (!node || node.trust_score < MAGISTRATE_THRESHOLD) {
+      return res.status(403).json({ error: "Only Magistrates can vote in the Council." });
+    }
+
+    const proposal = await db.get('SELECT * FROM consensus_proposals WHERE id = ?', [proposalId]);
+    if (!proposal || proposal.status !== 'pending') {
+      return res.status(404).json({ error: "Proposal not found or already closed." });
+    }
+
+    const votesFor = JSON.parse(proposal.votes_for || '[]');
+    const votesAgainst = JSON.parse(proposal.votes_against || '[]');
+
+    if (votesFor.includes(nodeId) || votesAgainst.includes(nodeId)) {
+      return res.status(400).json({ error: "You have already cast your vote on this proposal." });
+    }
+
+    if (vote === 'for') votesFor.push(nodeId);
+    else votesAgainst.push(nodeId);
+
+    await db.run('UPDATE consensus_proposals SET votes_for = ?, votes_against = ? WHERE id = ?', [
+      JSON.stringify(votesFor), JSON.stringify(votesAgainst), proposalId
+    ]);
+
+    // Check for consensus with WEIGHTED VOTES
+    const onlineMagistrates = await db.all('SELECT id FROM nodes WHERE trust_score >= ? AND status = ?', [MAGISTRATE_THRESHOLD, 'online']);
+    
+    // Calculate total weight of all online Magistrates and their delegates
+    const allNodes = await db.all('SELECT id, delegated_to FROM nodes WHERE is_banned = 0');
+    const getWeight = (magId: string) => {
+      const delegates = allNodes.filter(n => n.delegated_to === magId).length;
+      return 1 + delegates;
+    };
+
+    const totalPossibleWeight = onlineMagistrates.reduce((sum, m) => sum + getWeight(m.id), 0);
+    const currentVotesForWeight = votesFor.reduce((sum, mId) => sum + getWeight(mId), 0);
+    const currentVotesAgainstWeight = votesAgainst.reduce((sum, mId) => sum + getWeight(mId), 0);
+
+    const requiredWeight = Math.ceil(totalPossibleWeight / 2) + 1;
+
+    if (currentVotesForWeight >= requiredWeight) {
+      await db.run('UPDATE consensus_proposals SET status = ? WHERE id = ?', ['approved', proposalId]);
+      
+      // Apply the change
+      if (proposal.parameter_name === 'pow_difficulty') {
+        currentPowDifficulty = parseInt(proposal.parameter_value);
+        console.log(`[HIVE] CONSENSUS REACHED (Weighted): PoW Difficulty updated to ${currentPowDifficulty}`);
+      } else if (proposal.parameter_name === 'freeze_node') {
+        const targetNodeId = proposal.parameter_value;
+        await db.run('UPDATE nodes SET is_frozen = 1 WHERE id = ?', [targetNodeId]);
+        console.log(`[HIVE] EMERGENCY PROTOCOL: Node ${targetNodeId} has been FROZEN by consensus.`);
+      } else if (proposal.parameter_name === 'freeze_segment') {
+        const ispSegment = proposal.parameter_value;
+        // We'll use a simple ISP-based segment freeze for now
+        // In a real app, we'd store frozen segments in a separate table, 
+        // but for the demo we'll just update all nodes with that ISP
+        await db.run('UPDATE nodes SET is_frozen = 1 WHERE address LIKE ?', [`%${ispSegment}%`]);
+        console.log(`[HIVE] EMERGENCY PROTOCOL: Network segment ${ispSegment} has been FROZEN by consensus.`);
+      } else if (proposal.parameter_name === 'unfreeze_node') {
+        const targetNodeId = proposal.parameter_value;
+        await db.run('UPDATE nodes SET is_frozen = 0 WHERE id = ?', [targetNodeId]);
+        console.log(`[HIVE] EMERGENCY PROTOCOL: Node ${targetNodeId} has been UNFROZEN by consensus.`);
+      } else if (proposal.parameter_name === 'unfreeze_segment') {
+        const ispSegment = proposal.parameter_value;
+        await db.run('UPDATE nodes SET is_frozen = 0 WHERE address LIKE ?', [`%${ispSegment}%`]);
+        console.log(`[HIVE] EMERGENCY PROTOCOL: Network segment ${ispSegment} has been UNFROZEN by consensus.`);
+      }
+    } else if (currentVotesAgainstWeight >= requiredWeight) {
+      await db.run('UPDATE consensus_proposals SET status = ? WHERE id = ?', ['rejected', proposalId]);
+    }
+
+    res.json({ 
+      status: "voted", 
+      votes_for: votesFor.length, 
+      votes_against: votesAgainst.length,
+      weight_for: currentVotesForWeight,
+      weight_against: currentVotesAgainstWeight,
+      required_weight: requiredWeight
+    });
+  });
+
+  // 7. Vote Delegation
+  app.post("/api/v1/nodes/:nodeId/delegate", async (req, res) => {
+    const { nodeId } = req.params;
+    const { magistrateId } = req.body; // Can be null to undelegate
+
+    const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+    if (!node) return res.status(404).json({ error: "Node not found." });
+
+    if (magistrateId) {
+      const magistrate = await db.get('SELECT * FROM nodes WHERE id = ? AND trust_score >= ?', [magistrateId, MAGISTRATE_THRESHOLD]);
+      if (!magistrate) return res.status(400).json({ error: "Target is not a valid Magistrate." });
+      if (magistrateId === nodeId) return res.status(400).json({ error: "Cannot delegate to yourself." });
+    }
+
+    await db.run('UPDATE nodes SET delegated_to = ? WHERE id = ?', [magistrateId, nodeId]);
+    res.json({ status: "success", delegatedTo: magistrateId });
+  });
   app.post("/api/v1/tma/register", (req, res) => {
     const { telegramData, hardware } = req.body;
     

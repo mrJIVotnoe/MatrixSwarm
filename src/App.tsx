@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TelegramMiniApp } from './TelegramMiniApp';
 import { Leaderboard } from './components/Leaderboard';
+import { MagistrateCouncil } from './components/MagistrateCouncil';
+import { GovernanceHistory } from './components/GovernanceHistory';
+import { NodeList } from './components/NodeList';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -33,6 +36,9 @@ function MainDashboard() {
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
   const [commissarIntel, setCommissarIntel] = useState<Record<string, any>>({});
   const [trustScore, setTrustScore] = useState<number>(50);
+  const [delegatedTo, setDelegatedTo] = useState<string | null>(null);
+  const [recommendedMagistrates, setRecommendedMagistrates] = useState<any[]>([]);
+  const [selectedMagistrateId, setSelectedMagistrateId] = useState<string | null>(null);
   const [showCanon, setShowCanon] = useState(false);
   
   // For the chart
@@ -72,6 +78,14 @@ function MainDashboard() {
         const n = await fetchNodes();
         setNodes(n);
 
+        // Update current node delegation status
+        if (symbiote?.nodeId) {
+          const currentNode = n.find((node: any) => node.id === symbiote.nodeId);
+          if (currentNode) {
+            setDelegatedTo(currentNode.delegated_to);
+          }
+        }
+
         const t = await fetchRecentTasks();
         setRecentTasks(t);
 
@@ -89,12 +103,25 @@ function MainDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (status === "awaiting_consent") {
+      fetch('/api/v1/swarm/recommendations/magistrates')
+        .then(res => res.json())
+        .then(data => {
+          setRecommendedMagistrates(data);
+          if (data.length > 0) {
+            setSelectedMagistrateId(data[0].id); // Auto-select the best one
+          }
+        });
+    }
+  }, [status]);
+
   const handleIgnite = () => {
     if (symbiote) symbiote.ignite();
   };
 
   const handleConsent = () => {
-    if (symbiote) symbiote.grantConsent();
+    if (symbiote) symbiote.grantConsent(selectedMagistrateId);
   };
 
   return (
@@ -208,11 +235,51 @@ function MainDashboard() {
                 )}
 
                 {status === "awaiting_consent" && (
-                  <div className="space-y-3 p-3 border border-yellow-500/50 bg-yellow-500/5">
-                    <p className="text-xs text-yellow-500 flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>Симбионт запрашивает доступ к ресурсам узла для маршрутизации трафика Роя.</span>
-                    </p>
+                  <div className="space-y-4 p-4 border border-yellow-500/50 bg-yellow-500/5 rounded-sm">
+                    <div className="space-y-2">
+                      <p className="text-xs text-yellow-500 flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>Симбионт запрашивает доступ к ресурсам узла для маршрутизации трафика Роя.</span>
+                      </p>
+                    </div>
+
+                    {recommendedMagistrates.length > 0 && (
+                      <div className="pt-3 border-t border-yellow-500/20">
+                        <p className="text-[10px] text-yellow-600 font-bold uppercase mb-2 flex items-center gap-1">
+                          <Shield className="w-3 h-3" /> Авто-делегирование голоса:
+                        </p>
+                        <div className="space-y-2">
+                          {recommendedMagistrates.map(mag => (
+                            <button
+                              key={mag.id}
+                              onClick={() => setSelectedMagistrateId(mag.id)}
+                              className={`w-full p-2 text-left border transition-all flex justify-between items-center ${
+                                selectedMagistrateId === mag.id 
+                                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' 
+                                  : 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-yellow-500/30'
+                              }`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-mono">{mag.id.substring(0, 12)}...</span>
+                                <span className="text-[8px] uppercase opacity-60">Trust: {mag.trust_score}%</span>
+                              </div>
+                              {selectedMagistrateId === mag.id && <CheckCircle2 className="w-3 h-3" />}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setSelectedMagistrateId(null)}
+                            className={`w-full p-2 text-left border transition-all text-[10px] uppercase ${
+                              selectedMagistrateId === null 
+                                ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' 
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-yellow-500/30'
+                            }`}
+                          >
+                            Без делегирования
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <button 
                       onClick={handleConsent}
                       className="w-full py-2 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500 text-yellow-500 font-bold text-xs transition-all"
@@ -270,54 +337,25 @@ function MainDashboard() {
             </div>
 
             {/* Global Leaderboard */}
-            <Leaderboard />
+            <Leaderboard 
+              currentNodeId={symbiote?.nodeId} 
+              currentDelegatedTo={delegatedTo}
+              onDelegate={(magId) => setDelegatedTo(magId)}
+            />
+
+            {/* Magistrate Council */}
+            <MagistrateCouncil 
+              nodeId={symbiote?.nodeId} 
+              isMagistrate={trustScore >= 90} 
+            />
+
+            {/* Governance History */}
+            <GovernanceHistory />
           </div>
 
           {/* Middle Column: Node Map & Commissar Intel */}
           <div className="space-y-6 flex flex-col">
-            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex flex-col flex-1">
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <Server className="w-4 h-4" />
-                ТОПОЛОГИЯ ГРАЖДАН (NODES)
-              </h2>
-              <div className="flex-1 bg-neutral-950 border border-emerald-500/10 p-4 overflow-y-auto max-h-[300px]">
-                {nodes.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-emerald-600 text-xs">
-                    ОЖИДАНИЕ ДАННЫХ ОТ ЯДРА...
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    {nodes.map(node => (
-                      <motion.div 
-                        key={node.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={`p-3 border text-xs flex flex-col gap-2 ${
-                          node.status === 'online' 
-                            ? 'border-emerald-500/30 bg-emerald-500/5' 
-                            : 'border-red-500/30 bg-red-500/5'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-emerald-400 truncate" title={node.id}>
-                            {node.id.substring(0,6)}
-                          </span>
-                          {node.status === 'online' ? (
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981] animate-pulse" />
-                          ) : (
-                            <div className="w-2 h-2 rounded-full bg-red-500" />
-                          )}
-                        </div>
-                        <div className="text-emerald-600/70 flex justify-between">
-                          <span>{node.power_rating}</span>
-                          <span>T:{node.trust_score}</span>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <NodeList nodes={nodes} isMagistrate={trustScore >= 90} currentNodeId={symbiote?.nodeId} />
 
             {/* Commissar Intelligence */}
             <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex-1">
