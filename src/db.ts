@@ -32,15 +32,31 @@ async function initDb(db: Database) {
       token TEXT,
       is_banned INTEGER DEFAULT 0,
       delegated_to TEXT, -- ID of the Magistrate this node delegates its vote to
-      is_frozen INTEGER DEFAULT 0 -- Emergency freeze status
+      is_frozen INTEGER DEFAULT 0, -- Emergency freeze status
+      lat REAL DEFAULT 0,
+      lng REAL DEFAULT 0,
+      cell_id TEXT,
+      cluster_id TEXT,
+      senses TEXT
     );
 
-    // Migration: Ensure is_frozen column exists
-    try {
-      await db.run('ALTER TABLE nodes ADD COLUMN is_frozen INTEGER DEFAULT 0');
-    } catch (e) {
-      // Column probably already exists
-    }
+    // Migration: Ensure new columns exist
+    try { await db.run('ALTER TABLE nodes ADD COLUMN is_frozen INTEGER DEFAULT 0'); } catch (e) {}
+    try { await db.run('ALTER TABLE nodes ADD COLUMN lat REAL DEFAULT 0'); } catch (e) {}
+    try { await db.run('ALTER TABLE nodes ADD COLUMN lng REAL DEFAULT 0'); } catch (e) {}
+    try { await db.run('ALTER TABLE nodes ADD COLUMN cell_id TEXT'); } catch (e) {}
+    try { await db.run('ALTER TABLE nodes ADD COLUMN cluster_id TEXT'); } catch (e) {}
+    try { await db.run('ALTER TABLE nodes ADD COLUMN senses TEXT'); } catch (e) {}
+
+    CREATE TABLE IF NOT EXISTS karma_ledger (
+      id TEXT PRIMARY KEY,
+      node_id TEXT,
+      action TEXT,
+      amount INTEGER,
+      timestamp INTEGER,
+      previous_hash TEXT,
+      hash TEXT
+    );
 
     CREATE TABLE IF NOT EXISTS strategies (
       id TEXT PRIMARY KEY,

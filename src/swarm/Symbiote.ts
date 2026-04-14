@@ -1,3 +1,5 @@
+import SHA256 from 'crypto-js/sha256';
+
 export type SymbioteStatus = 
   | "sleeping" 
   | "evaluating" 
@@ -14,8 +16,42 @@ export class SwarmSymbiote {
   public hardwareStats = { cores: 1, ram: 2 };
   public trustScore: number = 50;
   public isp: string = "BrowserISP"; // Simulated ISP for web clients
+  public senses = {
+    vision: false,
+    hearing: false,
+    proprioception: false,
+    touch: false
+  };
 
-  constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {}
+  constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {
+    this.initSenses();
+  }
+
+  private initSenses() {
+    // Vision (Screen visibility)
+    this.senses.vision = !document.hidden;
+    document.addEventListener("visibilitychange", () => {
+      this.senses.vision = !document.hidden;
+    });
+
+    // Proprioception (Orientation)
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener("deviceorientation", (event) => {
+        if (event.alpha !== null) this.senses.proprioception = true;
+      }, { once: true });
+    }
+
+    // Touch (Vibration API availability)
+    if ('vibrate' in navigator) {
+      this.senses.touch = true;
+    }
+
+    // Hearing (Microphone permission check - non-blocking)
+    navigator.mediaDevices?.enumerateDevices().then(devices => {
+      const hasMic = devices.some(d => d.kind === 'audioinput');
+      this.senses.hearing = hasMic;
+    }).catch(() => {});
+  }
 
   private evaluateHardware(): string {
     const cores = navigator.hardwareConcurrency || 1;
@@ -115,7 +151,7 @@ export class SwarmSymbiote {
           const res = await fetch(`/api/v1/nodes/${this.nodeId}/heartbeat`, { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isp: this.isp })
+            body: JSON.stringify({ isp: this.isp, senses: this.senses })
           });
           const data = await res.json();
           
@@ -151,6 +187,100 @@ export class SwarmSymbiote {
         });
       } catch (e) {
         this.onUpdate(this.status, `[AKASHIC] Ошибка записи в ПЗУ.`);
+      }
+      return;
+    }
+
+    if (task.type === "compute_hash") {
+      this.onUpdate(this.status, `[COMPUTE] Вычислительная задача (Сложность: ${task.difficulty})`);
+      const startTime = Date.now();
+      let nonce = 0;
+      const prefix = "0".repeat(task.difficulty);
+      
+      const computeChunk = async () => {
+        // Process in chunks to avoid freezing the main thread
+        for (let i = 0; i < 5000; i++) {
+          const hash = SHA256(task.seed + nonce).toString();
+          if (hash.startsWith(prefix)) {
+            const latency = Date.now() - startTime;
+            this.onUpdate(this.status, `[COMPUTE] Решение найдено! Nonce: ${nonce}. Время: ${latency}ms`);
+            
+            try {
+              await fetch(`/api/v1/nodes/${this.nodeId}/tasks/${task.id}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ success: true, latency_ms: latency, result: hash })
+              });
+            } catch (e) {
+              console.error("Failed to report compute task completion");
+            }
+            return;
+          }
+          nonce++;
+        }
+        // Yield to event loop and continue
+        setTimeout(computeChunk, 0);
+      };
+      
+      computeChunk();
+      return;
+    }
+
+    if (task.type === "spatial_recon") {
+      this.onUpdate(this.status, `[RECON] Сканирование сектора ${task.cell_id} (Обратный StarLink)...`);
+      const startTime = Date.now();
+      
+      // Simulate geospatial reconnaissance (pinging local infrastructure to map censorship)
+      setTimeout(() => {
+        const latency = Date.now() - startTime;
+        this.onUpdate(this.status, `[RECON] Сектор ${task.cell_id} нанесен на карту. Данные отправлены в Улей.`);
+        fetch(`/api/v1/nodes/${this.nodeId}/tasks/${task.id}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, latency_ms: latency })
+        }).catch(e => console.error("Failed to report recon completion"));
+      }, 2000);
+      return;
+    }
+
+    if (task.type === "cluster_chunk") {
+      this.onUpdate(this.status, `[CLUSTER] Выполнение части распределенной задачи: ${task.start} - ${task.end}`);
+      const startTime = Date.now();
+
+      if (task.job_type === "prime_search") {
+        const computePrimes = async () => {
+          let count = 0;
+          // Simple prime check
+          const isPrime = (n: number) => {
+            if (n < 2) return false;
+            for (let i = 2; i <= Math.sqrt(n); i++) {
+              if (n % i === 0) return false;
+            }
+            return true;
+          };
+
+          // Non-blocking loop
+          let current = task.start;
+          const processBatch = () => {
+            const batchEnd = Math.min(current + 5000, task.end);
+            for (; current < batchEnd; current++) {
+              if (isPrime(current)) count++;
+            }
+            if (current < task.end) {
+              setTimeout(processBatch, 0);
+            } else {
+              const latency = Date.now() - startTime;
+              this.onUpdate(this.status, `[CLUSTER] Фрагмент завершен. Найдено простых чисел: ${count}. Время: ${latency}ms`);
+              fetch(`/api/v1/nodes/${this.nodeId}/tasks/${task.id}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ success: true, latency_ms: latency, result: count })
+              });
+            }
+          };
+          processBatch();
+        };
+        computePrimes();
       }
       return;
     }

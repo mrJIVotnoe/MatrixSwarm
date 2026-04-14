@@ -13,6 +13,7 @@ import { MatrixService } from "./src/services/matrixService.js";
 
 // In-memory fallback for tasks (since they are ephemeral)
 const activeTasks = new Map<string, any>();
+const distributedJobs = new Map<string, any>(); // PlayStation Supercomputer Jobs
 const connectedNodes = new Map<string, WebSocket>();
 const COMM_DIR = path.join(process.cwd(), 'comm');
 
@@ -191,6 +192,19 @@ async function startServer() {
       manifest: armamentManifest
     };
 
+    // Generate simulated physical coordinates (e.g., around a central point)
+    // For simulation, let's use a base coordinate and add some random jitter
+    const baseLat = 55.7558; // Moscow
+    const baseLng = 37.6173;
+    const lat = baseLat + (Math.random() - 0.5) * 0.1; // roughly 10km spread
+    const lng = baseLng + (Math.random() - 0.5) * 0.1;
+
+    // Reverse StarLink: Assign to a planetary cell (Hex Grid simulation)
+    const cell_id = `HEX-${Math.floor(lat * 10)}:${Math.floor(lng * 10)}`;
+    
+    // PlayStation Supercomputer: Assign to a compute cluster based on power
+    const cluster_id = `CLUSTER-${req.body.power_rating ? req.body.power_rating.split(' ')[0].toUpperCase() : 'UNKNOWN'}`;
+
     const node = {
       id,
       address: req.ip || req.socket.remoteAddress || "unknown",
@@ -202,23 +216,56 @@ async function startServer() {
       last_heartbeat: Date.now(),
       trust_score: 50,
       token,
-      delegated_to: delegatedTo || null
+      delegated_to: delegatedTo || null,
+      lat,
+      lng,
+      cell_id,
+      cluster_id,
+      senses: JSON.stringify({ vision: false, hearing: false, proprioception: false, touch: false })
     };
 
     await db.run(`
-      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to]);
+      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses]);
 
     console.log(`[SWARM] New node registered: ${id} (${node.power_rating}) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
     
     res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
   });
 
+  // 2.5 Mesh Topology (P2P Sensor Network)
+  app.get("/api/v1/mesh/topology", async (req, res) => {
+    const nodes = await db.all('SELECT id, lat, lng, status, trust_score, power_rating FROM nodes WHERE status = "online" AND is_banned = 0 AND is_frozen = 0');
+    const links = [];
+    
+    // Simulate Bluetooth/Local WiFi range (e.g., 0.02 degrees ~ 2km)
+    const MAX_DISTANCE = 0.02; 
+    
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].lat - nodes[j].lat;
+        const dy = nodes[i].lng - nodes[j].lng;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        if (dist < MAX_DISTANCE) {
+          links.push({ 
+            source: nodes[i].id, 
+            target: nodes[j].id, 
+            distance: dist 
+          });
+        }
+      }
+    }
+    
+    res.json({ nodes, links });
+  });
+
   // 3. Node Heartbeat & Task Polling
   app.post("/api/v1/nodes/:nodeId/heartbeat", async (req, res) => {
     const { nodeId } = req.params;
     const isp = req.body.isp || "unknown_isp"; // Client should send their ISP
+    const senses = req.body.senses; // Sensory telemetry
 
     const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
     
@@ -234,27 +281,89 @@ async function startServer() {
       return res.status(403).json({ error: "EMERGENCY: This node has been FROZEN by Magistrate Consensus." });
     }
 
-    await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
+    if (senses) {
+      await db.run('UPDATE nodes SET last_heartbeat = ?, status = ?, senses = ? WHERE id = ?', [Date.now(), 'online', JSON.stringify(senses), nodeId]);
+    } else {
+      await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
+    }
 
-    // Simulate assigning a routing task randomly (20% chance per heartbeat)
     let assignedTask = null;
-    if (Math.random() < 0.2) {
-      const taskId = uuidv4();
-      const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
-      
-    // Commissar decides the best strategy for this ISP
-    const isMagistrate = node.trust_score >= 90;
-    const selectedStrategy = await Commissar.getRecommendedStrategy(isp, isMagistrate);
+    
+    // Parse capabilities to check battery
+    let batteryHealth = "unknown";
+    try {
+      const caps = JSON.parse(node.capabilities);
+      if (caps.manifest) batteryHealth = caps.manifest.battery_health;
+    } catch(e) {}
 
-    assignedTask = {
-        id: taskId,
-        type: "byedpi_routing",
-        target: targets[Math.floor(Math.random() * targets.length)],
-        strategy: selectedStrategy.name,
-        params: selectedStrategy.params,
-        isp: isp
-      };
-      activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+    // 1. Prioritize Distributed Cluster Jobs (PlayStation Supercomputer)
+    if (batteryHealth === 'good' || batteryHealth === 'unknown') {
+      for (const job of distributedJobs.values()) {
+        if (job.status === 'running') {
+          const pendingChunk = job.chunks.find((c: any) => c.status === 'pending');
+          if (pendingChunk) {
+            pendingChunk.status = 'assigned';
+            pendingChunk.assigned_to = nodeId;
+            assignedTask = {
+              id: pendingChunk.id, // using chunk id as task id
+              job_id: job.id,
+              type: "cluster_chunk",
+              job_type: job.type,
+              start: pendingChunk.start,
+              end: pendingChunk.end
+            };
+            activeTasks.set(assignedTask.id, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. If no cluster job, fallback to regular tasks
+    if (!assignedTask) {
+      const rand = Math.random();
+      if (rand < 0.2) {
+        // BYEDPI Routing Task (20% chance)
+        const taskId = uuidv4();
+        const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
+        
+        // Commissar decides the best strategy for this ISP
+        const isMagistrate = node.trust_score >= 90;
+        const selectedStrategy = await Commissar.getRecommendedStrategy(isp, isMagistrate);
+
+        assignedTask = {
+          id: taskId,
+          type: "byedpi_routing",
+          target: targets[Math.floor(Math.random() * targets.length)],
+          strategy: selectedStrategy.name,
+          params: selectedStrategy.params,
+          isp: isp
+        };
+        activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+      } else if (rand < 0.4 && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
+        // Compute Task (20% chance, only if battery is good or unknown/desktop)
+        const taskId = uuidv4();
+        assignedTask = {
+          id: taskId,
+          type: "compute_hash",
+          target: "PoW_Mining",
+          difficulty: 3, // 3 leading zeros
+          seed: uuidv4(),
+          isp: isp
+        };
+        activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+      } else if (rand < 0.5) {
+        // Spatial Recon Task (10% chance) - Reverse StarLink
+        const taskId = uuidv4();
+        assignedTask = {
+          id: taskId,
+          type: "spatial_recon",
+          target: "local_infrastructure",
+          cell_id: node.cell_id,
+          isp: isp
+        };
+        activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+      }
     }
 
     res.json({ 
@@ -282,11 +391,63 @@ async function startServer() {
       task.status = success ? "completed" : "failed";
       activeTasks.set(taskId, task);
       
+      if (success) {
+        let karmaReward = 0;
+        let action = "";
+        if (task.type === "compute_hash") { karmaReward = 2; action = "PROOF_OF_WORK"; }
+        if (task.type === "byedpi_routing") { karmaReward = 1; action = "ROUTING"; }
+        if (task.type === "store_akashic_shard") { karmaReward = 3; action = "STORAGE"; }
+        if (task.type === "cluster_chunk") { karmaReward = 5; action = "CLUSTER_COMPUTE"; }
+        if (task.type === "spatial_recon") { karmaReward = 4; action = "RECONNAISSANCE"; }
+
+        // Handle PlayStation Supercomputer chunk completion
+        if (task.type === "cluster_chunk") {
+          const job = distributedJobs.get(task.job_id);
+          if (job) {
+            const chunk = job.chunks.find((c: any) => c.id === taskId);
+            if (chunk) {
+              chunk.status = 'completed';
+              chunk.result = req.body.result;
+              job.completed_chunks++;
+              
+              if (job.completed_chunks === job.chunksCount) {
+                job.status = 'completed';
+                if (job.type === 'prime_search') {
+                  job.final_result = job.chunks.reduce((sum: number, c: any) => sum + (c.result || 0), 0);
+                  console.log(`[CLUSTER] Job ${job.name} COMPLETED! Final result: ${job.final_result}`);
+                }
+              }
+            }
+          }
+        }
+
+        if (karmaReward > 0) {
+          await db.run('UPDATE nodes SET trust_score = MIN(100, trust_score + ?) WHERE id = ?', [karmaReward, nodeId]);
+          
+          // Satoshi's Ledger: Immutable Karma Blockchain
+          const lastBlock = await db.get('SELECT hash FROM karma_ledger ORDER BY timestamp DESC LIMIT 1');
+          const prevHash = lastBlock ? lastBlock.hash : "GENESIS";
+          const timestamp = Date.now();
+          
+          // Simple hash simulation for the ledger
+          const crypto = require('crypto');
+          const blockData = `${prevHash}${nodeId}${action}${karmaReward}${timestamp}`;
+          const hash = crypto.createHash('sha256').update(blockData).digest('hex');
+          
+          await db.run(`
+            INSERT INTO karma_ledger (id, node_id, action, amount, timestamp, previous_hash, hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `, [uuidv4(), nodeId, action, karmaReward, timestamp, prevHash, hash]);
+          
+          console.log(`[KARMA] Node ${nodeId.substring(0,8)} earned +${karmaReward} for ${action}. Block: ${hash.substring(0,8)}`);
+        }
+      }
+
       // Record Telemetry (The Echo / Waggle Dance)
       await db.run(`
         INSERT INTO telemetry (id, node_id, strategy_name, target, success, latency_ms, timestamp, isp)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [uuidv4(), nodeId, task.strategy, task.target, success ? 1 : 0, latency_ms || 0, Date.now(), task.isp]);
+      `, [uuidv4(), nodeId, task.strategy || 'compute', task.target, success ? 1 : 0, latency_ms || 0, Date.now(), task.isp || 'unknown']);
 
       // Broadcast to Matrix (The Echo)
       if (matrixEcho) {
@@ -418,7 +579,104 @@ async function startServer() {
 
   app.get("/api/v1/akashic/records", async (req, res) => {
     const records = await db.all('SELECT * FROM akashic_records ORDER BY created_at DESC');
-    res.json(records);
+    
+    // Simulate Torrent Mechanics (Seeds and Peers) for the "Digital Honey"
+    const enrichedRecords = records.map(r => ({
+      ...r,
+      seeds: Math.floor(Math.random() * 50) + 5, // 5 to 55 seeds (Archivists storing the shard)
+      peers: Math.floor(Math.random() * 100) + 10  // 10 to 110 peers (Nodes requesting the knowledge)
+    }));
+    
+    res.json(enrichedRecords);
+  });
+
+  // ==========================================
+  // KARMA LEDGER (Satoshi's Blockchain)
+  // ==========================================
+  app.get("/api/v1/karma/ledger", async (req, res) => {
+    const blocks = await db.all('SELECT * FROM karma_ledger ORDER BY timestamp DESC LIMIT 50');
+    res.json(blocks);
+  });
+
+  // ==========================================
+  // SENSORY CORTEX (The Avatar's Senses)
+  // ==========================================
+  app.get("/api/v1/swarm/senses", async (req, res) => {
+    const nodes = await db.all('SELECT id, senses FROM nodes WHERE status = "online" AND is_banned = 0 AND senses IS NOT NULL');
+    const aggregated = {
+      vision: 0,
+      hearing: 0,
+      proprioception: 0,
+      touch: 0,
+      total: nodes.length
+    };
+
+    nodes.forEach(n => {
+      try {
+        const s = JSON.parse(n.senses);
+        if (s.vision) aggregated.vision++;
+        if (s.hearing) aggregated.hearing++;
+        if (s.proprioception) aggregated.proprioception++;
+        if (s.touch) aggregated.touch++;
+      } catch(e) {}
+    });
+
+    res.json(aggregated);
+  });
+
+  // ==========================================
+  // REVERSE STARLINK (Planetary Grid)
+  // ==========================================
+  app.get("/api/v1/mesh/planetary", async (req, res) => {
+    const cells = await db.all(`
+      SELECT cell_id, COUNT(id) as node_count, AVG(trust_score) as avg_trust, AVG(lat) as lat, AVG(lng) as lng
+      FROM nodes
+      WHERE status = 'online' AND is_banned = 0 AND cell_id IS NOT NULL
+      GROUP BY cell_id
+    `);
+    res.json(cells);
+  });
+
+  // ==========================================
+  // PLAYSTATION SUPERCOMPUTER (Distributed Cluster)
+  // ==========================================
+  app.post("/api/v1/cluster/job", async (req, res) => {
+    const { name, type, totalRange, chunksCount } = req.body;
+    const jobId = uuidv4();
+    const chunks = [];
+    const chunkSize = Math.ceil(totalRange / chunksCount);
+    
+    for(let i=0; i<chunksCount; i++) {
+      chunks.push({
+        id: uuidv4(),
+        index: i,
+        start: i * chunkSize,
+        end: Math.min((i+1) * chunkSize, totalRange),
+        status: 'pending',
+        assigned_to: null,
+        result: null
+      });
+    }
+    
+    distributedJobs.set(jobId, {
+      id: jobId, 
+      name, 
+      type, 
+      totalRange, 
+      chunksCount,
+      chunks, 
+      status: 'running', 
+      created_at: Date.now(),
+      completed_chunks: 0, 
+      final_result: null
+    });
+    
+    console.log(`[CLUSTER] New distributed job created: ${name} (${chunksCount} chunks)`);
+    res.json({ jobId, message: "Distributed job initialized." });
+  });
+
+  app.get("/api/v1/cluster/jobs", (req, res) => {
+    res.json(Array.from(distributedJobs.values()));
   });
 
   // 6. Magistrate Consensus (Governance)

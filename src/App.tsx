@@ -9,8 +9,12 @@ import { Leaderboard } from './components/Leaderboard';
 import { MagistrateCouncil } from './components/MagistrateCouncil';
 import { GovernanceHistory } from './components/GovernanceHistory';
 import { NodeList } from './components/NodeList';
-
 import { AkashicRecords } from './components/AkashicRecords';
+import { NetworkTopology } from './components/NetworkTopology';
+import { KarmaLedger } from './components/KarmaLedger';
+import { ClusterMonitor } from './components/ClusterMonitor';
+import { PlanetaryGrid } from './components/PlanetaryGrid';
+import { SensoryCortex } from './components/SensoryCortex';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -357,6 +361,18 @@ function MainDashboard() {
 
           {/* Middle Column: Node Map & Commissar Intel */}
           <div className="space-y-6 flex flex-col">
+            {/* Sensory Cortex */}
+            <SensoryCortex />
+
+            {/* Mesh Topology */}
+            <NetworkTopology />
+
+            {/* Planetary Grid */}
+            <PlanetaryGrid />
+
+            {/* PlayStation Supercomputer */}
+            <ClusterMonitor />
+
             {/* Akashic Records */}
             <AkashicRecords />
 
@@ -394,6 +410,9 @@ function MainDashboard() {
           {/* Right Column: Tasks & Logs */}
           <div className="space-y-6 flex flex-col">
             
+            {/* Karma Ledger (Blockchain) */}
+            <KarmaLedger />
+
             {/* Active Tasks */}
             <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex-1">
               <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
