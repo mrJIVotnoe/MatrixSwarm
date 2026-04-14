@@ -40,14 +40,6 @@ async function initDb(db: Database) {
       senses TEXT
     );
 
-    // Migration: Ensure new columns exist
-    try { await db.run('ALTER TABLE nodes ADD COLUMN is_frozen INTEGER DEFAULT 0'); } catch (e) {}
-    try { await db.run('ALTER TABLE nodes ADD COLUMN lat REAL DEFAULT 0'); } catch (e) {}
-    try { await db.run('ALTER TABLE nodes ADD COLUMN lng REAL DEFAULT 0'); } catch (e) {}
-    try { await db.run('ALTER TABLE nodes ADD COLUMN cell_id TEXT'); } catch (e) {}
-    try { await db.run('ALTER TABLE nodes ADD COLUMN cluster_id TEXT'); } catch (e) {}
-    try { await db.run('ALTER TABLE nodes ADD COLUMN senses TEXT'); } catch (e) {}
-
     CREATE TABLE IF NOT EXISTS karma_ledger (
       id TEXT PRIMARY KEY,
       node_id TEXT,
@@ -103,6 +95,14 @@ async function initDb(db: Database) {
       status TEXT -- 'assigned', 'stored'
     );
   `);
+
+  // Migration: Ensure new columns exist
+  try { await db.run('ALTER TABLE nodes ADD COLUMN is_frozen INTEGER DEFAULT 0'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN lat REAL DEFAULT 0'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN lng REAL DEFAULT 0'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN cell_id TEXT'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN cluster_id TEXT'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN senses TEXT'); } catch (e) {}
 
   // Seed initial strategies if empty
   const count = await db.get('SELECT COUNT(*) as count FROM strategies');

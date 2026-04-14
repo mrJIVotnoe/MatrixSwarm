@@ -10,7 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "start": "node server.ts",
+    "start": "tsx server.ts",
     "prepare": "husky install",
     "os": "tsx src/os/Orchestrator.ts",
     "simulate": "tsx swarm/node_simulator.ts"
@@ -52,7 +52,8 @@
     "react-router-dom": "^7.13.2",
     "recharts": "^3.8.1",
     "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1",
+    "sqlite3": "5.1.7",
+    "tsx": "^4.21.0",
     "uuid": "^11.1.0",
     "vite": "^6.2.0",
     "ws": "^8.20.0"
@@ -66,7 +67,6 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.1.4"
