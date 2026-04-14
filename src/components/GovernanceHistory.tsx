@@ -42,9 +42,9 @@ export const GovernanceHistory: React.FC = () => {
   );
 
   return (
-    <div className="bg-neutral-900 border border-emerald-500/20 rounded-sm p-5 h-full flex flex-col">
+    <div className="bg-slate-900 border border-cyan-500/20 rounded-sm p-5 h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-sm font-bold flex items-center gap-2 text-emerald-400">
+        <h2 className="text-sm font-bold flex items-center gap-2 text-cyan-400">
           <History className="w-4 h-4" />
           АРХИВ РЕШЕНИЙ (GOVERNANCE HISTORY)
         </h2>
@@ -55,7 +55,7 @@ export const GovernanceHistory: React.FC = () => {
             placeholder="Поиск..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="bg-neutral-950 border border-neutral-800 text-[10px] pl-7 pr-2 py-1 rounded-sm focus:border-emerald-500/50 outline-none text-emerald-400 w-32"
+            className="bg-slate-950 border border-slate-800 text-[10px] pl-7 pr-2 py-1 rounded-sm focus:border-cyan-500/50 outline-none text-cyan-400 w-32"
           />
         </div>
       </div>
@@ -66,7 +66,7 @@ export const GovernanceHistory: React.FC = () => {
             key={record.id}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-neutral-950 border-l-2 border-neutral-800 p-3 hover:bg-neutral-900 transition-colors"
+            className="bg-slate-950 border-l-2 border-slate-800 p-3 hover:bg-slate-900 transition-colors"
             style={{ borderLeftColor: record.status === 'approved' ? '#10b981' : '#ef4444' }}
           >
             <div className="flex justify-between items-start mb-2">
@@ -80,7 +80,7 @@ export const GovernanceHistory: React.FC = () => {
                    `${record.parameter_name.replace('_', ' ')} → ${record.parameter_value}`}
                 </h3>
               </div>
-              <div className={`flex items-center gap-1 text-[9px] font-bold uppercase ${record.status === 'approved' ? 'text-emerald-500' : 'text-red-500'}`}>
+              <div className={`flex items-center gap-1 text-[9px] font-bold uppercase ${record.status === 'approved' ? 'text-cyan-500' : 'text-red-500'}`}>
                 {record.status === 'approved' ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                 {record.status}
               </div>

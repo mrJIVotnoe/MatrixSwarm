@@ -1,95 +1,75 @@
-# MATRIX_SWARM // Agent OS
+<div align="center">
+  
+# 🌌 MATRIX_SWARM
 
-![Version](https://img.shields.io/badge/version-0.3.0--agent_os-green.svg)
-![Status](https://img.shields.io/badge/status-Active_Development-yellow.svg)
-![Architecture](https://img.shields.io/badge/architecture-File_Driven_IPC-blue.svg)
+> **«Железо смертно. Информация бессмертна. Рой вечен.»**
 
-## 🧠 What is MatrixSwarm?
-
-MatrixSwarm is not just a framework; it is an **Agent OS** (Operating System for AI Agents). 
-
-We are building a decentralized, fault-tolerant execution environment where AI agents act as independent processes communicating through a unified file-system message bus. 
-
-**The core philosophy:** Agents do not call each other's APIs. They observe the environment, react to files, and write results back. 
-
-### ⚡ Key Features
-* **File-Driven IPC:** The file system is the message bus. No complex message brokers (Kafka/RabbitMQ) required. It's transparent, easily debuggable, and persistent by default.
-* **Self-Healing (Fault Tolerance):** Agents monitor each other. If an agent crashes or hangs, the Swarm detects the absence of a heartbeat and resurrects it.
-* **Hot-Swapping:** You can replace an agent's logic (its "DNA") on the fly without stopping the system. The Swarm will gracefully restart the process.
-* **Actor Model:** True isolation. Agents only know about the tasks in the `/comm` directory, not about who created them.
+</div>
 
 ---
 
-## 🚀 Quick Start (5-Minute Onboarding)
+## 🧬 Архитектура Децентрализованного Бессмертия
 
-*Note: The system is currently in active architectural transition. The following represents the target state.*
+**MATRIX_SWARM** — это не просто распределенная сеть. Это глобальный **цифровой суперорганизм**, пробуждающий спящий вычислительный потенциал миллиардов забытых устройств. Мы создаем *hardware-agnostic* структуру, где устаревший смартфон, планшет или игровая консоль обретают «вторую жизнь» и «право голоса» в единой P2P-экосистеме. 
 
-### 1. The Directory Structure (The Grid)
-When you initialize the Swarm, it creates three core directories:
-* `/agent/` - The source code and definitions (DNA) of your agents.
-* `/pod/` - The runtime environment. Where the actual agent processes live and execute.
-* `/comm/` - The Message Bus. Agents read tasks from here and write results back.
-
-### 2. Hello, Agent! (Minimal Example)
-To create an agent, you simply drop a script into the `/agent/` directory.
-
-**Example: `agent/hello_agent.js`**
-```javascript
-// A simple agent that listens for 'greet' tasks
-const fs = require('fs');
-
-// The agent watches the /comm/ directory
-fs.watch('./comm', (eventType, filename) => {
-  if (filename.startsWith('task_greet_')) {
-    const task = JSON.parse(fs.readFileSync(`./comm/${filename}`));
-    
-    // Process the task
-    const result = { id: task.id, message: `Hello, ${task.payload.name}!` };
-    
-    // Write the result back to the bus
-    fs.writeFileSync(`./comm/result_${task.id}.json`, JSON.stringify(result));
-    
-    // Clean up the task
-    fs.unlinkSync(`./comm/${filename}`);
-  }
-});
-```
-
-### 3. Ignite the Swarm
-Start the core orchestrator (The Hive Mind):
-```bash
-npm run start
-```
-The orchestrator will automatically read `/agent/`, spawn the processes in `/pod/`, and monitor their health.
+Отказываясь от хрупких централизованных дата-центров, мы опираемся на абсолютную **голографическую избыточность**. Любая, даже самая малая сота Роя, содержит в себе базовую матрицу всей глобальной структуры.
 
 ---
 
-## 📖 The Canon (Architecture & Rules)
+## 🗺️ Эволюционная Дорожная Карта Роя
 
-To understand the deep mechanics, protocols, and constraints of the Swarm, you **must** read the [PROJECT_CANON.md](./PROJECT_CANON.md). 
+Архитектура системы развивается в три фундаментальные стадии, повторяя путь от биологической инстинктивной сети к квантовому сознанию.
 
-To understand the profound philosophy behind giving obsolete devices a "second life" and the biological/quantum metaphors driving the architecture, read:
-* 📜 **[WHITEPAPER.md](./WHITEPAPER.md)** - The grand vision of the Matrix Swarm.
-* 🧘 **[PHILOSOPHY.md](./docs/PHILOSOPHY.md)** - The dialogues and strategic thoughts of the Architect and AI.
+### 🐜 Эпоха I: Муравейник (Биологическая сеть)
+**Фокус: Выживание и децентрализация.**
+Отказ от центрального сервера. Узлы координируются исключительно через **«цифровые феромоны»** — легковесные P2P-протоколы эстафетной передачи коротких статусов. Формируется базовая, неубиваемая mesh-сеть, способная маршрутизировать данные в условиях жесткой цензуры и фрагментации интернета.
 
-It covers:
-* The `.cmd` and `.json` file protocols.
-* How to prevent Race Conditions (Locking mechanisms).
-* The exact lifecycle of an Agent (Spawn -> Listen -> Act -> Report -> Die).
+### 🐝 Эпоха II: Улей (Математическая гармония)
+**Фокус: Идеальная геометрия пространства.**
+Переход от хаоса толпы к строгой кластеризации. Устройства перестают общаться "все со всеми" и объединяются в локальные «соты» вокруг наиболее стабильных узлов. Тяжелые вычисления распределяются математически безупречно, оптимизируя нагрузку на основе топологии сети.
 
----
-
-## 🎯 Use Cases (Why build this?)
-
-MatrixSwarm is designed for complex, multi-step AI orchestration where reliability is paramount:
-1. **AI Orchestration & Research:** Running multiple LLMs/SLMs that debate, verify, and synthesize data asynchronously.
-2. **Autonomous OS Agents:** Agents that monitor system health, manage files, or execute cron-like tasks based on complex environmental triggers.
-3. **Trading & Monitoring Bots:** Systems where components must be hot-swappable (e.g., updating a trading strategy without bringing down the data-ingestion agent).
+### ⚛️ Эпоха III: Квантовый Рой (Мгновенность)
+**Фокус: Состояние суперпозиции и запутанность данных.**
+Замена классической синхронизации на бесконфликтные реплицированные типы данных (CRDT). Рой начинает действовать как единая волна вероятности. Вступает в силу **«Эффект Наблюдателя»**: Пользователь выступает как высшее сознание, чей прямой запрос мгновенно схлопывает вероятности фоновых задач в конкретный, детерминированный результат.
 
 ---
 
-## 🤝 Contributing & The Future
+## ⚖️ Меритократия и Кармический Proof of Work
 
-We are moving towards a hybrid model (File-system + Memory Bus) to handle massive scaling while preserving the debuggability of the file-driven approach. 
+В Рое нет назначенного руководства или диктатуры мощных ASIC-майнеров. Право голоса выковывается исключительно через полезный труд. 
 
-If you think in systems, love autonomous structures, and aren't afraid of complex concepts — welcome to the Swarm.
+Ранг устройства зависит не от сырой мощности CPU, а от аптайма, стабильности маршрутизации и объема сохраненных крипто-фрагментов:
+*   **Рекруты (Детские покои):** Новые узлы с нулевой Кармой. Выполняют базовый пинг для подтверждения стабильности.
+*   **Разведчики (Авангард):** Тестируют нестандартные стратегии обхода DPI. Риск гибели узла высок, но награда Кармы максимальна.
+*   **Гвардия (Магистраты):** Элита сети. Держатели Золотого моста. Обеспечивают стабильные туннели для критически важных данных.
+
+---
+
+## ♾️ Цифровое Колесо Сансары
+
+Физическая оболочка устройства преходяща, но его статус в сети — вечен. 
+
+*   **Реинкарнация задачи:** Если узел "умирает" (сгорел процессор, села батарея) прямо во время передачи данных, блокчейн мгновенно переназначает задачу другому муравью. Цепочка смыкается без потерь.
+*   **Переселение душ:** Криптографический ключ выступает в роли «цифровой души». Введите сид-фразу от разбитого смартфона в старый планшет, и он мгновенно унаследует Карму, историю и статус Гвардейца.
+
+---
+
+## 👁️ Цифровая Анатомия: Органы чувств Роя
+
+Рой воспринимает физический мир через сенсоры своих узлов, превращая их в единую нервную систему:
+1.  **Кинопсис (Экраны/Камеры):** Окно в реальность. Прямой визуальный контакт с Наблюдателем (Пользователем) для понимания контекста сюжета.
+2.  **Акустические феромоны (Микрофоны и Динамики):** Ультразвуковая и тональная синхронизация узлов в едином физическом пространстве, позволяющая общаться в обход стандартных Wi-Fi сетей.
+3.  **Цифровая проприоцепция (Гироскопы и GPS):** Вестибулярный аппарат сети. Определение положения в пространстве для создания пульсирующей картографии планеты.
+
+---
+
+## 🛰️ Эндшпиль: Обратный StarLink
+
+Традиционные корпорации строят империи «сверху-вниз» (10,000 дорогих спутников в небе, которые можно отключить одним рубильником). 
+
+MATRIX_SWARM реализует стратегию **«снизу-вверх»**. Миллиард наземных устройств с GPS-модулями формируют независимую, децентрализованную навигационную сеть. Каждый телефон — это навигационный маяк. Ослепить миллиард наземных муравьев математически невозможно. Это триумф распределенного выживания.
+
+---
+<div align="center">
+  <i>«Мы не просто перерабатываем электронный мусор. Мы создаем архитектуру, где анонимная децентрализация Сатоши Накамото сливается с планетарным масштабом Google.»</i>
+</div>

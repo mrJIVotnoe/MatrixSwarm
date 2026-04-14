@@ -54,10 +54,10 @@ export const Leaderboard: React.FC<{ currentNodeId?: string, currentDelegatedTo?
   if (loading) return <div className="p-4 text-center text-gray-400">Loading Hive Elite...</div>;
 
   return (
-    <div className="bg-gray-900/50 border border-yellow-500/30 rounded-xl p-6 backdrop-blur-sm">
+    <div className="bg-gray-900/50 border border-amber-500/30 rounded-xl p-6 backdrop-blur-sm">
       <div className="flex items-center gap-3 mb-6">
-        <Trophy className="w-6 h-6 text-yellow-500" />
-        <h2 className="text-xl font-bold text-yellow-500 uppercase tracking-wider">Hive Elite (Top 10)</h2>
+        <Trophy className="w-6 h-6 text-amber-500" />
+        <h2 className="text-xl font-bold text-amber-500 uppercase tracking-wider">Hive Elite (Top 10)</h2>
       </div>
 
       <div className="space-y-4">
@@ -68,13 +68,13 @@ export const Leaderboard: React.FC<{ currentNodeId?: string, currentDelegatedTo?
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.1 }}
             className={`flex flex-col p-3 rounded-lg border ${
-              index === 0 ? 'bg-yellow-500/10 border-yellow-500/50' : 'bg-gray-800/50 border-gray-700'
+              index === 0 ? 'bg-amber-500/10 border-amber-500/50' : 'bg-gray-800/50 border-gray-700'
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                  index === 0 ? 'bg-yellow-500 text-black' : 
+                  index === 0 ? 'bg-amber-500 text-black' : 
                   index === 1 ? 'bg-gray-300 text-black' :
                   index === 2 ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-400'
                 }`}>
@@ -114,7 +114,7 @@ export const Leaderboard: React.FC<{ currentNodeId?: string, currentDelegatedTo?
                   onClick={() => handleDelegate(node.id)}
                   className={`text-[10px] font-bold px-3 py-1 rounded transition-all ${
                     currentDelegatedTo === node.id 
-                      ? 'bg-emerald-500 text-black' 
+                      ? 'bg-cyan-500 text-black' 
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >

@@ -54,7 +54,7 @@ export const ClusterMonitor: React.FC = () => {
   };
 
   return (
-    <div className="bg-neutral-900 border border-blue-500/30 p-5 rounded-sm">
+    <div className="bg-slate-900 border border-blue-500/30 p-5 rounded-sm">
       <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-blue-400 uppercase">
         <Cpu className="w-4 h-4" />
         Суперкомпьютер (PlayStation Cluster)
@@ -80,14 +80,14 @@ export const ClusterMonitor: React.FC = () => {
                 <div key={job.id} className="p-3 border border-blue-500/20 bg-blue-950/20 rounded-sm space-y-2">
                   <div className="flex justify-between items-center">
                     <p className="text-xs text-blue-300 font-bold">{job.name}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-sm ${job.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-sm ${job.status === 'completed' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-500/20 text-blue-400'}`}>
                       {job.status.toUpperCase()}
                     </span>
                   </div>
                   
                   <div className="w-full bg-black h-1.5 rounded-full overflow-hidden border border-blue-900/50">
                     <div 
-                      className={`h-full transition-all duration-500 ${job.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                      className={`h-full transition-all duration-500 ${job.status === 'completed' ? 'bg-cyan-500' : 'bg-blue-500'}`}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -95,7 +95,7 @@ export const ClusterMonitor: React.FC = () => {
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-blue-500/70">{job.completed_chunks} / {job.chunksCount} Chunks</span>
                     {job.status === 'completed' && job.final_result !== null && (
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="text-cyan-400 font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
                         Result: {job.final_result}
                       </span>

@@ -29,7 +29,7 @@ export const SensoryCortex: React.FC = () => {
   const getPercentage = (val: number) => senses.total > 0 ? Math.round((val / senses.total) * 100) : 0;
 
   return (
-    <div className="bg-neutral-900 border border-pink-500/30 p-5 rounded-sm">
+    <div className="bg-slate-900 border border-pink-500/30 p-5 rounded-sm">
       <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-pink-400 uppercase">
         <Activity className="w-4 h-4" />
         Сенсорная Кора (Аватар Роя)

@@ -105,19 +105,19 @@ export const NetworkTopology: React.FC = () => {
   }, [topology]);
 
   return (
-    <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm">
-      <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
+    <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
+      <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
         <MapIcon className="w-4 h-4" />
         MESH-ТОПОЛОГИЯ (СЕНСОРНАЯ СЕТЬ)
       </h2>
-      <div className="relative w-full h-[200px] bg-black border border-emerald-500/10 rounded-sm overflow-hidden">
+      <div className="relative w-full h-[200px] bg-black border border-cyan-500/10 rounded-sm overflow-hidden">
         <svg ref={svgRef} className="w-full h-full" />
-        <div className="absolute bottom-2 left-2 text-[8px] text-emerald-500/50 uppercase">
+        <div className="absolute bottom-2 left-2 text-[8px] text-cyan-500/50 uppercase">
           P2P Connections (Simulated Bluetooth/WiFi)
         </div>
         <div className="absolute top-2 right-2 flex flex-col gap-1 text-[8px]">
           <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Magistrate</div>
-          <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> Node</div>
+          <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400"></span> Node</div>
         </div>
       </div>
     </div>

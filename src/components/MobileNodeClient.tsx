@@ -215,7 +215,7 @@ export const MobileNodeClient: React.FC = () => {
             >
               <div className="bg-[#11111a] border border-cyan-900/30 p-6 rounded-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-2">
-                  <Activity className={`w-4 h-4 ${status === "working" ? "text-yellow-400 animate-pulse" : "text-green-400"}`} />
+                  <Activity className={`w-4 h-4 ${status === "working" ? "text-amber-400 animate-pulse" : "text-green-400"}`} />
                 </div>
                 <p className="text-[10px] text-gray-500 uppercase mb-1">Node_Identity</p>
                 <h3 className="text-xl font-bold text-white mb-4">{nodeInfo?.nodeId}</h3>
@@ -258,9 +258,9 @@ export const MobileNodeClient: React.FC = () => {
               <div className="bg-[#11111a] border border-cyan-900/30 p-6 rounded-sm min-h-[160px] flex flex-col justify-center items-center text-center">
                 {status === "working" ? (
                   <div className="space-y-4 w-full">
-                    <Loader2 className="w-12 h-12 text-yellow-400 animate-spin mx-auto" />
+                    <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto" />
                     <div>
-                      <p className="text-xs text-yellow-400 font-bold uppercase">Processing_Task</p>
+                      <p className="text-xs text-amber-400 font-bold uppercase">Processing_Task</p>
                       <p className="text-[10px] text-gray-600 mt-1">{currentTask?.id}</p>
                     </div>
                     {currentTask?.payload && (

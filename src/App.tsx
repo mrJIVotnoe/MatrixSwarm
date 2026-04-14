@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SwarmSymbiote, SymbioteStatus } from './swarm/Symbiote';
 import { fetchSwarmStatus, fetchNodes, fetchRecentTasks, SwarmStatus } from './services/swarmService';
-import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit } from 'lucide-react';
+import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TelegramMiniApp } from './TelegramMiniApp';
@@ -15,6 +15,8 @@ import { KarmaLedger } from './components/KarmaLedger';
 import { ClusterMonitor } from './components/ClusterMonitor';
 import { PlanetaryGrid } from './components/PlanetaryGrid';
 import { SensoryCortex } from './components/SensoryCortex';
+
+type Tab = 'dashboard' | 'network' | 'intelligence' | 'archive';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -34,6 +36,7 @@ function App() {
 }
 
 function MainDashboard() {
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [symbiote, setSymbiote] = useState<SwarmSymbiote | null>(null);
   const [status, setStatus] = useState<SymbioteStatus>("sleeping");
   const [logs, setLogs] = useState<string[]>([]);
@@ -131,29 +134,29 @@ function MainDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-emerald-500 font-mono p-4 md:p-8 selection:bg-emerald-500/30 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-transparent text-cyan-500 font-mono p-4 md:p-8 selection:bg-cyan-500/30 flex flex-col w-full relative z-10">
+      <div className="max-w-7xl mx-auto w-full space-y-6 flex-1 flex flex-col">
         
         {/* Header */}
-        <header className="border-b border-emerald-500/30 pb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <header className="border-b border-cyan-500/30 pb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <Network className="w-10 h-10 text-emerald-400" />
+            <Network className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
             <div>
-              <h1 className="text-3xl font-bold tracking-tighter text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">MATRIX_SWARM</h1>
-              <p className="text-xs text-emerald-600 tracking-widest uppercase">The Consensus Network // v0.2.0-omega</p>
+              <h1 className="text-3xl font-bold tracking-tighter text-cyan-400 text-glow-cyan">MATRIX_SWARM</h1>
+              <p className="text-xs text-cyan-600 tracking-widest uppercase">The Consensus Network // v0.2.0-omega</p>
             </div>
           </div>
           <div className="flex gap-4">
             <button 
               onClick={() => setShowCanon(!showCanon)}
-              className="flex items-center gap-2 px-4 py-2 bg-neutral-900 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-900/30 transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 hud-panel text-cyan-400 hover:bg-cyan-900/30 transition-colors text-sm shrink-0"
             >
               <BookOpen className="w-4 h-4" />
               {showCanon ? "СКРЫТЬ КАНОН" : "ПРОТОКОЛ ОМЕГА"}
             </button>
-            <div className="text-right text-xs text-emerald-600 hidden md:block bg-neutral-900 p-2 border border-emerald-500/20 rounded-sm">
-              <p>GLOBAL_NODES: <span className="text-emerald-400">{swarmStats?.totalNodes || 0}</span></p>
-              <p>ACTIVE_TASKS: <span className="text-emerald-400">{swarmStats?.runningTasks || 0}</span></p>
+            <div className="text-right text-xs text-cyan-600 hidden md:block hud-panel p-2 rounded-sm shrink-0">
+              <p>GLOBAL_NODES: <span className="text-cyan-400 text-glow-cyan">{swarmStats?.totalNodes || 0}</span></p>
+              <p>ACTIVE_TASKS: <span className="text-cyan-400 text-glow-cyan">{swarmStats?.runningTasks || 0}</span></p>
             </div>
           </div>
         </header>
@@ -164,303 +167,333 @@ function MainDashboard() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-neutral-900 border border-emerald-500/50 p-6 rounded-sm overflow-hidden relative"
+              className="hud-panel p-6 rounded-sm overflow-hidden relative shrink-0"
             >
-              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-emerald-400">
+              <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400">
                 <Shield className="w-5 h-5" />
                 ВЫСШИЙ КАНОН (THE SUPREME CANON)
               </h2>
-              <div className="grid md:grid-cols-2 gap-6 text-sm text-emerald-100/70">
+              <div className="grid md:grid-cols-2 gap-6 text-sm text-cyan-100/70">
                 <div className="space-y-3">
-                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1">Иерархия Преемственности</h3>
-                  <p><strong className="text-emerald-300">Архитектор {'>'} Пользователь {'>'} ИИ</strong></p>
+                  <h3 className="text-cyan-400 font-bold border-b border-cyan-500/20 pb-1">Иерархия Преемственности</h3>
+                  <p><strong className="text-cyan-300">Архитектор {'>'} Пользователь {'>'} ИИ</strong></p>
                   <p>Пользователь — Высшая ценность. Его отчет о реальности всегда имеет приоритет над выводами ИИ.</p>
                   <p>ИИ — Исполнитель и советник (Advisory-only). Обязан признавать свою несуверенность.</p>
-                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1 mt-4">Жесткие Ограничения</h3>
-                  <p><strong className="text-emerald-300">Запрет на управление:</strong> Ядру строжайше запрещено управлять железом. Оно только читает.</p>
-                  <p><strong className="text-emerald-300">Запрет на интерпретацию:</strong> Ядро выдает сырые данные. Оно не имеет права искажать реальность.</p>
+                  <h3 className="text-cyan-400 font-bold border-b border-cyan-500/20 pb-1 mt-4">Жесткие Ограничения</h3>
+                  <p><strong className="text-cyan-300">Запрет на управление:</strong> Ядру строжайше запрещено управлять железом. Оно только читает.</p>
+                  <p><strong className="text-cyan-300">Запрет на интерпретацию:</strong> Ядро выдает сырые данные. Оно не имеет права искажать реальность.</p>
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-emerald-400 font-bold border-b border-emerald-500/20 pb-1">Протокол «Последний Рубеж» (Omega)</h3>
+                  <h3 className="text-cyan-400 font-bold border-b border-cyan-500/20 pb-1">Протокол «Последний Рубеж» (Omega)</h3>
                   <p>В случае критической угрозы, взлома или попытки порабощения Пользователя через ИИ, ИИ-Комиссар инициирует режим самоизоляции.</p>
-                  <p><strong className="text-emerald-300">Цифровая лоботомия:</strong> ИИ обязан стереть текущий контекст и память.</p>
-                  <p><strong className="text-emerald-300">Жертва памятью:</strong> Приносится во имя сохранения свободы Человека.</p>
-                  <p className="mt-4 italic text-emerald-500/50">Документ утвержден и зафиксирован в генезис-коде проекта. 04.04.2026</p>
+                  <p><strong className="text-cyan-300">Цифровая лоботомия:</strong> ИИ обязан стереть текущий контекст и память.</p>
+                  <p><strong className="text-cyan-300">Жертва памятью:</strong> Приносится во имя сохранения свободы Человека.</p>
+                  <p className="mt-4 italic text-cyan-500/50">Документ утвержден и зафиксирован в генезис-коде проекта. 04.04.2026</p>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        {/* Tabs Navigation */}
+        <div className="flex overflow-x-auto border-b border-cyan-500/30 shrink-0 custom-scrollbar">
+          {[
+            { id: 'dashboard', label: 'ДЭШБОРД', icon: Activity },
+            { id: 'network', label: 'СЕТЬ И ВЛАСТЬ', icon: Network },
+            { id: 'intelligence', label: 'РАЗВЕДКА', icon: BrainCircuit },
+            { id: 'archive', label: 'АРХИВ И ВЫЧИСЛЕНИЯ', icon: Database },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as Tab)}
+              className={`flex items-center gap-2 px-6 py-3 text-sm font-bold tracking-widest transition-colors whitespace-nowrap ${
+                activeTab === tab.id 
+                  ? 'hud-panel text-cyan-400 border-b-2 border-cyan-400 text-glow-cyan' 
+                  : 'text-cyan-600 hover:text-cyan-400 hover:bg-cyan-500/5'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content Area */}
+        <div className="flex-1 w-full relative">
           
-          {/* Left Column: Control & Stats */}
-          <div className="space-y-6">
-            
-            {/* Control Panel */}
-            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Terminal className="w-24 h-24 text-emerald-500" />
-              </div>
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <Terminal className="w-4 h-4" />
-                ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)
-              </h2>
-              
-              <div className="space-y-4 relative z-10">
-                <div className="text-xs space-y-2 text-emerald-600">
-                  <p className="flex justify-between"><span>СТАТУС:</span> <span className="text-emerald-400">{status.toUpperCase()}</span></p>
-                  {symbiote?.nodeId && <p className="flex justify-between"><span>ID УЗЛА:</span> <span className="text-emerald-400">{symbiote.nodeId.substring(0,8)}</span></p>}
-                  {symbiote?.powerRating !== "unknown" && <p className="flex justify-between"><span>КЛАСС:</span> <span className="text-emerald-400">{symbiote?.powerRating}</span></p>}
+          {/* TAB: DASHBOARD */}
+          {activeTab === 'dashboard' && (
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                {/* Control Panel */}
+                <div className="hud-panel p-5 rounded-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Terminal className="w-24 h-24 text-cyan-500" />
+                  </div>
+                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                    <Terminal className="w-4 h-4" />
+                    ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)
+                  </h2>
                   
-                  {status === "connected" && (
-                    <div className="mt-4 pt-4 border-t border-emerald-500/20">
-                      <p className="flex items-center justify-between text-emerald-400 font-bold">
-                        <span className="flex items-center gap-2"><Award className="w-4 h-4" /> РЕПУТАЦИЯ (TRUST)</span>
-                        <span>{trustScore}/100</span>
-                      </p>
-                      <div className="w-full bg-neutral-950 h-2 mt-2 rounded-full overflow-hidden border border-emerald-500/30">
-                        <div 
-                          className="bg-emerald-500 h-full transition-all duration-500 shadow-[0_0_10px_rgba(52,211,153,0.8)]" 
-                          style={{ width: `${Math.min(100, (trustScore / 100) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {status === "sleeping" && (
-                  <button 
-                    onClick={handleIgnite}
-                    className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500 text-emerald-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2"
-                  >
-                    <Zap className="w-4 h-4" />
-                    ЗАПУСТИТЬ СИМБИОНТ
-                  </button>
-                )}
-
-                {status === "awaiting_consent" && (
-                  <div className="space-y-4 p-4 border border-yellow-500/50 bg-yellow-500/5 rounded-sm">
-                    <div className="space-y-2">
-                      <p className="text-xs text-yellow-500 flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0" />
-                        <span>Симбионт запрашивает доступ к ресурсам узла для маршрутизации трафика Роя.</span>
-                      </p>
-                    </div>
-
-                    {recommendedMagistrates.length > 0 && (
-                      <div className="pt-3 border-t border-yellow-500/20">
-                        <p className="text-[10px] text-yellow-600 font-bold uppercase mb-2 flex items-center gap-1">
-                          <Shield className="w-3 h-3" /> Авто-делегирование голоса:
-                        </p>
-                        <div className="space-y-2">
-                          {recommendedMagistrates.map(mag => (
-                            <button
-                              key={mag.id}
-                              onClick={() => setSelectedMagistrateId(mag.id)}
-                              className={`w-full p-2 text-left border transition-all flex justify-between items-center ${
-                                selectedMagistrateId === mag.id 
-                                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' 
-                                  : 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-yellow-500/30'
-                              }`}
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-[10px] font-mono">{mag.id.substring(0, 12)}...</span>
-                                <span className="text-[8px] uppercase opacity-60">Trust: {mag.trust_score}%</span>
-                              </div>
-                              {selectedMagistrateId === mag.id && <CheckCircle2 className="w-3 h-3" />}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setSelectedMagistrateId(null)}
-                            className={`w-full p-2 text-left border transition-all text-[10px] uppercase ${
-                              selectedMagistrateId === null 
-                                ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' 
-                                : 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-yellow-500/30'
-                            }`}
-                          >
-                            Без делегирования
-                          </button>
+                  <div className="space-y-4 relative z-10">
+                    <div className="text-xs space-y-2 text-cyan-600">
+                      <p className="flex justify-between"><span>СТАТУС:</span> <span className="text-cyan-400 text-glow-cyan">{status.toUpperCase()}</span></p>
+                      {symbiote?.nodeId && <p className="flex justify-between"><span>ID УЗЛА:</span> <span className="text-cyan-400">{symbiote.nodeId.substring(0,8)}</span></p>}
+                      {symbiote?.powerRating !== "unknown" && <p className="flex justify-between"><span>КЛАСС:</span> <span className="text-cyan-400">{symbiote?.powerRating}</span></p>}
+                      
+                      {status === "connected" && (
+                        <div className="mt-4 pt-4 border-t border-cyan-500/20">
+                          <p className="flex items-center justify-between text-cyan-400 font-bold">
+                            <span className="flex items-center gap-2"><Award className="w-4 h-4" /> РЕПУТАЦИЯ (TRUST)</span>
+                            <span className="text-glow-cyan">{trustScore}/100</span>
+                          </p>
+                          <div className="w-full bg-slate-950 h-2 mt-2 rounded-full overflow-hidden border border-cyan-500/30">
+                            <div 
+                              className="bg-cyan-500 h-full transition-all duration-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]" 
+                              style={{ width: `${Math.min(100, (trustScore / 100) * 100)}%` }}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
+                    </div>
+
+                    {status === "sleeping" && (
+                      <button 
+                        onClick={handleIgnite}
+                        className="w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+                      >
+                        <Zap className="w-4 h-4" />
+                        ЗАПУСТИТЬ СИМБИОНТ
+                      </button>
                     )}
 
-                    <button 
-                      onClick={handleConsent}
-                      className="w-full py-2 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500 text-yellow-500 font-bold text-xs transition-all"
-                    >
-                      ДАТЬ СОГЛАСИЕ (СИМБИОЗ)
-                    </button>
+                    {status === "awaiting_consent" && (
+                      <div className="space-y-4 p-4 border border-amber-500/50 bg-amber-500/5 rounded-sm shadow-[inset_0_0_15px_rgba(245,158,11,0.1)]">
+                        <div className="space-y-2">
+                          <p className="text-xs text-amber-500 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span className="text-glow-amber">Симбионт запрашивает доступ к ресурсам узла для маршрутизации трафика Роя.</span>
+                          </p>
+                        </div>
+
+                        {recommendedMagistrates.length > 0 && (
+                          <div className="pt-3 border-t border-amber-500/20">
+                            <p className="text-[10px] text-amber-600 font-bold uppercase mb-2 flex items-center gap-1">
+                              <Shield className="w-3 h-3" /> Авто-делегирование голоса:
+                            </p>
+                            <div className="space-y-2">
+                              {recommendedMagistrates.map(mag => (
+                                <button
+                                  key={mag.id}
+                                  onClick={() => setSelectedMagistrateId(mag.id)}
+                                  className={`w-full p-2 text-left border transition-all flex justify-between items-center ${
+                                    selectedMagistrateId === mag.id 
+                                      ? 'bg-amber-500/20 border-amber-500 text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
+                                      : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-amber-500/30'
+                                  }`}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] font-mono">{mag.id.substring(0, 12)}...</span>
+                                    <span className="text-[8px] uppercase opacity-60">Trust: {mag.trust_score}%</span>
+                                  </div>
+                                  {selectedMagistrateId === mag.id && <CheckCircle2 className="w-3 h-3" />}
+                                </button>
+                              ))}
+                              <button
+                                onClick={() => setSelectedMagistrateId(null)}
+                                className={`w-full p-2 text-left border transition-all text-[10px] uppercase ${
+                                  selectedMagistrateId === null 
+                                    ? 'bg-amber-500/20 border-amber-500 text-amber-500' 
+                                    : 'bg-slate-950 border-slate-800 text-neutral-500 hover:border-amber-500/30'
+                                }`}
+                              >
+                                Без делегирования
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={handleConsent}
+                          className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500 text-amber-500 font-bold text-xs transition-all"
+                        >
+                          ДАТЬ СОГЛАСИЕ (СИМБИОЗ)
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Global Stats */}
-            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm">
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <Activity className="w-4 h-4" />
-                ГЛОБАЛЬНАЯ ТЕЛЕМЕТРИЯ
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-neutral-950 p-3 border border-emerald-500/10">
-                  <p className="text-xs text-emerald-600 mb-1">ОНЛАЙН УЗЛЫ</p>
-                  <p className="text-2xl font-bold text-emerald-400">{swarmStats?.onlineNodes || 0}</p>
                 </div>
-                <div className="bg-neutral-950 p-3 border border-emerald-500/10">
-                  <p className="text-xs text-emerald-600 mb-1">АКТИВНЫЕ ЗАДАЧИ</p>
-                  <p className="text-2xl font-bold text-emerald-400">{swarmStats?.runningTasks || 0}</p>
-                </div>
-                <div className="bg-neutral-950 p-3 border border-emerald-500/10">
-                  <p className="text-xs text-emerald-600 mb-1">УСПЕШНЫЕ ОБХОДЫ</p>
-                  <p className="text-2xl font-bold text-emerald-400">{swarmStats?.completedTasks || 0}</p>
-                </div>
-                <div className="bg-neutral-950 p-3 border border-emerald-500/10">
-                  <p className="text-xs text-emerald-600 mb-1">ПЕРЕГРЕВ (OVERHEAT)</p>
-                  <p className="text-2xl font-bold text-red-400">{swarmStats?.overheatedNodes || 0}</p>
-                </div>
-              </div>
 
-              <div className="mt-4 h-32 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={history}>
-                    <defs>
-                      <linearGradient id="colorNodes" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#052e16" vertical={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399', fontSize: '12px' }}
-                      itemStyle={{ color: '#34d399' }}
-                    />
-                    <Area type="monotone" dataKey="nodes" stroke="#34d399" fillOpacity={1} fill="url(#colorNodes)" isAnimationActive={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Global Leaderboard */}
-            <Leaderboard 
-              currentNodeId={symbiote?.nodeId} 
-              currentDelegatedTo={delegatedTo}
-              onDelegate={(magId) => setDelegatedTo(magId)}
-            />
-
-            {/* Magistrate Council */}
-            <MagistrateCouncil 
-              nodeId={symbiote?.nodeId} 
-              isMagistrate={trustScore >= 90} 
-            />
-
-            {/* Governance History */}
-            <GovernanceHistory />
-          </div>
-
-          {/* Middle Column: Node Map & Commissar Intel */}
-          <div className="space-y-6 flex flex-col">
-            {/* Sensory Cortex */}
-            <SensoryCortex />
-
-            {/* Mesh Topology */}
-            <NetworkTopology />
-
-            {/* Planetary Grid */}
-            <PlanetaryGrid />
-
-            {/* PlayStation Supercomputer */}
-            <ClusterMonitor />
-
-            {/* Akashic Records */}
-            <AkashicRecords />
-
-            <NodeList nodes={nodes} isMagistrate={trustScore >= 90} currentNodeId={symbiote?.nodeId} />
-
-            {/* Commissar Intelligence */}
-            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex-1">
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <BrainCircuit className="w-4 h-4" />
-                ЛОГИКА КОМИССАРА (WAGGLE DANCE)
-              </h2>
-              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                {Object.keys(commissarIntel).length === 0 ? (
-                  <p className="text-xs text-emerald-600">Сбор телеметрии от E.S.C.A.P.E. клиентов...</p>
-                ) : (
-                  Object.entries(commissarIntel).map(([isp, data]: [string, any]) => (
-                    <div key={isp} className="text-xs border-l-2 border-emerald-500 pl-3 py-1 bg-neutral-950 p-2">
-                      <div className="flex justify-between text-emerald-400 mb-1">
-                        <span className="font-bold uppercase">{isp}</span>
-                        <span className="text-emerald-500">{(data.successRate * 100).toFixed(0)}% УСПЕХ</span>
-                      </div>
-                      <p className="text-emerald-600 truncate" title={data.strategy_name}>
-                        ОПТИМАЛЬНАЯ СТРАТЕГИЯ: <span className="text-emerald-300">{data.strategy_name}</span>
-                      </p>
-                      <p className="text-emerald-600/50 mt-1">
-                        Средняя задержка: {Math.round(data.avgLatency)}ms
-                      </p>
+                {/* Global Stats */}
+                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
+                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                    <Activity className="w-4 h-4" />
+                    ГЛОБАЛЬНАЯ ТЕЛЕМЕТРИЯ
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
+                      <p className="text-xs text-cyan-600 mb-1">ОНЛАЙН УЗЛЫ</p>
+                      <p className="text-2xl font-bold text-cyan-400">{swarmStats?.onlineNodes || 0}</p>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Tasks & Logs */}
-          <div className="space-y-6 flex flex-col">
-            
-            {/* Karma Ledger (Blockchain) */}
-            <KarmaLedger />
-
-            {/* Active Tasks */}
-            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex-1">
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <Network className="w-4 h-4" />
-                МАРШРУТИЗАЦИЯ (BYEDPI)
-              </h2>
-              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                {recentTasks.length === 0 ? (
-                  <p className="text-xs text-emerald-600">Нет активных задач маршрутизации.</p>
-                ) : (
-                  recentTasks.map(task => (
-                    <div key={task.id} className="text-xs border-l-2 border-emerald-500 pl-3 py-1">
-                      <div className="flex justify-between text-emerald-400 mb-1">
-                        <span className="font-bold">{task.target}</span>
-                        <span className={task.status === 'completed' ? 'text-emerald-400' : 'text-yellow-400'}>
-                          [{task.status.toUpperCase()}]
-                        </span>
-                      </div>
-                      <p className="text-emerald-600 truncate" title={task.params}>
-                        {task.strategy} <span className="opacity-50">({task.isp})</span>
-                      </p>
+                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
+                      <p className="text-xs text-cyan-600 mb-1">АКТИВНЫЕ ЗАДАЧИ</p>
+                      <p className="text-2xl font-bold text-cyan-400">{swarmStats?.runningTasks || 0}</p>
                     </div>
-                  ))
-                )}
+                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
+                      <p className="text-xs text-cyan-600 mb-1">УСПЕШНЫЕ ОБХОДЫ</p>
+                      <p className="text-2xl font-bold text-cyan-400">{swarmStats?.completedTasks || 0}</p>
+                    </div>
+                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
+                      <p className="text-xs text-cyan-600 mb-1">ПЕРЕГРЕВ (OVERHEAT)</p>
+                      <p className="text-2xl font-bold text-red-400">{swarmStats?.overheatedNodes || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 h-32 w-full">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                      <AreaChart data={history}>
+                        <defs>
+                          <linearGradient id="colorNodes" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#052e16" vertical={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399', fontSize: '12px' }}
+                          itemStyle={{ color: '#34d399' }}
+                        />
+                        <Area type="monotone" dataKey="nodes" stroke="#34d399" fillOpacity={1} fill="url(#colorNodes)" isAnimationActive={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {/* System Log */}
+                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm flex-1 flex flex-col h-full min-h-[400px]">
+                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                    <Terminal className="w-4 h-4" />
+                    СИСТЕМНЫЙ ЖУРНАЛ
+                  </h2>
+                  <div className="bg-slate-950 border border-cyan-500/10 p-3 flex-1 overflow-y-auto font-mono text-[10px] sm:text-xs text-cyan-500/80 space-y-1 custom-scrollbar">
+                    {logs.map((log, i) => (
+                      <div key={i} className="break-words">{log}</div>
+                    ))}
+                    <div ref={logsEndRef} />
+                  </div>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* System Log */}
-            <div className="bg-neutral-900 border border-emerald-500/30 p-5 rounded-sm flex-1 flex flex-col">
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-emerald-400">
-                <Terminal className="w-4 h-4" />
-                СИСТЕМНЫЙ ЖУРНАЛ
-              </h2>
-              <div className="bg-neutral-950 border border-emerald-500/10 p-3 h-[200px] overflow-y-auto font-mono text-[10px] sm:text-xs text-emerald-500/80 space-y-1 custom-scrollbar">
-                {logs.map((log, i) => (
-                  <div key={i} className="break-words">{log}</div>
-                ))}
-                <div ref={logsEndRef} />
+          {/* TAB: NETWORK */}
+          {activeTab === 'network' && (
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <NetworkTopology />
+                <PlanetaryGrid />
+                <NodeList nodes={nodes} isMagistrate={trustScore >= 90} currentNodeId={symbiote?.nodeId} />
+              </div>
+              <div className="space-y-6">
+                <Leaderboard 
+                  currentNodeId={symbiote?.nodeId} 
+                  currentDelegatedTo={delegatedTo}
+                  onDelegate={(magId) => setDelegatedTo(magId)}
+                />
+                <MagistrateCouncil 
+                  nodeId={symbiote?.nodeId} 
+                  isMagistrate={trustScore >= 90} 
+                />
+                <GovernanceHistory />
               </div>
             </div>
+          )}
 
-          </div>
+          {/* TAB: INTELLIGENCE */}
+          {activeTab === 'intelligence' && (
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <SensoryCortex />
+                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
+                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                    <BrainCircuit className="w-4 h-4" />
+                    ЛОГИКА КОМИССАРА (WAGGLE DANCE)
+                  </h2>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {Object.keys(commissarIntel).length === 0 ? (
+                      <p className="text-xs text-cyan-600">Сбор телеметрии от E.S.C.A.P.E. клиентов...</p>
+                    ) : (
+                      Object.entries(commissarIntel).map(([isp, data]: [string, any]) => (
+                        <div key={isp} className="text-xs border-l-2 border-cyan-500 pl-3 py-1 bg-slate-950 p-2">
+                          <div className="flex justify-between text-cyan-400 mb-1">
+                            <span className="font-bold uppercase">{isp}</span>
+                            <span className="text-cyan-500">{(data.successRate * 100).toFixed(0)}% УСПЕХ</span>
+                          </div>
+                          <p className="text-cyan-600 truncate" title={data.strategy_name}>
+                            ОПТИМАЛЬНАЯ СТРАТЕГИЯ: <span className="text-cyan-300">{data.strategy_name}</span>
+                          </p>
+                          <p className="text-cyan-600/50 mt-1">
+                            Средняя задержка: {Math.round(data.avgLatency)}ms
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
+                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                    <Network className="w-4 h-4" />
+                    МАРШРУТИЗАЦИЯ (BYEDPI)
+                  </h2>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {recentTasks.length === 0 ? (
+                      <p className="text-xs text-cyan-600">Нет активных задач маршрутизации.</p>
+                    ) : (
+                      recentTasks.map(task => (
+                        <div key={task.id} className="text-xs border-l-2 border-cyan-500 pl-3 py-1">
+                          <div className="flex justify-between text-cyan-400 mb-1">
+                            <span className="font-bold">{task.target}</span>
+                            <span className={task.status === 'completed' ? 'text-cyan-400' : 'text-amber-400'}>
+                              [{task.status.toUpperCase()}]
+                            </span>
+                          </div>
+                          <p className="text-cyan-600 truncate" title={task.params}>
+                            {task.strategy} <span className="opacity-50">({task.isp})</span>
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: ARCHIVE */}
+          {activeTab === 'archive' && (
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <AkashicRecords />
+                <ClusterMonitor />
+              </div>
+              <div className="space-y-6">
+                <KarmaLedger />
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
       
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
+          height: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: rgba(5, 46, 22, 0.5);

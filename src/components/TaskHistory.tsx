@@ -49,7 +49,7 @@ export const TaskHistory: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                   <div className="relative">
                     {task.status === "completed" && <CheckCircle className="w-3 h-3 text-green-400" />}
                     {task.status === "failed" && <XCircle className="w-3 h-3 text-red-400" />}
-                    {task.status === "running" && <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />}
+                    {task.status === "running" && <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />}
                     {task.status === "pending" && <Clock className="w-3 h-3 text-gray-400" />}
                     {task.status === "completed" && (
                       <motion.div 
@@ -104,7 +104,7 @@ export const TaskHistory: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                           <p className={`font-bold ${
                             task.status === "completed" ? "text-green-400" : 
                             task.status === "failed" ? "text-red-400" : 
-                            task.status === "running" ? "text-yellow-400" : "text-gray-400"
+                            task.status === "running" ? "text-amber-400" : "text-gray-400"
                           }`}>{task.status.toUpperCase()}</p>
                         </div>
                         <div>
@@ -186,7 +186,7 @@ export const TaskHistory: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                   <DetailItem label="Type" value={inspectingTask.type} />
                   <DetailItem label="Status" value={inspectingTask.status} color={
                     inspectingTask.status === "completed" ? "text-green-400" : 
-                    inspectingTask.status === "failed" ? "text-red-400" : "text-yellow-400"
+                    inspectingTask.status === "failed" ? "text-red-400" : "text-amber-400"
                   } />
                   <DetailItem label="Priority" value={`${inspectingTask.priority}/10`} />
                   <DetailItem label="Node" value={inspectingTask.assigned_node || "N/A"} />

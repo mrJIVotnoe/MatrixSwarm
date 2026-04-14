@@ -75,7 +75,7 @@ export const AkashicRecords: React.FC = () => {
   };
 
   return (
-    <div className="bg-neutral-900 border border-purple-500/30 p-5 rounded-sm">
+    <div className="bg-slate-900 border border-purple-500/30 p-5 rounded-sm">
       <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-purple-400">
         <Database className="w-4 h-4" />
         ХРОНИКИ АКАШИ (БИБЛИОТЕКА УЛЬЯ)
@@ -85,7 +85,7 @@ export const AkashicRecords: React.FC = () => {
       </p>
       
       <div className="space-y-4">
-        <div className="bg-neutral-950 p-3 border border-purple-500/20 rounded-sm space-y-3">
+        <div className="bg-slate-950 p-3 border border-purple-500/20 rounded-sm space-y-3">
           <p className="text-[10px] text-purple-300/70 uppercase tracking-widest">Запись в вечность</p>
           <input 
             type="text" 
@@ -113,7 +113,7 @@ export const AkashicRecords: React.FC = () => {
         <button 
           onClick={handleGenesisSync}
           disabled={isSyncing}
-          className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-xs font-bold tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 text-xs font-bold tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Database className="w-3 h-3" />
           {isSyncing ? "СИНХРОНИЗАЦИЯ..." : "СКАЧАТЬ БАЗУ ЗНАНИЙ (WIKI, GITHUB, LLM)"}
@@ -144,7 +144,7 @@ export const AkashicRecords: React.FC = () => {
                 {/* Torrent Mechanics: Seeds & Peers */}
                 <div className="flex items-center justify-between mt-1 pt-1 border-t border-purple-500/10">
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-400" title="Архивариусы (Seeds)">
+                    <div className="flex items-center gap-1 text-[10px] text-cyan-400" title="Архивариусы (Seeds)">
                       <Upload className="w-3 h-3" />
                       <span className="font-bold">{record.seeds || 0}</span>
                     </div>

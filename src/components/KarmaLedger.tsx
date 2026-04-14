@@ -32,7 +32,7 @@ export const KarmaLedger: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-neutral-900 border border-amber-500/30 p-5 rounded-sm">
+    <div className="bg-slate-900 border border-amber-500/30 p-5 rounded-sm">
       <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-amber-400 uppercase">
         <Link className="w-4 h-4" />
         Блокчейн Кармы (Satoshi's Ledger)
@@ -57,7 +57,7 @@ export const KarmaLedger: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-bold text-emerald-400">+{block.amount} KARMA</p>
+                    <p className="text-xs font-bold text-cyan-400">+{block.amount} KARMA</p>
                     <p className="text-[8px] text-gray-500">{new Date(block.timestamp).toLocaleTimeString()}</p>
                   </div>
                 </div>

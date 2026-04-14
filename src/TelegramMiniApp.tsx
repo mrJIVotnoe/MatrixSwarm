@@ -126,13 +126,13 @@ export function TelegramMiniApp() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-emerald-500 font-mono p-4 flex flex-col">
-      <header className="flex items-center justify-between border-b border-emerald-500/30 pb-4 mb-6">
+    <div className="min-h-screen bg-slate-950 text-cyan-500 font-mono p-4 flex flex-col">
+      <header className="flex items-center justify-between border-b border-cyan-500/30 pb-4 mb-6">
         <div className="flex items-center gap-2">
-          <Network className="w-6 h-6 text-emerald-400" />
-          <h1 className="text-xl font-bold tracking-tighter text-emerald-400">MATRIX_SWARM</h1>
+          <Network className="w-6 h-6 text-cyan-400" />
+          <h1 className="text-xl font-bold tracking-tighter text-cyan-400">MATRIX_SWARM</h1>
         </div>
-        <div className="text-xs bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30">
+        <div className="text-xs bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/30">
           TMA_NODE
         </div>
       </header>
@@ -140,9 +140,9 @@ export function TelegramMiniApp() {
       <main className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-8">
         
         <div className="text-center space-y-2">
-          <Smartphone className="w-16 h-16 text-emerald-500/50 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-emerald-400">Вторая Жизнь Устройства</h2>
-          <p className="text-sm text-emerald-600">
+          <Smartphone className="w-16 h-16 text-cyan-500/50 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-400">Вторая Жизнь Устройства</h2>
+          <p className="text-sm text-cyan-600">
             Превратите ваш телефон в активный узел децентрализованной сети. Помогайте обходить цензуру.
           </p>
         </div>
@@ -152,7 +152,7 @@ export function TelegramMiniApp() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleJoinSwarm}
-            className="w-full py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500 text-emerald-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2 rounded-sm shadow-[0_0_15px_rgba(52,211,153,0.2)]"
+            className="w-full py-4 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2 rounded-sm shadow-[0_0_15px_rgba(52,211,153,0.2)]"
           >
             <Zap className="w-5 h-5" />
             ПРИСОЕДИНИТЬСЯ К РОЮ
@@ -161,8 +161,8 @@ export function TelegramMiniApp() {
 
         {status === 'registering' && (
           <div className="text-center space-y-4">
-            <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
-            <p className="text-emerald-400 animate-pulse">Генерация ключей и регистрация в Улье...</p>
+            <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto" />
+            <p className="text-cyan-400 animate-pulse">Генерация ключей и регистрация в Улье...</p>
           </div>
         )}
 
@@ -170,61 +170,61 @@ export function TelegramMiniApp() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full bg-neutral-900 border border-emerald-500/50 p-6 rounded-sm space-y-6 relative overflow-hidden"
+            className="w-full bg-slate-900 border border-cyan-500/50 p-6 rounded-sm space-y-6 relative overflow-hidden"
           >
-            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_10px_#10b981]" />
+            <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_10px_#10b981]" />
             
-            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-4">
+            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4">
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-emerald-400" />
-                <span className="font-bold text-emerald-400">СТАТУС: АКТИВЕН</span>
+                <Shield className="w-5 h-5 text-cyan-400" />
+                <span className="font-bold text-cyan-400">СТАТУС: АКТИВЕН</span>
               </div>
-              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
+              <div className="w-3 h-3 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_#10b981]" />
             </div>
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-emerald-600">ПОЛЬЗОВАТЕЛЬ:</span>
-                <span className="text-emerald-400">@{tgUser?.username || 'anonymous'}</span>
+                <span className="text-cyan-600">ПОЛЬЗОВАТЕЛЬ:</span>
+                <span className="text-cyan-400">@{tgUser?.username || 'anonymous'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-emerald-600">ID УЗЛА:</span>
-                <span className="text-emerald-400 truncate max-w-[150px]" title={nodeId || ''}>{nodeId}</span>
+                <span className="text-cyan-600">ID УЗЛА:</span>
+                <span className="text-cyan-400 truncate max-w-[150px]" title={nodeId || ''}>{nodeId}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-emerald-600">TRUST SCORE:</span>
-                <span className="text-emerald-400 font-bold">{trustScore}</span>
+                <span className="text-cyan-600">TRUST SCORE:</span>
+                <span className="text-cyan-400 font-bold">{trustScore}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-emerald-600">ВЫПОЛНЕНО ЗАДАЧ:</span>
-                <span className="text-emerald-400">{tasksCompleted}</span>
+                <span className="text-cyan-600">ВЫПОЛНЕНО ЗАДАЧ:</span>
+                <span className="text-cyan-400">{tasksCompleted}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-emerald-600">MATRIX ECHO:</span>
-                <span className={`font-bold ${matrixStatus === 'online' ? 'text-emerald-400' : 'text-amber-500'}`}>
+                <span className="text-cyan-600">MATRIX ECHO:</span>
+                <span className={`font-bold ${matrixStatus === 'online' ? 'text-cyan-400' : 'text-amber-500'}`}>
                   {matrixStatus.toUpperCase()}
                 </span>
               </div>
             </div>
 
             {lastProbe && (
-              <div className="bg-neutral-950 p-3 border border-emerald-500/20 rounded-sm space-y-2">
+              <div className="bg-slate-950 p-3 border border-cyan-500/20 rounded-sm space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-emerald-600 uppercase tracking-widest">Последняя проверка:</span>
-                  <span className={`text-[10px] px-1 rounded ${lastProbe.success ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                  <span className="text-[10px] text-cyan-600 uppercase tracking-widest">Последняя проверка:</span>
+                  <span className={`text-[10px] px-1 rounded ${lastProbe.success ? 'bg-cyan-500/20 text-cyan-400' : 'bg-red-500/20 text-red-400'}`}>
                     {lastProbe.success ? 'УСПЕХ' : 'ОШИБКА'}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-emerald-400">{lastProbe.target}</span>
-                  <span className="text-emerald-600">{lastProbe.strategyUsed}</span>
-                  <span className="text-emerald-400">{lastProbe.latencyMs}ms</span>
+                  <span className="text-cyan-400">{lastProbe.target}</span>
+                  <span className="text-cyan-600">{lastProbe.strategyUsed}</span>
+                  <span className="text-cyan-400">{lastProbe.latencyMs}ms</span>
                 </div>
               </div>
             )}
 
-            <div className="pt-4 border-t border-emerald-500/20">
-              <p className="text-xs text-emerald-600 text-center flex items-center justify-center gap-2">
+            <div className="pt-4 border-t border-cyan-500/20">
+              <p className="text-xs text-cyan-600 text-center flex items-center justify-center gap-2">
                 <Activity className="w-4 h-4" />
                 Устройство передает телеметрию и выполняет фоновые задачи маршрутизации.
               </p>

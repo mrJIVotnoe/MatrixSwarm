@@ -84,7 +84,7 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
   if (!isMagistrate && proposals.length === 0) return null;
 
   return (
-    <div className="bg-neutral-900 border border-purple-500/30 rounded-sm p-5">
+    <div className="bg-slate-900 border border-purple-500/30 rounded-sm p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold flex items-center gap-2 text-purple-400">
           <Gavel className="w-4 h-4" />
@@ -103,7 +103,7 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-neutral-950 border border-purple-500/20 p-3 rounded-sm"
+              className="bg-slate-950 border border-purple-500/20 p-3 rounded-sm"
             >
               <div className="flex justify-between items-start mb-2">
                 <div>
@@ -128,9 +128,9 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
               </div>
 
               <div className="flex items-center gap-4 mt-4">
-                <div className="flex-1 h-1.5 bg-neutral-900 rounded-full overflow-hidden flex">
+                <div className="flex-1 h-1.5 bg-slate-900 rounded-full overflow-hidden flex">
                   <div 
-                    className="bg-emerald-500 h-full transition-all duration-500" 
+                    className="bg-cyan-500 h-full transition-all duration-500" 
                     style={{ width: `${(p.weight_for / (p.weight_for + p.weight_against || 1)) * 100}%` }}
                   />
                   <div 
@@ -139,7 +139,7 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
                   />
                 </div>
                 <div className="flex gap-3 text-[10px] font-bold">
-                  <span className="text-emerald-500" title={`Магистратов: ${p.votes_for.length}`}>ВЕС ЗА: {p.weight_for}</span>
+                  <span className="text-cyan-500" title={`Магистратов: ${p.votes_for.length}`}>ВЕС ЗА: {p.weight_for}</span>
                   <span className="text-red-500" title={`Магистратов: ${p.votes_against.length}`}>ВЕС ПРОТИВ: {p.weight_against}</span>
                 </div>
               </div>
@@ -153,7 +153,7 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
                 <div className="flex gap-2 mt-4">
                   <button
                     onClick={() => handleVote(p.id, 'for')}
-                    className="flex-1 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-500 text-[10px] font-bold transition-all flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/50 text-cyan-500 text-[10px] font-bold transition-all flex items-center justify-center gap-1"
                   >
                     <Check className="w-3 h-3" /> ПОДДЕРЖАТЬ
                   </button>
@@ -176,7 +176,7 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
         </AnimatePresence>
 
         {proposals.length === 0 && (
-          <div className="text-center py-6 border border-dashed border-neutral-800 rounded-sm">
+          <div className="text-center py-6 border border-dashed border-slate-800 rounded-sm">
             <AlertCircle className="w-5 h-5 text-neutral-700 mx-auto mb-2" />
             <p className="text-[10px] text-neutral-600 uppercase tracking-widest">Нет активных голосований</p>
           </div>
@@ -193,7 +193,7 @@ export const MagistrateCouncil: React.FC<{ nodeId?: string, isMagistrate: boolea
               placeholder="ISP Сегмент (напр. Rostelecom)"
               value={ispToFreeze}
               onChange={(e) => setIspToFreeze(e.target.value)}
-              className="flex-1 bg-neutral-950 border border-red-900/30 text-[10px] px-3 py-2 rounded-sm focus:border-red-500/50 outline-none text-red-400"
+              className="flex-1 bg-slate-950 border border-red-900/30 text-[10px] px-3 py-2 rounded-sm focus:border-red-500/50 outline-none text-red-400"
             />
             <button 
               onClick={proposeFreezeSegment}

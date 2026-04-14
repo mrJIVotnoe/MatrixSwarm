@@ -105,7 +105,7 @@ export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentN
                   )}
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] text-gray-500 uppercase">Trust:</span>
-                    <span className={`text-[8px] font-bold ${node.trust_score > 70 ? 'text-green-400' : node.trust_score > 30 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    <span className={`text-[8px] font-bold ${node.trust_score > 70 ? 'text-green-400' : node.trust_score > 30 ? 'text-amber-400' : 'text-red-400'}`}>
                       {node.trust_score}%
                     </span>
                   </div>
@@ -136,7 +136,7 @@ export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentN
                     <p className="text-[6px] text-purple-400 mb-1 uppercase tracking-widest">Manifest of Armament</p>
                     <div className="grid grid-cols-2 gap-1 text-[7px] text-gray-400">
                       <div>ROM: <span className="text-cyan-400">{manifest.storage_gb || 0} GB</span></div>
-                      <div>BATTERY: <span className={manifest.battery_health === 'good' ? 'text-green-400' : 'text-yellow-400'}>{manifest.battery_health || 'UNKNOWN'}</span></div>
+                      <div>BATTERY: <span className={manifest.battery_health === 'good' ? 'text-green-400' : 'text-amber-400'}>{manifest.battery_health || 'UNKNOWN'}</span></div>
                       {manifest.sensors && manifest.sensors.length > 0 && (
                         <div className="col-span-2">SENSORS: <span className="text-gray-300">{manifest.sensors.join(', ')}</span></div>
                       )}
@@ -151,7 +151,7 @@ export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentN
               {node.benchmark && (
                 <div className="mt-2 pt-2 border-t border-cyan-900/10 flex justify-between items-center text-[7px] uppercase tracking-widest text-cyan-900">
                   <span>CPU: {node.benchmark.cpu_score} | RAM: {node.benchmark.ram_score}</span>
-                  <span className={node.benchmark.is_vm ? "text-yellow-900" : "text-green-900"}>
+                  <span className={node.benchmark.is_vm ? "text-amber-900" : "text-green-900"}>
                     {node.benchmark.is_vm ? "VM_DETECTED" : "PHYSICAL_HW"}
                   </span>
                 </div>
@@ -163,7 +163,7 @@ export const NodeList: React.FC<{ nodes: Node[], isMagistrate: boolean, currentN
                   node.is_frozen === 1 ? (
                     <button 
                       onClick={() => handleUnfreeze(node.id)}
-                      className="text-[7px] text-emerald-500/50 hover:text-emerald-500 border border-emerald-900/20 hover:border-emerald-500/50 px-1 rounded transition-all uppercase"
+                      className="text-[7px] text-cyan-500/50 hover:text-cyan-500 border border-cyan-900/20 hover:border-cyan-500/50 px-1 rounded transition-all uppercase"
                     >
                       Unfreeze
                     </button>

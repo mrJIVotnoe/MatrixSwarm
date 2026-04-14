@@ -25,7 +25,7 @@ export const PlanetaryGrid: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-neutral-900 border border-purple-500/30 p-5 rounded-sm">
+    <div className="bg-slate-900 border border-purple-500/30 p-5 rounded-sm">
       <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-purple-400 uppercase">
         <Globe className="w-4 h-4" />
         Планетарная Сетка (Обратный StarLink)
