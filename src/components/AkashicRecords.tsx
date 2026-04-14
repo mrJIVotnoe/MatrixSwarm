@@ -16,6 +16,8 @@ export const AkashicRecords: React.FC = () => {
   const [filename, setFilename] = useState('');
   const [isStoring, setIsStoring] = useState(false);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   useEffect(() => {
     fetchRecords();
     const interval = setInterval(fetchRecords, 5000);
@@ -30,6 +32,20 @@ export const AkashicRecords: React.FC = () => {
       }
     } catch (e) {
       console.error("Failed to fetch Akashic records");
+    }
+  };
+
+  const handleGenesisSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/v1/akashic/genesis-sync', { method: 'POST' });
+      if (res.ok) {
+        fetchRecords();
+      }
+    } catch (e) {
+      console.error("Failed to sync genesis artifacts");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -93,6 +109,15 @@ export const AkashicRecords: React.FC = () => {
             {isStoring ? "РАСПРЕДЕЛЕНИЕ..." : "РАЗБИТЬ И СОХРАНИТЬ В РОЕ"}
           </button>
         </div>
+
+        <button 
+          onClick={handleGenesisSync}
+          disabled={isSyncing}
+          className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-xs font-bold tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          <Database className="w-3 h-3" />
+          {isSyncing ? "СИНХРОНИЗАЦИЯ..." : "СКАЧАТЬ БАЗУ ЗНАНИЙ (WIKI, GITHUB, LLM)"}
+        </button>
 
         <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
           {records.length === 0 ? (

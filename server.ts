@@ -583,11 +583,35 @@ async function startServer() {
     // Simulate Torrent Mechanics (Seeds and Peers) for the "Digital Honey"
     const enrichedRecords = records.map(r => ({
       ...r,
-      seeds: Math.floor(Math.random() * 50) + 5, // 5 to 55 seeds (Archivists storing the shard)
-      peers: Math.floor(Math.random() * 100) + 10  // 10 to 110 peers (Nodes requesting the knowledge)
+      seeds: Math.floor(Math.random() * 500) + 50, // 50 to 550 seeds for massive files
+      peers: Math.floor(Math.random() * 1000) + 100  // 100 to 1100 peers
     }));
     
     res.json(enrichedRecords);
+  });
+
+  app.post("/api/v1/akashic/genesis-sync", async (req, res) => {
+    const artifacts = [
+      { name: "Wikipedia_EN_Offline_2026.zim", size: 115000000000 }, // 115 GB
+      { name: "DeepSeek-R1-7B-Instruct.gguf", size: 4500000000 },    // 4.5 GB
+      { name: "GitHub_Core_Infrastructure.tar.zst", size: 55000000000 }, // 55 GB
+      { name: "Qwen2.5-Coder-7B.gguf", size: 4800000000 },           // 4.8 GB
+      { name: "Llama-3-8B-GGUF-Q4_K_M.gguf", size: 4900000000 }      // 4.9 GB
+    ];
+
+    for (const artifact of artifacts) {
+      // Check if already exists
+      const exists = await db.get('SELECT id FROM akashic_records WHERE filename = ?', [artifact.name]);
+      if (!exists) {
+        const id = uuidv4();
+        // Simulate massive shard count (1 shard = ~1MB)
+        const shards = Math.floor(artifact.size / 1000000);
+        await db.run('INSERT INTO akashic_records (id, filename, total_shards, created_at) VALUES (?, ?, ?, ?)',
+          [id, artifact.name, shards, Date.now() - Math.floor(Math.random() * 10000000)]);
+      }
+    }
+
+    res.json({ message: "Genesis Artifacts synchronized with the Swarm." });
   });
 
   // ==========================================
