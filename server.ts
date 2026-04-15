@@ -205,6 +205,12 @@ async function startServer() {
     // PlayStation Supercomputer: Assign to a compute cluster based on power
     const cluster_id = `CLUSTER-${req.body.power_rating ? req.body.power_rating.split(' ')[0].toUpperCase() : 'UNKNOWN'}`;
 
+    const is_purified = req.body.is_purified ? 1 : 0;
+    const device_type = req.body.device_type || "smartphone";
+    
+    // If not purified, trust score starts lower and is capped.
+    const initial_trust = is_purified ? 50 : 10;
+
     const node = {
       id,
       address: req.ip || req.socket.remoteAddress || "unknown",
@@ -214,22 +220,24 @@ async function startServer() {
       power_rating: req.body.power_rating || "unknown",
       status: "online",
       last_heartbeat: Date.now(),
-      trust_score: 50,
+      trust_score: initial_trust,
       token,
       delegated_to: delegatedTo || null,
       lat,
       lng,
       cell_id,
       cluster_id,
-      senses: JSON.stringify({ vision: false, hearing: false, proprioception: false, touch: false })
+      senses: JSON.stringify({ vision: false, hearing: false, proprioception: false, touch: false }),
+      is_purified,
+      device_type
     };
 
     await db.run(`
-      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses]);
+      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses, is_purified, device_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses, node.is_purified, node.device_type]);
 
-    console.log(`[SWARM] New node registered: ${id} (${node.power_rating}) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
+    console.log(`[SWARM] New node registered: ${id} (${node.power_rating}, ${device_type}, Purified: ${is_purified}) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
     
     res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
   });
@@ -430,7 +438,6 @@ async function startServer() {
           const timestamp = Date.now();
           
           // Simple hash simulation for the ledger
-          const crypto = require('crypto');
           const blockData = `${prevHash}${nodeId}${action}${karmaReward}${timestamp}`;
           const hash = crypto.createHash('sha256').update(blockData).digest('hex');
           
@@ -922,7 +929,7 @@ async function startServer() {
   // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SwarmSymbiote, SymbioteStatus } from './swarm/Symbiote';
 import { fetchSwarmStatus, fetchNodes, fetchRecentTasks, SwarmStatus } from './services/swarmService';
-import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database } from 'lucide-react';
+import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database, Star, Crosshair } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { TelegramMiniApp } from './TelegramMiniApp';
 import { Leaderboard } from './components/Leaderboard';
 import { MagistrateCouncil } from './components/MagistrateCouncil';
@@ -15,8 +15,9 @@ import { KarmaLedger } from './components/KarmaLedger';
 import { ClusterMonitor } from './components/ClusterMonitor';
 import { PlanetaryGrid } from './components/PlanetaryGrid';
 import { SensoryCortex } from './components/SensoryCortex';
+import { WelcomeBanner } from './components/WelcomeBanner';
 
-type Tab = 'dashboard' | 'network' | 'intelligence' | 'archive';
+type Tab = 'nexus' | 'recruit' | 'scout' | 'guard';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -35,8 +36,55 @@ function App() {
   return <MainDashboard />;
 }
 
+function LockedFeatureWrapper({ isLocked, reqKarma, currentKarma, title, desc, children }: { isLocked: boolean, reqKarma: number, currentKarma: number, title: string, desc: string, children: React.ReactNode }) {
+  return (
+    <div className={`hud-panel p-0 rounded-sm relative flex flex-col border transition-colors ${isLocked ? 'border-amber-500/30' : 'border-cyan-500/30'}`}>
+      
+      {/* MMO-style Item Header */}
+      <div className={`p-4 border-b ${isLocked ? 'border-amber-500/20 bg-amber-500/5' : 'border-cyan-500/20 bg-cyan-500/5'}`}>
+        <div className="flex justify-between items-start gap-4">
+          <div>
+            <h3 className={`text-sm font-bold tracking-wider flex items-center gap-2 ${isLocked ? 'text-amber-400' : 'text-cyan-400'}`}>
+              {isLocked ? <Lock className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+              {title}
+            </h3>
+            <p className="text-xs text-cyan-600/80 mt-1 leading-relaxed">{desc}</p>
+          </div>
+          {isLocked && (
+            <div className="text-right shrink-0 bg-slate-950/50 p-2 border border-amber-500/20 rounded">
+              <div className="text-[10px] text-amber-500 font-mono mb-1">ТРЕБУЕТСЯ КАРМА</div>
+              <div className="text-sm font-bold text-amber-400">{currentKarma} / {reqKarma}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* The "Skin" / Feature Preview */}
+      <div className={`relative flex-1 p-4 transition-all duration-500 ${isLocked ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
+        {/* Striped overlay for inactive look */}
+        {isLocked && (
+          <div className="absolute inset-0 z-10 bg-[repeating-linear-gradient(-45deg,transparent,transparent_10px,rgba(245,158,11,0.05)_10px,rgba(245,158,11,0.05)_20px)] pointer-events-none"></div>
+        )}
+        
+        {/* Actual Component */}
+        <div className="relative z-0 h-full">
+          {children}
+        </div>
+      </div>
+      
+      {/* Bottom Lock Bar */}
+      {isLocked && (
+         <div className="absolute bottom-0 left-0 right-0 bg-amber-500/10 border-t border-amber-500/30 p-2 backdrop-blur-md z-20 flex items-center justify-center gap-2">
+            <Lock className="w-3 h-3 text-amber-500" />
+            <span className="text-[10px] font-bold text-amber-500 tracking-widest">ФУНКЦИЯ ЗАБЛОКИРОВАНА</span>
+         </div>
+      )}
+    </div>
+  );
+}
+
 function MainDashboard() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('nexus');
   const [symbiote, setSymbiote] = useState<SwarmSymbiote | null>(null);
   const [status, setStatus] = useState<SymbioteStatus>("sleeping");
   const [logs, setLogs] = useState<string[]>([]);
@@ -199,10 +247,10 @@ function MainDashboard() {
         {/* Tabs Navigation */}
         <div className="flex overflow-x-auto border-b border-cyan-500/30 shrink-0 custom-scrollbar">
           {[
-            { id: 'dashboard', label: 'ДЭШБОРД', icon: Activity },
-            { id: 'network', label: 'СЕТЬ И ВЛАСТЬ', icon: Network },
-            { id: 'intelligence', label: 'РАЗВЕДКА', icon: BrainCircuit },
-            { id: 'archive', label: 'АРХИВ И ВЫЧИСЛЕНИЯ', icon: Database },
+            { id: 'nexus', label: 'НЕКСУС (NEXUS)', icon: Activity },
+            { id: 'recruit', label: 'РЕКРУТ (УРОВЕНЬ 1)', icon: Crosshair },
+            { id: 'scout', label: 'РАЗВЕДЧИК (УРОВЕНЬ 2)', icon: Star },
+            { id: 'guard', label: 'СТРАЖ (УРОВЕНЬ 3)', icon: Shield },
           ].map(tab => (
             <button
               key={tab.id}
@@ -222,8 +270,65 @@ function MainDashboard() {
         {/* Tab Content Area */}
         <div className="flex-1 w-full relative">
           
-          {/* TAB: DASHBOARD */}
-          {activeTab === 'dashboard' && (
+          {/* TAB: NEXUS (Welcome + Telemetry) */}
+          {activeTab === 'nexus' && (
+            <div className="space-y-6">
+              <WelcomeBanner />
+              
+              <div className="hud-panel p-6 rounded-sm flex-1 flex flex-col min-h-[400px]">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400 shrink-0">
+                  <Activity className="w-5 h-5" />
+                  ГЛОБАЛЬНАЯ ТЕЛЕМЕТРИЯ РОЯ
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 shrink-0">
+                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
+                    <div className="text-cyan-600 text-xs mb-1">TOTAL_NODES</div>
+                    <div className="text-2xl text-cyan-400 text-glow-cyan">{swarmStats?.totalNodes || 0}</div>
+                  </div>
+                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
+                    <div className="text-cyan-600 text-xs mb-1">ACTIVE_TASKS</div>
+                    <div className="text-2xl text-cyan-400 text-glow-cyan">{swarmStats?.runningTasks || 0}</div>
+                  </div>
+                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
+                    <div className="text-cyan-600 text-xs mb-1">NETWORK_LOAD</div>
+                    <div className="text-2xl text-cyan-400 text-glow-cyan">{(swarmStats?.networkLoad || 0).toFixed(1)}%</div>
+                  </div>
+                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
+                    <div className="text-cyan-600 text-xs mb-1">CONSENSUS</div>
+                    <div className="text-2xl text-amber-400 text-glow-amber">{(swarmStats?.consensusHealth || 0).toFixed(1)}%</div>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <AreaChart data={history}>
+                      <defs>
+                        <linearGradient id="colorNodes" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorTasks" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="time" stroke="#475569" fontSize={10} tickMargin={10} />
+                      <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `${val}`} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#22d3ee', color: '#22d3ee', fontSize: '12px' }}
+                        itemStyle={{ color: '#22d3ee' }}
+                      />
+                      <Area type="monotone" dataKey="nodes" stroke="#22d3ee" fillOpacity={1} fill="url(#colorNodes)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="tasks" stroke="#f59e0b" fillOpacity={1} fill="url(#colorTasks)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: RECRUIT */}
+          {activeTab === 'recruit' && (
             <div className="grid lg:grid-cols-2 gap-6">
               <div className="space-y-6">
                 {/* Control Panel */}
@@ -325,55 +430,32 @@ function MainDashboard() {
                   </div>
                 </div>
 
-                {/* Global Stats */}
-                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
-                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
-                    <Activity className="w-4 h-4" />
-                    ГЛОБАЛЬНАЯ ТЕЛЕМЕТРИЯ
-                  </h2>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
-                      <p className="text-xs text-cyan-600 mb-1">ОНЛАЙН УЗЛЫ</p>
-                      <p className="text-2xl font-bold text-cyan-400">{swarmStats?.onlineNodes || 0}</p>
+                {/* Unactivated Features for Recruit */}
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 500} reqKarma={500} currentKarma={trustScore}
+                  title="КВАНТОВАЯ МАРШРУТИЗАЦИЯ" 
+                  desc="Активация суррогатных туннелей и обход глубокого анализа пакетов (DPI)."
+                >
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-2 bg-slate-900/50 border border-cyan-500/20 rounded">
+                      <span className="text-xs text-cyan-500">Протокол BYEDPI</span>
+                      <span className="text-xs text-cyan-700">ОЖИДАНИЕ</span>
                     </div>
-                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
-                      <p className="text-xs text-cyan-600 mb-1">АКТИВНЫЕ ЗАДАЧИ</p>
-                      <p className="text-2xl font-bold text-cyan-400">{swarmStats?.runningTasks || 0}</p>
+                    <div className="flex justify-between items-center p-2 bg-slate-900/50 border border-cyan-500/20 rounded">
+                      <span className="text-xs text-cyan-500">Суррогатный мост</span>
+                      <span className="text-xs text-cyan-700">ОТКЛЮЧЕН</span>
                     </div>
-                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
-                      <p className="text-xs text-cyan-600 mb-1">УСПЕШНЫЕ ОБХОДЫ</p>
-                      <p className="text-2xl font-bold text-cyan-400">{swarmStats?.completedTasks || 0}</p>
-                    </div>
-                    <div className="bg-slate-950 p-3 border border-cyan-500/10">
-                      <p className="text-xs text-cyan-600 mb-1">ПЕРЕГРЕВ (OVERHEAT)</p>
-                      <p className="text-2xl font-bold text-red-400">{swarmStats?.overheatedNodes || 0}</p>
+                    <div className="flex justify-between items-center p-2 bg-slate-900/50 border border-cyan-500/20 rounded">
+                      <span className="text-xs text-cyan-500">Маскировка трафика</span>
+                      <span className="text-xs text-cyan-700">ОТКЛЮЧЕНА</span>
                     </div>
                   </div>
-
-                  <div className="mt-4 h-32 w-full">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                      <AreaChart data={history}>
-                        <defs>
-                          <linearGradient id="colorNodes" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#052e16" vertical={false} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399', fontSize: '12px' }}
-                          itemStyle={{ color: '#34d399' }}
-                        />
-                        <Area type="monotone" dataKey="nodes" stroke="#34d399" fillOpacity={1} fill="url(#colorNodes)" isAnimationActive={false} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+                </LockedFeatureWrapper>
               </div>
 
               <div className="space-y-6">
                 {/* System Log */}
-                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm flex-1 flex flex-col h-full min-h-[400px]">
+                <div className="hud-panel p-5 rounded-sm flex-1 flex flex-col h-full min-h-[400px]">
                   <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
                     <Terminal className="w-4 h-4" />
                     СИСТЕМНЫЙ ЖУРНАЛ
@@ -389,100 +471,85 @@ function MainDashboard() {
             </div>
           )}
 
-          {/* TAB: NETWORK */}
-          {activeTab === 'network' && (
-            <div className="grid lg:grid-cols-2 gap-6">
+          {/* TAB: SCOUT */}
+          {activeTab === 'scout' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar pb-6">
               <div className="space-y-6">
-                <NetworkTopology />
-                <PlanetaryGrid />
-                <NodeList nodes={nodes} isMagistrate={trustScore >= 90} currentNodeId={symbiote?.nodeId} />
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
+                  title="ТОПОЛОГИЯ СЕТИ" 
+                  desc="Визуализация P2P-связей Роя. Открывает доступ к анализу маршрутов и выявлению цензурных блокировок."
+                >
+                  <NetworkTopology />
+                </LockedFeatureWrapper>
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
+                  title="ПЛАНЕТАРНАЯ СЕТКА" 
+                  desc="Глобальная карта активности узлов. Позволяет отслеживать пульс Роя на всех континентах."
+                >
+                  <PlanetaryGrid />
+                </LockedFeatureWrapper>
               </div>
               <div className="space-y-6">
-                <Leaderboard 
-                  currentNodeId={symbiote?.nodeId} 
-                  currentDelegatedTo={delegatedTo}
-                  onDelegate={(magId) => setDelegatedTo(magId)}
-                />
-                <MagistrateCouncil 
-                  nodeId={symbiote?.nodeId} 
-                  isMagistrate={trustScore >= 90} 
-                />
-                <GovernanceHistory />
-              </div>
-            </div>
-          )}
-
-          {/* TAB: INTELLIGENCE */}
-          {activeTab === 'intelligence' && (
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                <SensoryCortex />
-                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
-                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
-                    <BrainCircuit className="w-4 h-4" />
-                    ЛОГИКА КОМИССАРА (WAGGLE DANCE)
-                  </h2>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {Object.keys(commissarIntel).length === 0 ? (
-                      <p className="text-xs text-cyan-600">Сбор телеметрии от E.S.C.A.P.E. клиентов...</p>
-                    ) : (
-                      Object.entries(commissarIntel).map(([isp, data]: [string, any]) => (
-                        <div key={isp} className="text-xs border-l-2 border-cyan-500 pl-3 py-1 bg-slate-950 p-2">
-                          <div className="flex justify-between text-cyan-400 mb-1">
-                            <span className="font-bold uppercase">{isp}</span>
-                            <span className="text-cyan-500">{(data.successRate * 100).toFixed(0)}% УСПЕХ</span>
-                          </div>
-                          <p className="text-cyan-600 truncate" title={data.strategy_name}>
-                            ОПТИМАЛЬНАЯ СТРАТЕГИЯ: <span className="text-cyan-300">{data.strategy_name}</span>
-                          </p>
-                          <p className="text-cyan-600/50 mt-1">
-                            Средняя задержка: {Math.round(data.avgLatency)}ms
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-6">
-                <div className="bg-slate-900 border border-cyan-500/30 p-5 rounded-sm">
-                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
-                    <Network className="w-4 h-4" />
-                    МАРШРУТИЗАЦИЯ (BYEDPI)
-                  </h2>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {recentTasks.length === 0 ? (
-                      <p className="text-xs text-cyan-600">Нет активных задач маршрутизации.</p>
-                    ) : (
-                      recentTasks.map(task => (
-                        <div key={task.id} className="text-xs border-l-2 border-cyan-500 pl-3 py-1">
-                          <div className="flex justify-between text-cyan-400 mb-1">
-                            <span className="font-bold">{task.target}</span>
-                            <span className={task.status === 'completed' ? 'text-cyan-400' : 'text-amber-400'}>
-                              [{task.status.toUpperCase()}]
-                            </span>
-                          </div>
-                          <p className="text-cyan-600 truncate" title={task.params}>
-                            {task.strategy} <span className="opacity-50">({task.isp})</span>
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
+                  title="СЕНСОРНАЯ КОРА" 
+                  desc="Прямой доступ к сырым данным NetProbe. Анализ аномалий и попыток перехвата трафика (DPI)."
+                >
+                  <SensoryCortex />
+                </LockedFeatureWrapper>
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
+                  title="МОНИТОР КЛАСТЕРОВ" 
+                  desc="Управление локальными сотами. Разведчики могут координировать группы рекрутов для прорыва блокировок."
+                >
+                  <ClusterMonitor />
+                </LockedFeatureWrapper>
               </div>
             </div>
           )}
 
-          {/* TAB: ARCHIVE */}
-          {activeTab === 'archive' && (
-            <div className="grid lg:grid-cols-2 gap-6">
+          {/* TAB: GUARD */}
+          {activeTab === 'guard' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar pb-6">
               <div className="space-y-6">
-                <AkashicRecords />
-                <ClusterMonitor />
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
+                  title="РЕЕСТР ЭЛИТЫ" 
+                  desc="Глобальный рейтинг Магистратов. Отображает узлы с наивысшим влиянием на развитие Роя."
+                >
+                  <Leaderboard />
+                </LockedFeatureWrapper>
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
+                  title="СОВЕТ МАГИСТРАТОВ" 
+                  desc="Интерфейс прямого управления сетью. Право вето на протоколы маршрутизации и распределение ресурсов."
+                >
+                  <MagistrateCouncil />
+                </LockedFeatureWrapper>
               </div>
               <div className="space-y-6">
-                <KarmaLedger />
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
+                  title="ИСТОРИЯ ГОЛОСОВАНИЙ" 
+                  desc="Архив принятых решений Совета. Прозрачный блокчейн-реестр эволюции Роя."
+                >
+                  <GovernanceHistory />
+                </LockedFeatureWrapper>
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
+                  title="ХРОНИКИ АКАШИ" 
+                  desc="Абсолютная память Роя. Доступ к децентрализованному хранилищу критически важных данных."
+                >
+                  <AkashicRecords />
+                </LockedFeatureWrapper>
+                <LockedFeatureWrapper 
+                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
+                  title="КАРМИЧЕСКИЙ РЕЕСТР" 
+                  desc="Аудит распределения Кармы. Магистраты контролируют справедливость вознаграждений в сети."
+                >
+                  <KarmaLedger />
+                </LockedFeatureWrapper>
               </div>
             </div>
           )}
@@ -496,10 +563,10 @@ function MainDashboard() {
           height: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(5, 46, 22, 0.5);
+          background: rgba(15, 23, 42, 0.5); /* slate-900 */
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(52, 211, 153, 0.5);
+          background: rgba(6, 182, 212, 0.5); /* cyan-500 */
         }
       `}</style>
     </div>
