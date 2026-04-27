@@ -193,7 +193,8 @@ async function startServer() {
     };
 
     // Generate simulated physical coordinates (e.g., around a central point)
-    // For simulation, let's use a base coordinate and add some random jitter
+    // Аксиома Навигации: Взгляд в Небо. Узел обращается к GPS не для связи с корпорациями,
+    // а чтобы осознать свое место на грешной земле. Это фундамент Навигации по Земле.
     const baseLat = 55.7558; // Moscow
     const baseLng = 37.6173;
     const lat = baseLat + (Math.random() - 0.5) * 0.1; // roughly 10km spread
@@ -207,9 +208,15 @@ async function startServer() {
 
     const is_purified = req.body.is_purified ? 1 : 0;
     const device_type = req.body.device_type || "smartphone";
+    const battery_level = req.body.battery_level !== undefined ? req.body.battery_level : 100;
+    const is_charging = req.body.is_charging !== undefined ? (req.body.is_charging ? 1 : 0) : 1;
     
     // If not purified, trust score starts lower and is capped.
-    const initial_trust = is_purified ? 50 : 10;
+    let initial_trust = is_purified ? 50 : 10;
+    
+    if (battery_level < 20 && !is_charging) {
+      initial_trust = Math.min(initial_trust, 20); // Penalize low battery uncharging
+    }
 
     const node = {
       id,
@@ -229,15 +236,17 @@ async function startServer() {
       cluster_id,
       senses: JSON.stringify({ vision: false, hearing: false, proprioception: false, touch: false }),
       is_purified,
-      device_type
+      device_type,
+      battery_level,
+      is_charging
     };
 
     await db.run(`
-      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses, is_purified, device_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses, node.is_purified, node.device_type]);
+      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses, is_purified, device_type, battery_level, is_charging)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses, node.is_purified, node.device_type, node.battery_level, node.is_charging]);
 
-    console.log(`[SWARM] New node registered: ${id} (${node.power_rating}, ${device_type}, Purified: ${is_purified}) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
+    console.log(`[SWARM] New node registered: ${id} (${node.power_rating}, ${device_type}, Purified: ${is_purified}, Battery: ${battery_level}%) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
     
     res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
   });
@@ -274,6 +283,8 @@ async function startServer() {
     const { nodeId } = req.params;
     const isp = req.body.isp || "unknown_isp"; // Client should send their ISP
     const senses = req.body.senses; // Sensory telemetry
+    const battery_level = req.body.battery_level !== undefined ? req.body.battery_level : undefined;
+    const is_charging = req.body.is_charging !== undefined ? (req.body.is_charging ? 1 : 0) : undefined;
 
     const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
     
@@ -289,11 +300,18 @@ async function startServer() {
       return res.status(403).json({ error: "EMERGENCY: This node has been FROZEN by Magistrate Consensus." });
     }
 
+    let updates = [`last_heartbeat = ${Date.now()}`, `status = "online"`];
     if (senses) {
-      await db.run('UPDATE nodes SET last_heartbeat = ?, status = ?, senses = ? WHERE id = ?', [Date.now(), 'online', JSON.stringify(senses), nodeId]);
-    } else {
-      await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
+      updates.push(`senses = '${JSON.stringify(senses)}'`);
     }
+    if (battery_level !== undefined) {
+      updates.push(`battery_level = ${battery_level}`);
+    }
+    if (is_charging !== undefined) {
+      updates.push(`is_charging = ${is_charging}`);
+    }
+
+    await db.run(`UPDATE nodes SET ${updates.join(', ')} WHERE id = ?`, [nodeId]);
 
     let assignedTask = null;
     
@@ -303,9 +321,14 @@ async function startServer() {
       const caps = JSON.parse(node.capabilities);
       if (caps.manifest) batteryHealth = caps.manifest.battery_health;
     } catch(e) {}
+    
+    // Энергосберегающая Навигация (Оперативный Резерв)
+    const isCharging = node.is_charging === 1;
+    const hasGoodBattery = node.battery_level === undefined || node.battery_level > 20;
+    const canDoHeavyTasks = isCharging || hasGoodBattery;
 
     // 1. Prioritize Distributed Cluster Jobs (PlayStation Supercomputer)
-    if (batteryHealth === 'good' || batteryHealth === 'unknown') {
+    if (canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
       for (const job of distributedJobs.values()) {
         if (job.status === 'running') {
           const pendingChunk = job.chunks.find((c: any) => c.status === 'pending');
@@ -348,8 +371,8 @@ async function startServer() {
           isp: isp
         };
         activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
-      } else if (rand < 0.4 && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
-        // Compute Task (20% chance, only if battery is good or unknown/desktop)
+      } else if (rand < 0.4 && canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
+        // Compute Task (20% chance, only if battery is good, charging, or unknown/desktop)
         const taskId = uuidv4();
         assignedTask = {
           id: taskId,

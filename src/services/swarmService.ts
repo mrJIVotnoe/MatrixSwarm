@@ -50,8 +50,10 @@ export const fetchNodes = async () => {
     const response = await fetch("/api/v1/nodes");
     if (!response.ok) throw new Error(`HTTP_ERROR: ${response.status}`);
     return response.json();
-  } catch (err) {
-    console.error("[SWARM_SERVICE] Failed to fetch nodes:", err);
+  } catch (err: any) {
+    if (err.message !== "Failed to fetch") {
+      console.error("[SWARM_SERVICE] Failed to fetch nodes:", err);
+    }
     throw err;
   }
 };
