@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SwarmSymbiote, SymbioteStatus } from './swarm/Symbiote';
 import { fetchSwarmStatus, fetchNodes, fetchRecentTasks, SwarmStatus } from './services/swarmService';
-import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database, Star, Crosshair } from 'lucide-react';
+import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database, Star, Crosshair, Wifi, Download, Monitor } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { TelegramMiniApp } from './TelegramMiniApp';
@@ -16,8 +16,16 @@ import { ClusterMonitor } from './components/ClusterMonitor';
 import { PlanetaryGrid } from './components/PlanetaryGrid';
 import { SensoryCortex } from './components/SensoryCortex';
 import { WelcomeBanner } from './components/WelcomeBanner';
+import { UserProfile } from './components/UserProfile';
+import { UserOnboarding } from './components/UserOnboarding';
+import { BriarComm } from './components/BriarComm';
+import { Aida64Panel } from './components/Aida64Panel';
+import { KiwixArchive } from './components/KiwixArchive';
+import { TorrentManager } from './components/TorrentManager';
+import { SpacedeskPanel } from './components/SpacedeskPanel';
+import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 
-type Tab = 'nexus' | 'recruit' | 'scout' | 'guard';
+type Tab = 'nexus' | 'recruit' | 'briar' | 'kiwix' | 'torrent' | 'spacedesk' | 'aida64' | 'guard';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -173,13 +181,98 @@ function MainDashboard() {
     }
   }, [status]);
 
-  const handleIgnite = () => {
-    if (symbiote) symbiote.ignite();
+  const [observerId, setObserverId] = useState<string | null>(() => {
+    if (!localStorage.getItem('soul_passport')) return null;
+    return localStorage.getItem('observerId') || null;
+  });
+  const [observerData, setObserverData] = useState<any>(null);
+  const [cellData, setCellData] = useState<any>(null);
+
+  useEffect(() => {
+    const passport = localStorage.getItem('soul_passport');
+    if (passport && !observerId) {
+       try {
+          if (validateSeedPhrase(passport)) {
+             const keys = getKeysFromSeed(passport);
+             deriveId(keys.publicKey).then(id => {
+                localStorage.setItem('observerId', id);
+                setObserverId(id);
+             });
+          } else {
+             localStorage.removeItem('soul_passport');
+          }
+       } catch (e) {
+          console.error("Failed to derive ID from passport", e);
+          localStorage.removeItem('soul_passport');
+       }
+    }
+  }, [observerId]);
+
+  const fetchObserverData = async (id: string) => {
+    try {
+      const res = await fetch(`/api/v1/observers/${id}`);
+      if (res.ok) {
+        setObserverData(await res.json());
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (observerId) {
+      fetchObserverData(observerId);
+      const iv = setInterval(() => fetchObserverData(observerId), 5000);
+      return () => clearInterval(iv);
+    }
+  }, [observerId]);
+
+  useEffect(() => {
+    const cid = (symbiote as any)?.cellId;
+    if (cid) {
+      const fetchCell = async () => {
+         try {
+            const res = await fetch(`/api/v1/mesh/cells/${cid}`);
+            if (res.ok) setCellData(await res.json());
+         } catch (e) {}
+      };
+      fetchCell();
+      const iv = setInterval(fetchCell, 5000);
+      return () => clearInterval(iv);
+    }
+  }, [(symbiote as any)?.cellId]);
+
+  const handleOnboardingComplete = async (alias: string, user_mode: string, privateKeyBase64: string, publicKeyBase64: string) => {
+    try {
+      const res = await fetch('/api/v1/observers/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias, public_key: publicKeyBase64, user_mode })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('soul_passport', privateKeyBase64);
+        localStorage.setItem('observerId', data.id);
+        setObserverId(data.id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleIgnite = async () => {
+    if (symbiote && observerId) {
+      symbiote.ignite(observerId);
+    }
   };
 
   const handleConsent = () => {
     if (symbiote) symbiote.grantConsent(selectedMagistrateId);
   };
+
+  if (!observerId) {
+    return <UserOnboarding onComplete={handleOnboardingComplete} />;
+  }
 
   return (
     <div className="min-h-screen bg-transparent text-cyan-500 font-mono p-4 md:p-8 selection:bg-cyan-500/30 flex flex-col w-full relative z-10">
@@ -248,10 +341,19 @@ function MainDashboard() {
         <div className="flex overflow-x-auto border-b border-cyan-500/30 shrink-0 custom-scrollbar">
           {[
             { id: 'nexus', label: 'НЕКСУС (NEXUS)', icon: Activity },
-            { id: 'recruit', label: 'РЕКРУТ (УРОВЕНЬ 1)', icon: Crosshair },
-            { id: 'scout', label: 'РАЗВЕДЧИК (УРОВЕНЬ 2)', icon: Star },
+            { id: 'recruit', label: observerData?.user_mode === 'ark' ? 'ПАНЕЛЬ СВЯЗИ' : 'РЕКРУТ (УРОВЕНЬ 1)', icon: Crosshair },
+            { id: 'briar', label: 'P2P СВЯЗЬ (BRIAR)', icon: Wifi },
+            { id: 'kiwix', label: 'КИВИКС (АРХИВ)', icon: BookOpen },
+            { id: 'torrent', label: 'uTORRENT (P2P)', icon: Download },
+            { id: 'spacedesk', label: 'SPACEDESK (KVM)', icon: Monitor },
+            { id: 'aida64', label: 'АППАРАТНАЯ ДИАГНОСТИКА (AIDA64)', icon: Cpu },
             { id: 'guard', label: 'СТРАЖ (УРОВЕНЬ 3)', icon: Shield },
-          ].map(tab => (
+          ].filter(tab => {
+            const mode = observerData?.user_mode || 'symbiote';
+            if (mode === 'ark') return tab.id === 'nexus' || tab.id === 'recruit';
+            if (mode === 'symbiote') return tab.id !== 'guard';
+            return true;
+          }).map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
@@ -274,6 +376,7 @@ function MainDashboard() {
           {activeTab === 'nexus' && (
             <div className="space-y-6">
               <WelcomeBanner />
+              <UserProfile observer={observerData} />
               
               <div className="hud-panel p-6 rounded-sm flex-1 flex flex-col min-h-[400px]">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400 shrink-0">
@@ -338,19 +441,36 @@ function MainDashboard() {
                   </div>
                   <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
                     <Terminal className="w-4 h-4" />
-                    ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)
+                    {observerData?.user_mode === 'ark' ? 'СОСТОЯНИЕ СВЯЗИ' : 'ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)'}
                   </h2>
                   
                   <div className="space-y-4 relative z-10">
                     <div className="text-xs space-y-2 text-cyan-600">
                       <p className="flex justify-between"><span>СТАТУС:</span> <span className="text-cyan-400 text-glow-cyan">{status.toUpperCase()}</span></p>
-                      {symbiote?.nodeId && <p className="flex justify-between"><span>ID УЗЛА:</span> <span className="text-cyan-400">{symbiote.nodeId.substring(0,8)}</span></p>}
-                      {symbiote?.powerRating !== "unknown" && <p className="flex justify-between"><span>КЛАСС:</span> <span className="text-cyan-400">{symbiote?.powerRating}</span></p>}
+                      {symbiote?.nodeId && <p className="flex justify-between"><span>{observerData?.user_mode === 'ark' ? 'ID КЛЮЧА:' : 'ID УЗЛА:'}</span> <span className="text-cyan-400">{symbiote.nodeId.substring(0,8)}</span></p>}
+                      {(symbiote as any)?.hardwareClass && observerData?.user_mode !== 'ark' && <p className="flex justify-between"><span>ОБОРУДОВАНИЕ:</span> <span className="text-cyan-400">{(symbiote as any).hardwareClass.toUpperCase()}</span></p>}
+                      {(symbiote as any)?.cellId && observerData?.user_mode !== 'ark' && (
+                        <div className="pt-2 border-t border-cyan-500/20 mt-2">
+                           <p className="flex justify-between"><span className="text-cyan-600">ЛОКАЛЬНАЯ СОТА:</span> <span className="text-amber-400">{(symbiote as any).cellId}</span></p>
+                           {cellData && (
+                             <>
+                               <p className="flex justify-between"><span className="text-cyan-600">УЗЛОВ В СОТЕ:</span> <span className="text-cyan-400">{cellData.nodes?.length || 0}</span></p>
+                               <p className="flex justify-between"><span className="text-cyan-600">МАГИСТРАТ (ЯДРО):</span> 
+                                  <span className={cellData.magistrate_id === symbiote?.nodeId ? "text-amber-400 font-bold" : "text-cyan-400"}>
+                                     {cellData.magistrate_id === symbiote?.nodeId ? "ВЫ (ЯКОРЬ)" : (cellData.magistrate_id?.substring(0,8) || 'НЕ НАЗНАЧЕН')}
+                                  </span>
+                               </p>
+                             </>
+                           )}
+                        </div>
+                      )}
+                      {(symbiote as any)?.mobilityScore !== undefined && observerData?.user_mode !== 'ark' && <p className="flex justify-between"><span className="text-cyan-600">ИНДЕКС МОБИЛЬНОСТИ:</span> <span className="text-cyan-400">{(symbiote as any).mobilityScore}</span></p>}
+                      {symbiote?.powerRating !== "unknown" && observerData?.user_mode !== 'ark' && <p className="flex justify-between"><span>КЛАСС:</span> <span className="text-cyan-400">{symbiote?.powerRating}</span></p>}
                       
                       {status === "connected" && (
                         <div className="mt-4 pt-4 border-t border-cyan-500/20">
                           <p className="flex items-center justify-between text-cyan-400 font-bold">
-                            <span className="flex items-center gap-2"><Award className="w-4 h-4" /> РЕПУТАЦИЯ (TRUST)</span>
+                            <span className="flex items-center gap-2"><Award className="w-4 h-4" /> {observerData?.user_mode === 'ark' ? 'ЗАЩИЩЕННОСТЬ СОЕДИНЕНИЯ' : 'РЕПУТАЦИЯ (TRUST)'}</span>
                             <span className="text-glow-cyan">{trustScore}/100</span>
                           </p>
                           <div className="w-full bg-slate-950 h-2 mt-2 rounded-full overflow-hidden border border-cyan-500/30">
@@ -369,7 +489,7 @@ function MainDashboard() {
                         className="w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]"
                       >
                         <Zap className="w-4 h-4" />
-                        ЗАПУСТИТЬ СИМБИОНТ
+                        {observerData?.user_mode === 'ark' ? 'УСТАНОВИТЬ СОЕДИНЕНИЕ' : 'ЗАПУСТИТЬ СИМБИОНТ'}
                       </button>
                     )}
 
@@ -458,7 +578,7 @@ function MainDashboard() {
                 <div className="hud-panel p-5 rounded-sm flex-1 flex flex-col h-full min-h-[400px]">
                   <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
                     <Terminal className="w-4 h-4" />
-                    СИСТЕМНЫЙ ЖУРНАЛ
+                    {observerData?.user_mode === 'ark' ? 'ПРОТОКОЛ МАРШРУТИЗАЦИИ' : 'СИСТЕМНЫЙ ЖУРНАЛ'}
                   </h2>
                   <div className="bg-slate-950 border border-cyan-500/10 p-3 flex-1 overflow-y-auto font-mono text-[10px] sm:text-xs text-cyan-500/80 space-y-1 custom-scrollbar">
                     {logs.map((log, i) => (
@@ -471,41 +591,48 @@ function MainDashboard() {
             </div>
           )}
 
-          {/* TAB: SCOUT */}
-          {activeTab === 'scout' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar pb-6">
-              <div className="space-y-6">
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
-                  title="ТОПОЛОГИЯ СЕТИ" 
-                  desc="Визуализация P2P-связей Роя. Открывает доступ к анализу маршрутов и выявлению цензурных блокировок."
-                >
-                  <NetworkTopology />
-                </LockedFeatureWrapper>
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
-                  title="ПЛАНЕТАРНАЯ СЕТКА" 
-                  desc="Глобальная карта активности узлов. Позволяет отслеживать пульс Роя на всех континентах."
-                >
-                  <PlanetaryGrid />
-                </LockedFeatureWrapper>
+          {/* TAB: BRIAR */}
+          {activeTab === 'briar' && (
+            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1 h-[70vh]">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-500">
+                  <Wifi className="w-5 h-5" /> BRAMBLE P2P MESH
+                </h2>
+                <p className="text-sm text-cyan-600 mb-4">
+                  Защищенная связь внутри локальной соты по протоколу Briar. E2E шифрование активировано.
+                </p>
+                <div className="flex-1 flex min-h-0">
+                  <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} />
+                </div>
               </div>
-              <div className="space-y-6">
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
-                  title="СЕНСОРНАЯ КОРА" 
-                  desc="Прямой доступ к сырым данным NetProbe. Анализ аномалий и попыток перехвата трафика (DPI)."
-                >
-                  <SensoryCortex />
-                </LockedFeatureWrapper>
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 1000} reqKarma={1000} currentKarma={trustScore}
-                  title="МОНИТОР КЛАСТЕРОВ" 
-                  desc="Управление локальными сотами. Разведчики могут координировать группы рекрутов для прорыва блокировок."
-                >
-                  <ClusterMonitor />
-                </LockedFeatureWrapper>
-              </div>
+            </div>
+          )}
+
+          {/* TAB: TORRENT */}
+          {activeTab === 'torrent' && (
+            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
+              <TorrentManager symbiote={symbiote} />
+            </div>
+          )}
+
+          {/* TAB: SPACEDESK */}
+          {activeTab === 'spacedesk' && (
+            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
+              <SpacedeskPanel symbiote={symbiote} />
+            </div>
+          )}
+
+          {/* TAB: AIDA64 */}
+          {activeTab === 'aida64' && (
+            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
+              <Aida64Panel />
+            </div>
+          )}
+
+          {/* TAB: KIWIX */}
+          {activeTab === 'kiwix' && (
+            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
+              <KiwixArchive symbiote={symbiote} />
             </div>
           )}
 

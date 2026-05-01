@@ -19,6 +19,16 @@ export async function getDb(): Promise<Database> {
 
 async function initDb(db: Database) {
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS observers (
+      id TEXT PRIMARY KEY,
+      alias TEXT,
+      trust_level TEXT DEFAULT 'newbie', -- newbie, citizen, magistrate
+      reputation INTEGER DEFAULT 0,
+      public_key TEXT,
+      user_mode TEXT DEFAULT 'symbiote',
+      created_at INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS nodes (
       id TEXT PRIMARY KEY,
       address TEXT,
@@ -40,6 +50,15 @@ async function initDb(db: Database) {
       senses TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS bramble_messages (
+      id TEXT PRIMARY KEY,
+      sender_id TEXT,
+      recipient_id TEXT,
+      encrypted_payload TEXT,
+      timestamp INTEGER,
+      is_delivered INTEGER DEFAULT 0
+    );
+    
     CREATE TABLE IF NOT EXISTS karma_ledger (
       id TEXT PRIMARY KEY,
       node_id TEXT,
@@ -107,6 +126,10 @@ async function initDb(db: Database) {
   try { await db.run('ALTER TABLE nodes ADD COLUMN device_type TEXT DEFAULT "smartphone"'); } catch (e) {}
   try { await db.run('ALTER TABLE nodes ADD COLUMN battery_level INTEGER DEFAULT 100'); } catch (e) {}
   try { await db.run('ALTER TABLE nodes ADD COLUMN is_charging INTEGER DEFAULT 1'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN owner_id TEXT'); } catch (e) {}
+  try { await db.run('ALTER TABLE observers ADD COLUMN user_mode TEXT DEFAULT "symbiote"'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN mobility_score INTEGER DEFAULT 0'); } catch (e) {}
+  try { await db.run('ALTER TABLE nodes ADD COLUMN ip_address TEXT'); } catch (e) {}
 
   // Seed initial strategies if empty
   const count = await db.get('SELECT COUNT(*) as count FROM strategies');

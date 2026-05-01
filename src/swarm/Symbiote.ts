@@ -8,6 +8,8 @@ export type SymbioteStatus =
   | "connected" 
   | "connection_failed";
 
+import { getSystemSpecs } from '../lib/aida64';
+
 export class SwarmSymbiote {
   public consentGranted: boolean = false;
   public powerRating: string = "unknown";
@@ -16,61 +18,114 @@ export class SwarmSymbiote {
   public hardwareStats = { cores: 1, ram: 2 };
   public trustScore: number = 50;
   public isp: string = "BrowserISP"; // Simulated ISP for web clients
-  public senses = {
+  public hardwareClass: string = "smartphone";
+  public mobilityScore: number = 0;
+  public cellId: string | null = null;
+  private lastCoords: { lat: number, lng: number } | null = null;
+  public sensors = {
     vision: false,
     hearing: false,
     proprioception: false,
-    touch: false
+    touch: false,
+    gps: false
   };
 
   constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {
     this.initSenses();
+    this.detectHardwareClass();
+  }
+
+  private detectHardwareClass() {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('smart-tv') || ua.includes('smarttv') || ua.includes('tizen') || ua.includes('webos')) {
+      this.hardwareClass = "smart_tv";
+    } else if (ua.includes('windows') || ua.includes('macintosh') || ua.includes('linux') && !ua.includes('android')) {
+      this.hardwareClass = "pc";
+    } else if (ua.includes('android') || ua.includes('iphone') || ua.includes('ipad')) {
+      this.hardwareClass = "smartphone";
+    } else {
+      this.hardwareClass = "unknown";
+    }
   }
 
   private initSenses() {
     // Vision (Screen visibility)
-    this.senses.vision = !document.hidden;
+    this.sensors.vision = !document.hidden;
     document.addEventListener("visibilitychange", () => {
-      this.senses.vision = !document.hidden;
+      this.sensors.vision = !document.hidden;
     });
 
     // Proprioception (Orientation)
     if (window.DeviceOrientationEvent) {
       window.addEventListener("deviceorientation", (event) => {
-        if (event.alpha !== null) this.senses.proprioception = true;
+        if (event.alpha !== null) this.sensors.proprioception = true;
       }, { once: true });
     }
 
     // Touch (Vibration API availability)
     if ('vibrate' in navigator) {
-      this.senses.touch = true;
+      this.sensors.touch = true;
     }
 
     // Hearing (Microphone permission check - non-blocking)
     navigator.mediaDevices?.enumerateDevices().then(devices => {
       const hasMic = devices.some(d => d.kind === 'audioinput');
-      this.senses.hearing = hasMic;
+      this.sensors.hearing = hasMic;
     }).catch(() => {});
+
+    // GPS (Geolocation)
+    if ('geolocation' in navigator) {
+      this.sensors.gps = true;
+      navigator.geolocation.watchPosition((pos) => {
+        const { latitude, longitude } = pos.coords;
+        if (this.lastCoords) {
+           const dLat = latitude - this.lastCoords.lat;
+           const dLng = longitude - this.lastCoords.lng;
+           const dist = Math.sqrt(dLat * dLat + dLng * dLng); // naive distance
+           if (dist > 0.0001) { // approx 10+ meters
+              this.mobilityScore += 1;
+           }
+        }
+        this.lastCoords = { lat: latitude, lng: longitude };
+        
+        // Calculate ~100m hex cell (naive rounding to 3 decimal places)
+        const cellLat = latitude.toFixed(3);
+        const cellLng = longitude.toFixed(3);
+        this.cellId = `CELL-${cellLat}-${cellLng}`;
+      }, () => {}, { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 });
+    }
   }
 
-  private evaluateHardware(): string {
-    const cores = navigator.hardwareConcurrency || 1;
-    const ram = (navigator as any).deviceMemory || 2; 
+  private async evaluateHardware(): Promise<string> {
+    const specs = await getSystemSpecs();
+    const cores = specs.cpuCores;
+    const ram = typeof (navigator as any).deviceMemory === 'number' ? (navigator as any).deviceMemory : 2; 
     
     this.hardwareStats = { cores, ram };
+
+    if (specs.os === 'iOS' || specs.os === 'Android') {
+      this.hardwareClass = "smartphone";
+    } else if (['Windows', 'MacOS', 'Linux', 'UNIX'].includes(specs.os)) {
+      this.hardwareClass = "pc";
+    } else {
+      this.hardwareClass = "smart_tv"; // Assume TV/IoT if not identified
+    }
 
     if (cores >= 8 && ram >= 8) return "llm_capable (Heavy)";
     if (cores >= 4 && ram >= 4) return "slm_capable (Medium)";
     return "router_node (Light)";
   }
 
-  public async ignite() {
+  private ownerId: string | null = null;
+
+  public async ignite(ownerId?: string | null) {
+    if (ownerId) this.ownerId = ownerId;
     this.status = "evaluating";
     this.onUpdate(this.status, "Анализ аппаратных мощностей...");
     
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    this.powerRating = this.evaluateHardware();
+    this.powerRating = await this.evaluateHardware();
 
     this.status = "awaiting_consent";
     this.onUpdate(this.status, `Оценка завершена: ${this.powerRating}. Ожидание согласия Гражданина.`);
@@ -124,7 +179,12 @@ export class SwarmSymbiote {
           cpu_cores: this.hardwareStats.cores,
           power_rating: this.powerRating,
           delegatedTo: delegatedTo,
-          manifest: manifest
+          manifest: manifest,
+          owner_id: this.ownerId,
+          device_type: this.hardwareClass,
+          mobility_score: this.mobilityScore,
+          cell_id: this.cellId,
+          senses: this.sensors
         })
       });
 
@@ -151,7 +211,7 @@ export class SwarmSymbiote {
           const res = await fetch(`/api/v1/nodes/${this.nodeId}/heartbeat`, { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isp: this.isp, senses: this.senses })
+            body: JSON.stringify({ isp: this.isp, senses: this.sensors, mobility_score: this.mobilityScore, cell_id: this.cellId })
           });
           const data = await res.json();
           

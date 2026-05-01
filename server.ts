@@ -74,6 +74,18 @@ async function startServer() {
           // Handle task completion via WS
           // (Logic similar to the POST route)
         }
+
+        // WebRTC Signaling (Briar P2P Integration)
+        if (data.type === 'webrtc_signal' && nodeId) {
+          const targetWs = connectedNodes.get(data.targetNodeId);
+          if (targetWs && targetWs.readyState === 1) { // 1 is OPEN
+            targetWs.send(JSON.stringify({
+              type: 'webrtc_signal',
+              senderNodeId: nodeId,
+              signal: data.signal
+            }));
+          }
+        }
       } catch (e) {
         console.error('[HIVE] WS Message Error:', e);
       }
@@ -172,6 +184,50 @@ async function startServer() {
   });
 
   // 2. Node Registration (The Symbiote connects here)
+  // ==========================================
+  // OBSERVERS (USERS)
+  // ==========================================
+  app.post("/api/v1/observers/register", async (req, res) => {
+    try {
+      const { alias, public_key, user_mode } = req.body;
+      let id = crypto.createHash('sha256').update(public_key).digest('hex').substring(0, 16);
+      
+      // Keep existing logic if duplicate (user restoring account)
+      const existing = await db.get('SELECT * FROM observers WHERE id = ?', [id]);
+      if (existing) {
+        return res.json({ id, message: "Observer restored successfully" });
+      }
+
+      const created_at = Date.now();
+      const mode = user_mode || 'symbiote';
+      
+      await db.run(`
+        INSERT INTO observers (id, alias, public_key, user_mode, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `, [id, alias, public_key, mode, created_at]);
+      
+      res.json({ id, message: "Observer registered successfully" });
+    } catch (e: any) {
+      console.error("Failed to register observer", e);
+      res.status(500).json({ error: "Failed to register observer" });
+    }
+  });
+
+  app.get("/api/v1/observers/:id", async (req, res) => {
+    try {
+      const observer = await db.get('SELECT * FROM observers WHERE id = ?', [req.params.id]);
+      if (!observer) return res.status(404).json({ error: "Observer not found" });
+      
+      // Get observer's nodes
+      const nodes = await db.all('SELECT id, address, status, power_rating, device_type, trust_score, battery_level, is_charging, cell_id, mobility_score FROM nodes WHERE owner_id = ?', [observer.id]);
+      
+      res.json({ ...observer, nodes });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to fetch observer" });
+    }
+  });
+
+  // Modify node registration to accept owner_id
   app.post("/api/v1/nodes/register", async (req, res) => {
     const id = uuidv4();
     const token = uuidv4();
@@ -201,7 +257,7 @@ async function startServer() {
     const lng = baseLng + (Math.random() - 0.5) * 0.1;
 
     // Reverse StarLink: Assign to a planetary cell (Hex Grid simulation)
-    const cell_id = `HEX-${Math.floor(lat * 10)}:${Math.floor(lng * 10)}`;
+    const cell_id = req.body.cell_id || `HEX-${Math.floor(lat * 10)}:${Math.floor(lng * 10)}`;
     
     // PlayStation Supercomputer: Assign to a compute cluster based on power
     const cluster_id = `CLUSTER-${req.body.power_rating ? req.body.power_rating.split(' ')[0].toUpperCase() : 'UNKNOWN'}`;
@@ -210,6 +266,7 @@ async function startServer() {
     const device_type = req.body.device_type || "smartphone";
     const battery_level = req.body.battery_level !== undefined ? req.body.battery_level : 100;
     const is_charging = req.body.is_charging !== undefined ? (req.body.is_charging ? 1 : 0) : 1;
+    const owner_id = req.body.owner_id || null;
     
     // If not purified, trust score starts lower and is capped.
     let initial_trust = is_purified ? 50 : 10;
@@ -238,13 +295,14 @@ async function startServer() {
       is_purified,
       device_type,
       battery_level,
-      is_charging
+      is_charging,
+      owner_id
     };
 
     await db.run(`
-      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses, is_purified, device_type, battery_level, is_charging)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses, node.is_purified, node.device_type, node.battery_level, node.is_charging]);
+      INSERT INTO nodes (id, address, capabilities, ram_mb, cpu_cores, power_rating, status, last_heartbeat, trust_score, token, delegated_to, lat, lng, cell_id, cluster_id, senses, is_purified, device_type, battery_level, is_charging, owner_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses, node.is_purified, node.device_type, node.battery_level, node.is_charging, node.owner_id]);
 
     console.log(`[SWARM] New node registered: ${id} (${node.power_rating}, ${device_type}, Purified: ${is_purified}, Battery: ${battery_level}%) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
     
@@ -278,6 +336,47 @@ async function startServer() {
     res.json({ nodes, links });
   });
 
+  // 2.6 Cell Topology (Local Hex Grid)
+  app.get("/api/v1/mesh/cells/:cellId", async (req, res) => {
+    const { cellId } = req.params;
+    const nodes = await db.all('SELECT id, device_type, trust_score, is_charging, mobility_score FROM nodes WHERE cell_id = ? AND status = "online" AND is_banned = 0 AND is_frozen = 0 ORDER BY trust_score DESC', [cellId]);
+    
+    let magistrateId = null;
+    if (nodes.length > 0) {
+      // Find the best candidate for Magistrate: highest trust, connected to power.
+      const chargingNodes = nodes.filter((n: any) => n.is_charging);
+      const candidates = chargingNodes.length > 0 ? chargingNodes : nodes;
+      magistrateId = candidates[0].id;
+    }
+    
+    res.json({ cell_id: cellId, nodes, magistrate_id: magistrateId });
+  });
+
+  // 2.7 Briar Protocol (Bramble Messages)
+  app.post("/api/v1/bramble/send", async (req, res) => {
+    const { senderId, recipientId, encryptedPayload } = req.body;
+    const msgId = crypto.randomUUID();
+    const timestamp = Date.now();
+    await db.run('INSERT INTO bramble_messages (id, sender_id, recipient_id, encrypted_payload, timestamp) VALUES (?, ?, ?, ?, ?)', 
+      [msgId, senderId, recipientId, encryptedPayload, timestamp]);
+    res.json({ success: true, messageId: msgId });
+  });
+
+  app.get("/api/v1/bramble/sync/:nodeId", async (req, res) => {
+    const { nodeId } = req.params;
+    const messages = await db.all('SELECT * FROM bramble_messages WHERE recipient_id = ? AND is_delivered = 0 ORDER BY timestamp ASC', [nodeId]);
+    res.json({ messages });
+  });
+
+  app.post("/api/v1/bramble/ack", async (req, res) => {
+    const { messageIds } = req.body;
+    if (Array.isArray(messageIds) && messageIds.length > 0) {
+      const placeholders = messageIds.map(() => '?').join(',');
+      await db.run(`UPDATE bramble_messages SET is_delivered = 1 WHERE id IN (${placeholders})`, messageIds);
+    }
+    res.json({ success: true });
+  });
+
   // 3. Node Heartbeat & Task Polling
   app.post("/api/v1/nodes/:nodeId/heartbeat", async (req, res) => {
     const { nodeId } = req.params;
@@ -285,6 +384,7 @@ async function startServer() {
     const senses = req.body.senses; // Sensory telemetry
     const battery_level = req.body.battery_level !== undefined ? req.body.battery_level : undefined;
     const is_charging = req.body.is_charging !== undefined ? (req.body.is_charging ? 1 : 0) : undefined;
+    const mobility_score = req.body.mobility_score || 0;
 
     const node = await db.get('SELECT * FROM nodes WHERE id = ?', [nodeId]);
     
@@ -300,7 +400,30 @@ async function startServer() {
       return res.status(403).json({ error: "EMERGENCY: This node has been FROZEN by Magistrate Consensus." });
     }
 
-    let updates = [`last_heartbeat = ${Date.now()}`, `status = "online"`];
+    // AIKIDO (ANTI-FARM LOGIC)
+    let extra_trust_modifier = 0;
+    if (node.device_type === "smartphone") {
+       if (mobility_score === 0 && node.trust_score > 20) {
+          // Stationary smartphone over time is treated as a potential farm node.
+          // Very slow decay (0.1) instead of 1 so it doesn't instantly punish normal users sitting at a desk.
+          // Just prevents them from climbing to Magistrate status without real human movement.
+       } else if (mobility_score > 0 && node.trust_score < 100) {
+          // A moving smartphone is a real user. Bonus trust up to max.
+          // Handled primarily by task successes, but mobility gives a baseline buffer.
+       }
+    }
+
+    // Decay stationary nodes very slowly so active movement is required for elite ranks
+    const isFarmSuspect = node.device_type === "smartphone" && mobility_score === 0;
+    if (isFarmSuspect && node.trust_score > 50) {
+      extra_trust_modifier = -0.5; // lose some trust if stationary at high ranks
+    } else if (mobility_score > 5 && node.trust_score < 30) {
+      extra_trust_modifier = 0.5; // slight boost for proven mobile devices
+    }
+
+    const current_trust = Math.min(100, Math.max(0, node.trust_score + extra_trust_modifier));
+
+    let updates = [`last_heartbeat = ${Date.now()}`, `status = "online"`, `mobility_score = ${Math.max(node.mobility_score, mobility_score)}`, `trust_score = ${current_trust}`];
     if (senses) {
       updates.push(`senses = '${JSON.stringify(senses)}'`);
     }
@@ -309,6 +432,9 @@ async function startServer() {
     }
     if (is_charging !== undefined) {
       updates.push(`is_charging = ${is_charging}`);
+    }
+    if (req.body.cell_id) {
+      updates.push(`cell_id = '${req.body.cell_id}'`);
     }
 
     await db.run(`UPDATE nodes SET ${updates.join(', ')} WHERE id = ?`, [nodeId]);
@@ -353,13 +479,16 @@ async function startServer() {
     // 2. If no cluster job, fallback to regular tasks
     if (!assignedTask) {
       const rand = Math.random();
-      if (rand < 0.2) {
-        // BYEDPI Routing Task (20% chance)
+      
+      const isFarmSuspect = node.device_type === "smartphone" && mobility_score === 0 && current_trust < 20;
+
+      if (rand < 0.2 && !isFarmSuspect) {
+        // BYEDPI Routing Task (20% chance, skipped for suspected farms)
         const taskId = uuidv4();
         const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
         
         // Commissar decides the best strategy for this ISP
-        const isMagistrate = node.trust_score >= 90;
+        const isMagistrate = current_trust >= 90;
         const selectedStrategy = await Commissar.getRecommendedStrategy(isp, isMagistrate);
 
         assignedTask = {
@@ -371,7 +500,7 @@ async function startServer() {
           isp: isp
         };
         activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
-      } else if (rand < 0.4 && canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
+      } else if ((rand < 0.4 || isFarmSuspect) && canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
         // Compute Task (20% chance, only if battery is good, charging, or unknown/desktop)
         const taskId = uuidv4();
         assignedTask = {
