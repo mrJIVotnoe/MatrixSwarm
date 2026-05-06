@@ -1,13 +1,17 @@
 [package]
-name = "escape_engine"
-version = "0.1.0"
+name = "matrix_swarm_core"
+version = "1.2.0"
 edition = "2021"
-description = "E.S.C.A.P.E. DPI Evasion Engine (The Muscle)"
+description = "MatrixSwarm Iron Hive - Core Engine for WASM and Native"
 
 [lib]
-# 'cdylib' is required to compile a dynamic library (.so, .dll, .dylib) for Go to link against via CGO
-# 'rlib' allows it to be used as a standard Rust library as well
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-libc = "0.2"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+bip39 = "2.0"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# For WASM or cross-platform time
+instant = { version = "0.1", features = ["wasm-bindgen"] }
