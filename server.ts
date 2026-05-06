@@ -57,32 +57,45 @@ async function startServer() {
         
         if (data.type === 'auth') {
           nodeId = data.nodeId;
+          const { cellId } = data; // Node can provide its cell on auth
           if (nodeId) {
             connectedNodes.set(nodeId, ws);
-            console.log(`[HIVE] Node ${nodeId} connected via WebSocket`);
-            ws.send(JSON.stringify({ type: 'auth_success', message: 'Connected to the Hive' }));
+            // Optionally store cellId in memory or DB for quick lookups
+            if (cellId) {
+              const db = await getDb();
+              await db.run('UPDATE nodes SET cell_id = ? WHERE id = ?', [cellId, nodeId]);
+            }
+            console.log(`[HIVE L3] Node ${nodeId} connected via Matchmaking Server`);
+            ws.send(JSON.stringify({ type: 'auth_success', message: 'Connected to Matchmaking Server' }));
           }
         }
 
-        if (data.type === 'pulse' && nodeId) {
-          // Update last heartbeat in DB
+        if (data.type === 'discovery' && nodeId) {
+          const { cellId } = data;
           const db = await getDb();
-          await db.run('UPDATE nodes SET last_heartbeat = ?, status = ? WHERE id = ?', [Date.now(), 'online', nodeId]);
+          const peers = await db.all(
+            'SELECT id, trust_score, power_rating, device_type, capabilities FROM nodes WHERE cell_id = ? AND status = "online" AND is_banned = 0 AND id != ? LIMIT 15', 
+            [cellId, nodeId]
+          );
+          
+          ws.send(JSON.stringify({
+            type: 'discovery_response',
+            peers: peers.filter((p: any) => connectedNodes.has(p.id))
+          }));
+          console.log(`[HIVE L3] Node ${nodeId} discovered ${peers.length} peers in cell ${cellId}`);
         }
 
-        if (data.type === 'task_complete' && nodeId) {
-          // Handle task completion via WS
-          // (Logic similar to the POST route)
-        }
-
-        // WebRTC Signaling (Briar P2P Integration)
-        if (data.type === 'webrtc_signal' && nodeId) {
+        // WebRTC Signaling (SDP Offers/Answers & ICE Candidates)
+        if (['webrtc_offer', 'webrtc_answer', 'webrtc_ice_candidate', 'webrtc_signal'].includes(data.type) && nodeId) {
           const targetWs = connectedNodes.get(data.targetNodeId);
-          if (targetWs && targetWs.readyState === 1) { // 1 is OPEN
+          if (targetWs && targetWs.readyState === 1) {
             targetWs.send(JSON.stringify({
-              type: 'webrtc_signal',
+              type: data.type,
               senderNodeId: nodeId,
-              signal: data.signal
+              sdp: data.sdp,
+              candidate: data.candidate,
+              signal: data.signal,
+              signature: data.signature // Mandatory for Zero-Trust verification
             }));
           }
         }

@@ -10,7 +10,27 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
 
-  const [cryptoAuth, setCryptoAuth] = useState<'none' | 'pending' | 'authorized' | 'rejected'>('none');
+  const [cryptoAuth, setCryptoAuth] = useState<'none' | 'pending' | 'authorized' | 'authorized_friend' | 'rejected' | 'aikido' | 'seed_prompt_self' | 'seed_prompt_friend'>('none');
+  const [countdown, setCountdown] = useState(15);
+  const [seedPhraseInput, setSeedPhraseInput] = useState('');
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (cryptoAuth === 'pending') {
+      timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            setCryptoAuth('aikido');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdown(15);
+    }
+    return () => clearInterval(timer);
+  }, [cryptoAuth]);
 
   // USB/Cable connection simulation
   useEffect(() => {
@@ -152,14 +172,16 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
                      <span className="text-purple-600 flex items-center gap-2">
                        {connectionType === 'usb' ? <Cable className="w-3 h-3" /> : <Wifi className="w-3 h-3" />}
                      </span>
-                     {cryptoAuth === 'pending' ? <span className="text-red-500 animate-pulse font-bold">ОБНАРУЖЕНО НЕИЗВЕСТНОЕ ОБОРУДОВАНИЕ</span> : (isConnected ? <span className="text-purple-400">СВЯЗЬ УСТАНОВЛЕНА И АВТОРИЗОВАНА</span> : <span className="text-purple-600">ОЖИДАНИЕ СЛЕЙВ-УЗЛА...</span>)}
+                     {['pending', 'seed_prompt_self', 'seed_prompt_friend'].includes(cryptoAuth) ? <span className="text-red-500 animate-pulse font-bold">ОБНАРУЖЕНО НЕИЗВЕСТНОЕ ОБОРУДОВАНИЕ</span> 
+                     : cryptoAuth === 'aikido' ? <span className="text-red-500 font-bold">СЛЕЙВ-УЗЕЛ ВОРКЕР (АЙКИДО)</span>
+                     : (isConnected ? <span className="text-purple-400">СВЯЗЬ УСТАНОВЛЕНА И АВТОРИЗОВАНА</span> : <span className="text-purple-600">ОЖИДАНИЕ СЛЕЙВ-УЗЛА...</span>)}
                    </div>
                </div>
                
                <div className="flex gap-2">
                   {!isStreaming ? (
                     <button 
-                      disabled={!isConnected || cryptoAuth !== 'authorized'}
+                      disabled={!isConnected || (cryptoAuth !== 'authorized' && cryptoAuth !== 'authorized_friend')}
                       onClick={startHostStream}
                       className="px-4 py-2 bg-purple-500/20 border border-purple-500 text-purple-400 flex items-center gap-2 font-bold text-xs disabled:opacity-50 hover:bg-purple-500/30"
                     >
@@ -177,23 +199,86 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
              </div>
 
              <div className="flex-1 bg-black border border-purple-500/30 relative flex items-center justify-center overflow-hidden">
-               {cryptoAuth === 'pending' ? (
+               {['pending', 'seed_prompt_self', 'seed_prompt_friend'].includes(cryptoAuth) ? (
                  <div className="flex flex-col items-center justify-center p-8 bg-black/90 absolute inset-0 z-10 border-2 border-red-500/50">
                     <Shield className="w-16 h-16 text-red-500 mb-4 animate-pulse" />
                     <h3 className="text-red-500 font-bold text-xl mb-2">АППАРАТНЫЙ КАРАНТИН</h3>
                     <p className="text-red-400/80 text-sm max-w-md text-center mb-6 border border-red-500/20 p-4 bg-red-950/30">
                       ВНИМАНИЕ! Обнаружено физическое подключение неизвестного устройства по USB-шине. 
-                      В целях безопасности (защита от несанкционированного DPI-сканирования, "Полицейских" дамперов или захвата контроля) 
-                      устройство переведено в состояние строгой изоляции.
+                      Выберите протокол развертывания узла и авторизации связи.
                     </p>
-                    <div className="flex gap-4">
-                      <button onClick={() => setCryptoAuth('rejected')} className="px-6 py-2 bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700 text-xs font-bold">
-                        БЛОКИРОВАТЬ ПОРТ
-                      </button>
-                      <button onClick={() => setCryptoAuth('authorized')} className="px-6 py-2 bg-red-900/50 border border-red-500 text-red-400 hover:bg-red-900/80 text-xs font-bold flex items-center gap-2">
-                        <Lock className="w-4 h-4" /> АВТОРИЗОВАТЬ (ДОВЕРЯЮ)
-                      </button>
-                    </div>
+                    
+                    {cryptoAuth === 'pending' ? (
+                      <>
+                        <div className="flex flex-col gap-3 w-full max-w-sm mb-6">
+                          <button onClick={() => setCryptoAuth('seed_prompt_self')} className="w-full px-6 py-3 bg-purple-900/50 border border-purple-500 text-purple-400 hover:bg-purple-900/80 text-xs font-bold flex items-center justify-center gap-2">
+                            <Lock className="w-4 h-4" /> ИНТЕГРАЦИЯ: МОЙ УЗЕЛ (СИД-ФРАЗА)
+                          </button>
+                          <button onClick={() => setCryptoAuth('seed_prompt_friend')} className="w-full px-6 py-3 bg-emerald-900/50 border border-emerald-500 text-emerald-400 hover:bg-emerald-900/80 text-xs font-bold flex items-center justify-center gap-2">
+                            <Link className="w-4 h-4" /> ИНСТАЛЛЯЦИЯ: УЗЕЛ СОЮЗНИКА
+                          </button>
+                          <button onClick={() => setCryptoAuth('aikido')} className="w-full px-6 py-3 bg-red-900/50 border border-red-500 text-red-400 hover:bg-red-900/80 text-xs font-bold flex items-center justify-center gap-2">
+                            <Activity className="w-4 h-4" /> АЙКИДО-ПРОТОКОЛ (САНДБОКС)
+                          </button>
+                        </div>
+                        
+                        <div className="w-full max-w-sm">
+                          <div className="text-red-500/80 text-[10px] text-center mb-1 font-mono">АВТО-АЙКИДО ЧЕРЕЗ {countdown} СЕК...</div>
+                          <div className="h-1 bg-red-950 w-full overflow-hidden">
+                            <div className="h-full bg-red-500 transition-none" style={{ width: `${(countdown / 15) * 100}%` }}></div>
+                          </div>
+                          <p className="text-red-500/50 text-[10px] text-center mt-2 leading-tight">
+                            Защита от изъятия: Без явной авторизации устройство-самозванец переводится в ранг "Ниже майнинга", без доступа к дисплею или данным, отдавая лишь свои вычислительные мощности Сети.
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full max-w-sm flex flex-col gap-4 bg-slate-900/50 border border-slate-700 p-4">
+                         <h4 className={`text-sm font-bold text-center ${cryptoAuth === 'seed_prompt_self' ? 'text-purple-400' : 'text-emerald-400'}`}>
+                           {cryptoAuth === 'seed_prompt_self' ? 'ПОДТВЕРЖДЕНИЕ ВЛАДЕЛЬЦА' : 'СОЗДАНИЕ УЗЛА СОЮЗНИКА'}
+                         </h4>
+                         <p className="text-xs text-slate-400 text-center leading-relaxed">
+                           {cryptoAuth === 'seed_prompt_self' 
+                              ? 'Введите вашу личную Сид-Фразу для расширения прав данного устройства до статуса "Доверенный Узел".' 
+                              : 'Предоставьте устройство другу для генерации и ввода его собственной Сид-Фразы. База данных будет сегрегирована.'}
+                         </p>
+                         <textarea 
+                           className="w-full h-24 bg-black border border-slate-700 p-3 text-xs font-mono text-slate-300 focus:border-purple-500 focus:outline-none"
+                           placeholder="Слово1 Слово2 Слово3..."
+                           value={seedPhraseInput}
+                           onChange={(e) => setSeedPhraseInput(e.target.value)}
+                         ></textarea>
+                         <div className="flex gap-2">
+                           <button onClick={() => { setCryptoAuth('pending'); setSeedPhraseInput(''); }} className="flex-1 px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 border border-slate-600">
+                             ОТМЕНА
+                           </button>
+                           <button 
+                             disabled={seedPhraseInput.trim().length < 10}
+                             onClick={() => {
+                               setCryptoAuth(cryptoAuth === 'seed_prompt_self' ? 'authorized' : 'authorized_friend');
+                               setSeedPhraseInput('');
+                             }} 
+                             className={`flex-1 px-4 py-2 text-xs font-bold disabled:opacity-50 border ${
+                               cryptoAuth === 'seed_prompt_self' 
+                                 ? 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/40 border-purple-500' 
+                                 : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border-emerald-500'
+                             }`}
+                           >
+                             ПРИНЯТЬ
+                           </button>
+                         </div>
+                      </div>
+                    )}
+                 </div>
+               ) : cryptoAuth === 'aikido' ? (
+                 <div className="text-red-500 flex flex-col items-center gap-4">
+                   <Activity className="w-20 h-20 animate-[spin_3s_linear_infinite] opacity-50" />
+                   <div className="text-center">
+                     <h3 className="font-bold text-lg">АЙКИДО-РЕЖИМ АКТИВЕН</h3>
+                     <p className="font-mono text-sm max-w-xs mt-2 text-red-400/80">
+                       Данный узел изолирован в песочнице. Доступ к KVM заблокирован. Устройство выполняет теневые вычисления для Сети.
+                     </p>
+                   </div>
                  </div>
                ) : cryptoAuth === 'rejected' ? (
                  <div className="text-slate-500 flex flex-col items-center gap-4">
@@ -253,11 +338,27 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
                    {connectionType === 'usb' ? <Cable className="w-12 h-12" /> : <Link className="w-12 h-12" />}
                    <p className="font-mono text-sm max-w-xs text-center border border-amber-500/20 p-2">Ожидание физического подключения к Хост-машине...</p>
                  </div>
-               ) : cryptoAuth === 'pending' ? (
+               ) : ['pending', 'seed_prompt_self', 'seed_prompt_friend'].includes(cryptoAuth) ? (
                  <div className="text-amber-500/70 flex flex-col items-center gap-4 border border-amber-500/30 p-8 bg-amber-950/20">
                    <Shield className="w-16 h-16 animate-pulse" />
                    <p className="font-mono text-sm font-bold text-center">ОЖИДАНИЕ АВТОРИЗАЦИИ</p>
                    <p className="text-xs text-center max-w-xs">Хост-машина включила режим Аппаратного Карантина. Для получения доступа требуется явное подтверждение с доверенного устройства.</p>
+                 </div>
+               ) : cryptoAuth === 'aikido' ? (
+                 <div className="w-full h-full relative flex items-center justify-center bg-black">
+                   <div className="absolute inset-0 bg-red-950/20 z-0"></div>
+                   <div className="text-red-500 font-mono text-xs text-center border border-red-900 bg-red-950/40 p-6 z-10 flex flex-col gap-4 max-w-sm mx-4">
+                     <Shield className="w-8 h-8 mx-auto" />
+                     <p className="font-bold">АППАРАТНАЯ ИЗОЛЯЦИЯ</p>
+                     <p className="opacity-80">Нет доступа к запрашиваемому узлу. Работа с дисплеем невозможна.</p>
+                     
+                     <div className="border border-red-900/50 pt-4 mt-2 border-t text-left space-y-1 text-[10px] opacity-60">
+                        <div>{'>'} connection_state: PENDING_AUTH</div>
+                        <div>{'>'} stream_service: BLOCKED</div>
+                        <div>{'>'} worker_process: RUNNING</div>
+                        <div className="animate-pulse">{'>'} background_tasks: hash_compute, relay_packet</div>
+                     </div>
+                   </div>
                  </div>
                ) : cryptoAuth === 'rejected' ? (
                  <div className="text-slate-500 flex flex-col items-center gap-4 border border-slate-700/50 p-8 bg-slate-900/50">
