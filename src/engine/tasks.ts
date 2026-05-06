@@ -1,4 +1,5 @@
 import { NodeRole, DeviceCapability } from '../core/models';
+import { PermissionEngine, TrustLevel, PermissionScope } from '../core/permissions';
 
 export type TaskStatus = 'pending' | 'assigned' | 'completed' | 'failed' | 'reincarnating';
 export type TaskComplexity = 'heavy' | 'light';
@@ -8,6 +9,7 @@ export interface SwarmTask {
   name: string;
   complexity: TaskComplexity;
   requiredCapabilities: DeviceCapability[];
+  requiredScope?: PermissionScope; 
   payload: any;
   status: TaskStatus;
   assignedToNodeId?: string;
@@ -31,9 +33,14 @@ export class TaskManager {
     return newTask;
   }
 
-  assignTask(taskId: string, nodeId: string) {
+  // Modified to check TrustLevel
+  assignTask(taskId: string, nodeId: string, nodeTrustLevel: TrustLevel = TrustLevel.RECRUIT, pubKey: string = '') {
     const task = this.queue.find(t => t.id === taskId);
     if (task) {
+      if (task.requiredScope && !PermissionEngine.hasPermission(nodeTrustLevel, task.requiredScope, pubKey)) {
+          this.log(`[PermissionEngine] Task ${task.id} REJECTED for Node ${nodeId} - Insufficient Trust (${nodeTrustLevel}) for scope: ${task.requiredScope}`);
+          return;
+      }
       task.status = 'assigned';
       task.assignedToNodeId = nodeId;
       task.lastHeartbeat = Date.now();

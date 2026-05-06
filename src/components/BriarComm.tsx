@@ -55,7 +55,7 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
 
     return () => {
       ws.close();
-      Object.values(peers).forEach(p => p.destroy());
+      Object.values(peers).forEach((p: any) => p.destroy && p.destroy());
     };
   }, [symbiote?.nodeId]);
 

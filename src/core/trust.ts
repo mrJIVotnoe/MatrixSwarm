@@ -1,48 +1,61 @@
-import { ConnectionType, Device, TrustLevel } from './models';
+import { HardwarePort, TrustLevel } from './permissions';
+import { AikidoStatus } from './aikido';
 
-export const TRUST_CONSTANTS = {
-  USB_INITIAL: 0,
-  WEBRTC_INITIAL: 1, // Assumption
-  SEED_CONFIRMED: +2,
-  KNOWN_DEVICE: +1,
-  SUSPICIOUS_ACTIVITY: -1,
-  KEY_MISMATCH: -10, // Instant sandbox
-  MIN_MAGISTRATE_TRUST: 5,
+export const KPOW_CONSTANTS = {
+  KARMA_PER_HOUR_UPTIME: 1,
+  KARMA_PER_SUCCESSFUL_PACKET: 0.1,
+  KARMA_MAX_PER_DAY: 100, // Anti-bot farm cap
 };
 
 /**
- * Initializes a new device's trust level based on connection context
+ * Initializes a new node's trust level based strictly on hardware connection.
  */
-export function initializeDeviceTrust(connectionType: ConnectionType): TrustLevel {
-  if (connectionType === 'usb') {
-    return TRUST_CONSTANTS.USB_INITIAL; // Аппаратный карантин
+export function initializeDeviceTrust(portType: HardwarePort): TrustLevel {
+  // L0 - Hardware Quarantine. Physical devices connected via USB have zero trust initially.
+  if (portType === 'usb') {
+    return TrustLevel.QUARANTINE;
   }
-  return TRUST_CONSTANTS.WEBRTC_INITIAL;
+  return TrustLevel.RECRUIT;
 }
 
 /**
- * Process trust actions
+ * Calculates earned Karma based on Karma Proof of Work (KPoW) and Aikido Status.
+ * Only real contributions increase Karma.
+ * Поощрение "Домашних узлов" (Home Anchor / Stable Guardian) происходит путем обычного
+ * начисления Кармы как для стационарного ПК (за Аптайм и KPoW).
  */
-export type TrustAction = 'CONFIRM_SEED' | 'DISCOVER_KNOWN' | 'SUSPICIOUS_EVENT' | 'KEY_MISMATCH';
+export function calculateTrustScore(
+  baseKarma: number,
+  hoursConnected: number, 
+  successfulRelayedPackets: number,
+  aikidoStatus: AikidoStatus = 'Nomad'
+): number {
+  let earned = 0;
+  
+  // Base growth for uptime and storage/relaying
+  earned += hoursConnected * KPOW_CONSTANTS.KARMA_PER_HOUR_UPTIME;
+  earned += successfulRelayedPackets * KPOW_CONSTANTS.KARMA_PER_SUCCESSFUL_PACKET;
+  
+  // Cap the daily earnings to prevent sudden massive spikes
+  let cappedEarned = Math.min(earned, KPOW_CONSTANTS.KARMA_MAX_PER_DAY);
 
-export function evaluateTrust(currentTrust: TrustLevel, action: TrustAction): TrustLevel {
-  switch (action) {
-    case 'CONFIRM_SEED':
-      return currentTrust + TRUST_CONSTANTS.SEED_CONFIRMED;
-    case 'DISCOVER_KNOWN':
-      return currentTrust + TRUST_CONSTANTS.KNOWN_DEVICE;
-    case 'SUSPICIOUS_EVENT':
-      return currentTrust + TRUST_CONSTANTS.SUSPICIOUS_ACTIVITY;
-    case 'KEY_MISMATCH':
-      return currentTrust + TRUST_CONSTANTS.KEY_MISMATCH;
-    default:
-      return currentTrust;
+  // Apply Aikido Protocol logical limits on growth
+  if (aikidoStatus === 'Stationary Asset') {
+    // Боты и фермы: режем рост Кармы до нуля
+    cappedEarned = 0;
   }
+
+  return baseKarma + cappedEarned;
 }
 
 /**
- * Check if the device is trusted enough to be given un-sandboxed access
+ * Evaluates the final computed TrustLevel based on current total Karma score.
  */
-export function isDeviceTrusted(device: Device): boolean {
-  return device.trustLevel > 0;
+export function evaluateTrustLevelByKarma(karmaScore: number): TrustLevel {
+  if (karmaScore < 0) return TrustLevel.TRAITOR;
+  if (karmaScore < 10) return TrustLevel.QUARANTINE;
+  if (karmaScore < 100) return TrustLevel.RECRUIT;
+  if (karmaScore < 500) return TrustLevel.ADEPT;
+  if (karmaScore < 1000) return TrustLevel.GUARD;
+  return TrustLevel.MAGISTRATE;
 }

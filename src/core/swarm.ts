@@ -1,13 +1,16 @@
-import { Device, NodeRole, TrustLevel } from './models';
-import { TRUST_CONSTANTS } from './trust';
+import { Device, Node, NodeRole } from './models';
+import { TrustLevel } from './permissions';
 
 /**
  * Automatically determine the node role based on device profile and karma (Trust Level)
  */
-export function determineNodeRole(device: Device): NodeRole {
-  // If the device is in quarantine or has negative trust, sandboxed.
-  if (device.trustLevel <= 0) {
-    return 'sandboxed'; // "Ниже майнинга" / Aikido Sandbox
+export function determineNodeRole(deviceTrustLevel: TrustLevel, device: Device): NodeRole {
+  // If the device is in quarantine or has negative trust, traitor.
+  if (deviceTrustLevel === TrustLevel.TRAITOR) {
+    return 'traitor'; // "Ниже майнинга" / Aikido Sandbox
+  }
+  if (deviceTrustLevel === TrustLevel.QUARANTINE) {
+    return 'recruit'; // Just joining
   }
 
   const { capabilities } = device;
@@ -18,10 +21,10 @@ export function determineNodeRole(device: Device): NodeRole {
   // PC profile (Compute + Storage)
   if (isComputeHeavy && isStorageHeavy) {
     // Requires high Karma to be a Magistrate
-    if (device.trustLevel >= TRUST_CONSTANTS.MIN_MAGISTRATE_TRUST) {
+    if (deviceTrustLevel >= TrustLevel.MAGISTRATE) {
       return 'magistrate';
     } else {
-      return 'client'; // Wait for promotion
+      return 'guard'; // Middle tier
     }
   }
 
@@ -31,17 +34,17 @@ export function determineNodeRole(device: Device): NodeRole {
   }
 
   // default / smartphone / display / sensor
-  return 'client';
+  return 'scout';
 }
 
 /**
  * Generate a node template based on the connected device
  */
-export function bootstrapNode(device: Device, connectedPeers: string[] = []): import('./models').Node {
+export function bootstrapNode(device: Device, trustLevel: TrustLevel, userPublicKey: string): Node {
   return {
     id: `node_${device.id}_${Date.now()}`,
+    userPublicKey,
     deviceId: device.id,
-    role: determineNodeRole(device),
-    connections: connectedPeers,
+    role: determineNodeRole(trustLevel, device),
   };
 }

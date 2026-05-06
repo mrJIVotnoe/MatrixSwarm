@@ -1,34 +1,46 @@
-export type TrustLevel = number; // -1 to infinity? or 0 to 10? The prompt mentions: usb=0, +2, +1 etc.
+import { TrustLevel } from './permissions';
 
 export interface User {
   id: string; // hash publicKey
   publicKey: string;
-  trustLevel: TrustLevel;
 }
 
 export type DeviceCapability = 'camera' | 'compute' | 'storage' | 'display' | 'sensor' | 'network_routing';
+export type DeviceType = 'smartphone' | 'tablet' | 'pc' | 'smart_tv' | 'router';
 
 export interface Device {
   id: string;
-  fingerprint: string;
+  deviceId: string;
+  deviceType: DeviceType;
   capabilities: DeviceCapability[];
-  ownerId: string; // User ID
-  trustLevel: TrustLevel;
 }
 
-export type NodeRole = 'client' | 'relay' | 'magistrate' | 'sandboxed';
+export type NodeRole = 'recruit' | 'scout' | 'guard' | 'magistrate' | 'traitor' | 'client' | 'relay' | 'sandboxed';
 
 export interface Node {
-  id: string;
+  id: string; // Always hash(publicKey)
+  userPublicKey: string;
   deviceId: string;
-  connections: string[]; // IDs of peer Connections (or peer nodes?) The prompt says: "connections (ID пиров)"
   role: NodeRole;
 }
 
 export type ConnectionType = 'webrtc' | 'relay' | 'usb';
 
 export interface Connection {
-  peerId: string; // The ID of the connected Node
+  targetNodeId: string;
   type: ConnectionType;
-  // potentially status, latency, etc.
+}
+
+/**
+ * Deterministically derives a Node ID from a User's Public Key.
+ * In a production environment, this would use SHA-256.
+ */
+export function deriveNodeId(publicKey: string): string {
+  let hash = 0;
+  for (let i = 0; i < publicKey.length; i++) {
+    const char = publicKey.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `nx_${Math.abs(hash).toString(16)}`;
 }

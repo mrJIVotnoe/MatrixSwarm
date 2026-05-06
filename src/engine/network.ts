@@ -1,4 +1,5 @@
 import { Device } from '../core/models';
+import { TrustLevel } from '../core/permissions';
 
 export interface SwarmDataPacket {
   id: string;
@@ -34,11 +35,11 @@ export class P2PSignalingEngine {
   }
 
   // Zero-Trust Enforcement
-  routeData(packet: SwarmDataPacket, targetDevice: Device) {
+  routeData(packet: SwarmDataPacket, targetTrustLevel: TrustLevel) {
     if (packet.type === 'honey') {
       // "Trust Level < 2" threshold for Honey data as per requirement
-      if (targetDevice.trustLevel < 2) {
-        this.log(`[ZeroTrustEnforcement] ERROR: Attempted to send "Honey" data to untrusted Node ${packet.targetNodeId} (TrustLevel: ${targetDevice.trustLevel}). BLOCKED. Converting to encrypted transit stream.`);
+      if (targetTrustLevel < TrustLevel.ADEPT) {
+        this.log(`[ZeroTrustEnforcement] ERROR: Attempted to send "Honey" data to untrusted Node ${packet.targetNodeId} (TrustLevel: ${targetTrustLevel}). BLOCKED. Converting to encrypted transit stream.`);
         // Force wrap / encrypt to prevent access
         packet.type = 'transit';
         packet.payload = this.encryptForTransit(packet.payload);
@@ -46,7 +47,7 @@ export class P2PSignalingEngine {
         this.log(`[ZeroTrustEnforcement] "Honey" data transfer to Node ${packet.targetNodeId} AUTHORIZED.`);
       }
     } else {
-      this.log(`Routing transit packet to Node ${packet.targetNodeId} (TrustLevel: ${targetDevice.trustLevel}).`);
+      this.log(`Routing transit packet to Node ${packet.targetNodeId} (TrustLevel: ${targetTrustLevel}).`);
     }
 
     this.transmit(packet);

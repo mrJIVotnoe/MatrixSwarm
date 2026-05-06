@@ -242,9 +242,9 @@ async function startServer() {
 
   // Modify node registration to accept owner_id
   app.post("/api/v1/nodes/register", async (req, res) => {
-    const id = uuidv4();
+    const { id, delegatedTo, manifest, capabilities = [], ram_mb, cpu_cores, power_rating, mobility_score, senses } = req.body;
     const token = uuidv4();
-    const { delegatedTo, manifest } = req.body;
+    const nodeId = id || uuidv4();
     
     // Parse Manifest of Armament if provided
     const defaultManifest = {
@@ -289,7 +289,7 @@ async function startServer() {
     }
 
     const node = {
-      id,
+      id: nodeId,
       address: req.ip || req.socket.remoteAddress || "unknown",
       capabilities: JSON.stringify(fullCapabilities),
       ram_mb: req.body.ram_mb || 1024,
@@ -317,9 +317,9 @@ async function startServer() {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [node.id, node.address, node.capabilities, node.ram_mb, node.cpu_cores, node.power_rating, node.status, node.last_heartbeat, node.trust_score, node.token, node.delegated_to, node.lat, node.lng, node.cell_id, node.cluster_id, node.senses, node.is_purified, node.device_type, node.battery_level, node.is_charging, node.owner_id]);
 
-    console.log(`[SWARM] New node registered: ${id} (${node.power_rating}, ${device_type}, Purified: ${is_purified}, Battery: ${battery_level}%) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
+    console.log(`[SWARM] New node registered: ${nodeId} (${node.power_rating}, ${device_type}, Purified: ${is_purified}, Battery: ${battery_level}%) ${delegatedTo ? `(Delegated to ${delegatedTo})` : ''}`);
     
-    res.json({ id, token, message: "Welcome to the Swarm, Citizen." });
+    res.json({ id: nodeId, token, message: "Welcome to the Swarm, Citizen." });
   });
 
   // 2.5 Mesh Topology (P2P Sensor Network)
@@ -1090,6 +1090,45 @@ async function startServer() {
 
     res.json({ status: "acknowledged" });
   });
+
+  // --- EXPERIMENTAL BACKGROUND SWEEP ---
+  setInterval(async () => {
+    try {
+      const now = Date.now();
+      const offlineThreshold = now - 15000; // 15 seconds
+
+      // 1. Mark offline nodes
+      const oldNodes = await db.all('SELECT id FROM nodes WHERE status = "online" AND last_heartbeat < ?', [offlineThreshold]);
+      if (oldNodes.length > 0) {
+        const placeholders = oldNodes.map(() => '?').join(',');
+        const ids = oldNodes.map((n: any) => n.id);
+        await db.run(`UPDATE nodes SET status = "offline" WHERE id IN (${placeholders})`, ids);
+        console.log(`[SWARM] Marked ${ids.length} nodes offline.`);
+        
+        // 2. TaskReincarnation
+        for (const [taskId, task] of activeTasks.entries()) {
+          if (task.status === "assigned" && ids.includes(task.assigned_to)) {
+             console.log(`[SWARM] TaskReincarnation: Re-queueing task ${taskId} from offline node ${task.assigned_to}`);
+             task.status = "pending";
+             task.assigned_to = null;
+          }
+        }
+        
+        // Handle distributed jobs (re-queue cluster chunks)
+        for (const [jobId, job] of distributedJobs.entries()) {
+          for (const chunk of job.chunks) {
+            if (chunk.status === "assigned" && ids.includes(chunk.assigned_to)) {
+               console.log(`[SWARM] TaskReincarnation: Re-queueing cluster chunk ${chunk.id} from offline node ${chunk.assigned_to}`);
+               chunk.status = "pending";
+               chunk.assigned_to = null;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[SWARM] Background sweep error:", e);
+    }
+  }, 5000);
 
   // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== "production") {

@@ -19,13 +19,9 @@ import { WelcomeBanner } from './components/WelcomeBanner';
 import { UserProfile } from './components/UserProfile';
 import { UserOnboarding } from './components/UserOnboarding';
 import { BriarComm } from './components/BriarComm';
-import { Aida64Panel } from './components/Aida64Panel';
-import { KiwixArchive } from './components/KiwixArchive';
-import { TorrentManager } from './components/TorrentManager';
-import { SpacedeskPanel } from './components/SpacedeskPanel';
 import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 
-type Tab = 'nexus' | 'recruit' | 'briar' | 'kiwix' | 'torrent' | 'spacedesk' | 'aida64' | 'guard';
+type Tab = 'nexus' | 'briar';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -267,7 +263,7 @@ function MainDashboard() {
   };
 
   const handleConsent = () => {
-    if (symbiote) symbiote.grantConsent(selectedMagistrateId);
+    if (symbiote && observerId) symbiote.grantConsent(observerId, selectedMagistrateId);
   };
 
   if (!observerId) {
@@ -340,20 +336,9 @@ function MainDashboard() {
         {/* Tabs Navigation */}
         <div className="flex overflow-x-auto border-b border-cyan-500/30 shrink-0 custom-scrollbar">
           {[
-            { id: 'nexus', label: 'НЕКСУС (NEXUS)', icon: Activity },
-            { id: 'recruit', label: observerData?.user_mode === 'ark' ? 'ПАНЕЛЬ СВЯЗИ' : 'РЕКРУТ (УРОВЕНЬ 1)', icon: Crosshair },
-            { id: 'briar', label: 'P2P СВЯЗЬ (BRIAR)', icon: Wifi },
-            { id: 'kiwix', label: 'КИВИКС (АРХИВ)', icon: BookOpen },
-            { id: 'torrent', label: 'uTORRENT (P2P)', icon: Download },
-            { id: 'spacedesk', label: 'SPACEDESK (KVM)', icon: Monitor },
-            { id: 'aida64', label: 'АППАРАТНАЯ ДИАГНОСТИКА (AIDA64)', icon: Cpu },
-            { id: 'guard', label: 'СТРАЖ (УРОВЕНЬ 3)', icon: Shield },
-          ].filter(tab => {
-            const mode = observerData?.user_mode || 'symbiote';
-            if (mode === 'ark') return tab.id === 'nexus' || tab.id === 'recruit';
-            if (mode === 'symbiote') return tab.id !== 'guard';
-            return true;
-          }).map(tab => (
+            { id: 'nexus', label: 'NEXUS (СЕНСОРНАЯ ПАНЕЛЬ)', icon: Activity },
+            { id: 'briar', label: 'P2P MESH (СВЯЗЬ)', icon: Wifi },
+          ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
@@ -372,219 +357,142 @@ function MainDashboard() {
         {/* Tab Content Area */}
         <div className="flex-1 w-full relative">
           
-          {/* TAB: NEXUS (Welcome + Telemetry) */}
+          {/* TAB: NEXUS */}
           {activeTab === 'nexus' && (
             <div className="space-y-6">
               <WelcomeBanner />
               <UserProfile observer={observerData} />
               
-              <div className="hud-panel p-6 rounded-sm flex-1 flex flex-col min-h-[400px]">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400 shrink-0">
-                  <Activity className="w-5 h-5" />
-                  ГЛОБАЛЬНАЯ ТЕЛЕМЕТРИЯ РОЯ
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 shrink-0">
-                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
-                    <div className="text-cyan-600 text-xs mb-1">TOTAL_NODES</div>
-                    <div className="text-2xl text-cyan-400 text-glow-cyan">{swarmStats?.totalNodes || 0}</div>
-                  </div>
-                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
-                    <div className="text-cyan-600 text-xs mb-1">ACTIVE_TASKS</div>
-                    <div className="text-2xl text-cyan-400 text-glow-cyan">{swarmStats?.runningTasks || 0}</div>
-                  </div>
-                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
-                    <div className="text-cyan-600 text-xs mb-1">NETWORK_LOAD</div>
-                    <div className="text-2xl text-cyan-400 text-glow-cyan">{(swarmStats?.networkLoad || 0).toFixed(1)}%</div>
-                  </div>
-                  <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
-                    <div className="text-cyan-600 text-xs mb-1">CONSENSUS</div>
-                    <div className="text-2xl text-amber-400 text-glow-amber">{(swarmStats?.consensusHealth || 0).toFixed(1)}%</div>
-                  </div>
-                </div>
-                <div className="flex-1 min-h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                    <AreaChart data={history}>
-                      <defs>
-                        <linearGradient id="colorNodes" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorTasks" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                      <XAxis dataKey="time" stroke="#475569" fontSize={10} tickMargin={10} />
-                      <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `${val}`} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#22d3ee', color: '#22d3ee', fontSize: '12px' }}
-                        itemStyle={{ color: '#22d3ee' }}
-                      />
-                      <Area type="monotone" dataKey="nodes" stroke="#22d3ee" fillOpacity={1} fill="url(#colorNodes)" strokeWidth={2} />
-                      <Area type="monotone" dataKey="tasks" stroke="#f59e0b" fillOpacity={1} fill="url(#colorTasks)" strokeWidth={2} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: RECRUIT */}
-          {activeTab === 'recruit' && (
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                {/* Control Panel */}
-                <div className="hud-panel p-5 rounded-sm relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Terminal className="w-24 h-24 text-cyan-500" />
-                  </div>
-                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
-                    <Terminal className="w-4 h-4" />
-                    {observerData?.user_mode === 'ark' ? 'СОСТОЯНИЕ СВЯЗИ' : 'ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)'}
+              <div className="grid lg:grid-cols-2 gap-6">
+                
+                {/* Global Telemetry (Left Column) */}
+                <div className="hud-panel p-6 rounded-sm flex-1 flex flex-col min-h-[400px]">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400 shrink-0">
+                    <Activity className="w-5 h-5" />
+                    ГЛОБАЛЬНАЯ ТЕЛЕМЕТРИЯ РОЯ
                   </h2>
-                  
-                  <div className="space-y-4 relative z-10">
-                    <div className="text-xs space-y-2 text-cyan-600">
-                      <p className="flex justify-between"><span>СТАТУС:</span> <span className="text-cyan-400 text-glow-cyan">{status.toUpperCase()}</span></p>
-                      {symbiote?.nodeId && <p className="flex justify-between"><span>{observerData?.user_mode === 'ark' ? 'ID КЛЮЧА:' : 'ID УЗЛА:'}</span> <span className="text-cyan-400">{symbiote.nodeId.substring(0,8)}</span></p>}
-                      {(symbiote as any)?.hardwareClass && observerData?.user_mode !== 'ark' && <p className="flex justify-between"><span>ОБОРУДОВАНИЕ:</span> <span className="text-cyan-400">{(symbiote as any).hardwareClass.toUpperCase()}</span></p>}
-                      {(symbiote as any)?.cellId && observerData?.user_mode !== 'ark' && (
-                        <div className="pt-2 border-t border-cyan-500/20 mt-2">
-                           <p className="flex justify-between"><span className="text-cyan-600">ЛОКАЛЬНАЯ СОТА:</span> <span className="text-amber-400">{(symbiote as any).cellId}</span></p>
-                           {cellData && (
-                             <>
-                               <p className="flex justify-between"><span className="text-cyan-600">УЗЛОВ В СОТЕ:</span> <span className="text-cyan-400">{cellData.nodes?.length || 0}</span></p>
-                               <p className="flex justify-between"><span className="text-cyan-600">МАГИСТРАТ (ЯДРО):</span> 
-                                  <span className={cellData.magistrate_id === symbiote?.nodeId ? "text-amber-400 font-bold" : "text-cyan-400"}>
-                                     {cellData.magistrate_id === symbiote?.nodeId ? "ВЫ (ЯКОРЬ)" : (cellData.magistrate_id?.substring(0,8) || 'НЕ НАЗНАЧЕН')}
-                                  </span>
-                               </p>
-                             </>
-                           )}
-                        </div>
-                      )}
-                      {(symbiote as any)?.mobilityScore !== undefined && observerData?.user_mode !== 'ark' && <p className="flex justify-between"><span className="text-cyan-600">ИНДЕКС МОБИЛЬНОСТИ:</span> <span className="text-cyan-400">{(symbiote as any).mobilityScore}</span></p>}
-                      {symbiote?.powerRating !== "unknown" && observerData?.user_mode !== 'ark' && <p className="flex justify-between"><span>КЛАСС:</span> <span className="text-cyan-400">{symbiote?.powerRating}</span></p>}
-                      
-                      {status === "connected" && (
-                        <div className="mt-4 pt-4 border-t border-cyan-500/20">
-                          <p className="flex items-center justify-between text-cyan-400 font-bold">
-                            <span className="flex items-center gap-2"><Award className="w-4 h-4" /> {observerData?.user_mode === 'ark' ? 'ЗАЩИЩЕННОСТЬ СОЕДИНЕНИЯ' : 'РЕПУТАЦИЯ (TRUST)'}</span>
-                            <span className="text-glow-cyan">{trustScore}/100</span>
-                          </p>
-                          <div className="w-full bg-slate-950 h-2 mt-2 rounded-full overflow-hidden border border-cyan-500/30">
-                            <div 
-                              className="bg-cyan-500 h-full transition-all duration-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]" 
-                              style={{ width: `${Math.min(100, (trustScore / 100) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                  <div className="grid grid-cols-2 gap-4 mb-6 shrink-0">
+                    <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
+                      <div className="text-cyan-600 text-xs mb-1">TOTAL_NODES</div>
+                      <div className="text-2xl text-cyan-400 text-glow-cyan">{swarmStats?.totalNodes || 0}</div>
                     </div>
+                    <div className="bg-slate-950 p-4 border border-cyan-500/20 rounded">
+                      <div className="text-cyan-600 text-xs mb-1">ACTIVE_TASKS</div>
+                      <div className="text-2xl text-cyan-400 text-glow-cyan">{swarmStats?.runningTasks || 0}</div>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                      <AreaChart data={history}>
+                        <defs>
+                          <linearGradient id="colorNodes" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorTasks" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                        <XAxis dataKey="time" stroke="#475569" fontSize={10} tickMargin={10} />
+                        <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `${val}`} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#22d3ee', color: '#22d3ee', fontSize: '12px' }}
+                          itemStyle={{ color: '#22d3ee' }}
+                        />
+                        <Area type="monotone" dataKey="nodes" stroke="#22d3ee" fillOpacity={1} fill="url(#colorNodes)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="tasks" stroke="#f59e0b" fillOpacity={1} fill="url(#colorTasks)" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
 
-                    {status === "sleeping" && (
-                      <button 
-                        onClick={handleIgnite}
-                        className="w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]"
-                      >
-                        <Zap className="w-4 h-4" />
-                        {observerData?.user_mode === 'ark' ? 'УСТАНОВИТЬ СОЕДИНЕНИЕ' : 'ЗАПУСТИТЬ СИМБИОНТ'}
-                      </button>
-                    )}
-
-                    {status === "awaiting_consent" && (
-                      <div className="space-y-4 p-4 border border-amber-500/50 bg-amber-500/5 rounded-sm shadow-[inset_0_0_15px_rgba(245,158,11,0.1)]">
-                        <div className="space-y-2">
-                          <p className="text-xs text-amber-500 flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 shrink-0" />
-                            <span className="text-glow-amber">Симбионт запрашивает доступ к ресурсам узла для маршрутизации трафика Роя.</span>
-                          </p>
-                        </div>
-
-                        {recommendedMagistrates.length > 0 && (
-                          <div className="pt-3 border-t border-amber-500/20">
-                            <p className="text-[10px] text-amber-600 font-bold uppercase mb-2 flex items-center gap-1">
-                              <Shield className="w-3 h-3" /> Авто-делегирование голоса:
+                {/* Local Node Status (Right Column) */}
+                <div className="space-y-6">
+                  {/* Control Panel */}
+                  <div className="hud-panel p-5 rounded-sm relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Terminal className="w-24 h-24 text-cyan-500" />
+                    </div>
+                    <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                      <Terminal className="w-4 h-4" />
+                      ЛОКАЛЬНЫЙ УЗЕЛ (E.S.C.A.P.E.)
+                    </h2>
+                    
+                    <div className="space-y-4 relative z-10">
+                      <div className="text-xs space-y-2 text-cyan-600">
+                        <p className="flex justify-between"><span>СТАТУС:</span> <span className="text-cyan-400 text-glow-cyan">{status.toUpperCase()}</span></p>
+                        {symbiote?.nodeId && <p className="flex justify-between"><span>ID УЗЛА (HASH):</span> <span className="text-cyan-400">{symbiote.nodeId.substring(0,8)}</span></p>}
+                        {(symbiote as any)?.hardwareClass && <p className="flex justify-between"><span>ОБОРУДОВАНИЕ:</span> <span className="text-cyan-400">{(symbiote as any).hardwareClass.toUpperCase()}</span></p>}
+                        {(symbiote as any)?.cellId && (
+                          <div className="pt-2 border-t border-cyan-500/20 mt-2">
+                             <p className="flex justify-between"><span className="text-cyan-600">ЛОКАЛЬНАЯ СОТА:</span> <span className="text-amber-400">{(symbiote as any).cellId}</span></p>
+                             {cellData && (
+                               <>
+                                 <p className="flex justify-between"><span className="text-cyan-600">УЗЛОВ В СОТЕ:</span> <span className="text-cyan-400">{cellData.nodes?.length || 0}</span></p>
+                                 <p className="flex justify-between"><span className="text-cyan-600">МАГИСТРАТ (ЯДРО):</span> 
+                                    <span className={cellData.magistrate_id === symbiote?.nodeId ? "text-amber-400 font-bold" : "text-cyan-400"}>
+                                       {cellData.magistrate_id === symbiote?.nodeId ? "ВЫ (ЯКОРЬ)" : (cellData.magistrate_id?.substring(0,8) || 'НЕ НАЗНАЧЕН')}
+                                    </span>
+                                 </p>
+                               </>
+                             )}
+                          </div>
+                        )}
+                        {symbiote?.powerRating !== "unknown" && <p className="flex justify-between"><span>КЛАСС:</span> <span className="text-cyan-400">{symbiote?.powerRating}</span></p>}
+                        
+                        {status === "connected" && (
+                          <div className="mt-4 pt-4 border-t border-cyan-500/20">
+                            <p className="flex items-center justify-between text-cyan-400 font-bold">
+                              <span className="flex items-center gap-2"><Award className="w-4 h-4" /> УРОВЕНЬ ДОВЕРИЯ (TRUST)</span>
+                              <span className="text-glow-cyan">{trustScore}/100</span>
                             </p>
-                            <div className="space-y-2">
-                              {recommendedMagistrates.map(mag => (
-                                <button
-                                  key={mag.id}
-                                  onClick={() => setSelectedMagistrateId(mag.id)}
-                                  className={`w-full p-2 text-left border transition-all flex justify-between items-center ${
-                                    selectedMagistrateId === mag.id 
-                                      ? 'bg-amber-500/20 border-amber-500 text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
-                                      : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-amber-500/30'
-                                  }`}
-                                >
-                                  <div className="flex flex-col">
-                                    <span className="text-[10px] font-mono">{mag.id.substring(0, 12)}...</span>
-                                    <span className="text-[8px] uppercase opacity-60">Trust: {mag.trust_score}%</span>
-                                  </div>
-                                  {selectedMagistrateId === mag.id && <CheckCircle2 className="w-3 h-3" />}
-                                </button>
-                              ))}
-                              <button
-                                onClick={() => setSelectedMagistrateId(null)}
-                                className={`w-full p-2 text-left border transition-all text-[10px] uppercase ${
-                                  selectedMagistrateId === null 
-                                    ? 'bg-amber-500/20 border-amber-500 text-amber-500' 
-                                    : 'bg-slate-950 border-slate-800 text-neutral-500 hover:border-amber-500/30'
-                                }`}
-                              >
-                                Без делегирования
-                              </button>
+                            <div className="w-full bg-slate-950 h-2 mt-2 rounded-full overflow-hidden border border-cyan-500/30">
+                              <div 
+                                className="bg-cyan-500 h-full transition-all duration-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]" 
+                                style={{ width: `${Math.min(100, (trustScore / 100) * 100)}%` }}
+                              />
                             </div>
                           </div>
                         )}
-
-                        <button 
-                          onClick={handleConsent}
-                          className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500 text-amber-500 font-bold text-xs transition-all"
-                        >
-                          ДАТЬ СОГЛАСИЕ (СИМБИОЗ)
-                        </button>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Unactivated Features for Recruit */}
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 500} reqKarma={500} currentKarma={trustScore}
-                  title="КВАНТОВАЯ МАРШРУТИЗАЦИЯ" 
-                  desc="Активация суррогатных туннелей и обход глубокого анализа пакетов (DPI)."
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-2 bg-slate-900/50 border border-cyan-500/20 rounded">
-                      <span className="text-xs text-cyan-500">Протокол BYEDPI</span>
-                      <span className="text-xs text-cyan-700">ОЖИДАНИЕ</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-slate-900/50 border border-cyan-500/20 rounded">
-                      <span className="text-xs text-cyan-500">Суррогатный мост</span>
-                      <span className="text-xs text-cyan-700">ОТКЛЮЧЕН</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-slate-900/50 border border-cyan-500/20 rounded">
-                      <span className="text-xs text-cyan-500">Маскировка трафика</span>
-                      <span className="text-xs text-cyan-700">ОТКЛЮЧЕНА</span>
+                      {status === "sleeping" && (
+                        <button 
+                          onClick={handleIgnite}
+                          className="w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+                        >
+                          <Zap className="w-4 h-4" />
+                          ЗАПУСТИТЬ СИМБИОНТ
+                        </button>
+                      )}
+
+                      {status === "awaiting_consent" && (
+                        <div className="space-y-4 p-4 border border-amber-500/50 bg-amber-500/5 rounded-sm shadow-[inset_0_0_15px_rgba(245,158,11,0.1)]">
+                          <button 
+                            onClick={handleConsent}
+                            className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500 text-amber-500 font-bold text-xs transition-all"
+                          >
+                            ДАТЬ СОГЛАСИЕ (СИМБИОЗ)
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </LockedFeatureWrapper>
-              </div>
 
-              <div className="space-y-6">
-                {/* System Log */}
-                <div className="hud-panel p-5 rounded-sm flex-1 flex flex-col h-full min-h-[400px]">
-                  <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
-                    <Terminal className="w-4 h-4" />
-                    {observerData?.user_mode === 'ark' ? 'ПРОТОКОЛ МАРШРУТИЗАЦИИ' : 'СИСТЕМНЫЙ ЖУРНАЛ'}
-                  </h2>
-                  <div className="bg-slate-950 border border-cyan-500/10 p-3 flex-1 overflow-y-auto font-mono text-[10px] sm:text-xs text-cyan-500/80 space-y-1 custom-scrollbar">
-                    {logs.map((log, i) => (
-                      <div key={i} className="break-words">{log}</div>
-                    ))}
-                    <div ref={logsEndRef} />
+                  {/* System Log */}
+                  <div className="hud-panel p-5 rounded-sm flex-1 flex flex-col min-h-[300px]">
+                    <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                      <Terminal className="w-4 h-4" />
+                      СИСТЕМНЫЙ ЖУРНАЛ
+                    </h2>
+                    <div className="bg-slate-950 border border-cyan-500/10 p-3 flex-1 overflow-y-auto font-mono text-[10px] sm:text-xs text-cyan-500/80 space-y-1 custom-scrollbar">
+                      {logs.map((log, i) => (
+                        <div key={i} className="break-words">{log}</div>
+                      ))}
+                      <div ref={logsEndRef} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -596,87 +504,14 @@ function MainDashboard() {
             <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
               <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1 h-[70vh]">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-500">
-                  <Wifi className="w-5 h-5" /> BRAMBLE P2P MESH
+                  <Wifi className="w-5 h-5" /> P2P MESH СВЯЗЬ
                 </h2>
                 <p className="text-sm text-cyan-600 mb-4">
-                  Защищенная связь внутри локальной соты по протоколу Briar. E2E шифрование активировано.
+                  Защищенная связь внутри локальной соты по P2P WebRTC DataChannel. Если прямой канал недоступен, сообщение маршрутизируется через Доверенные Узлы.
                 </p>
                 <div className="flex-1 flex min-h-0">
                   <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} />
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: TORRENT */}
-          {activeTab === 'torrent' && (
-            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
-              <TorrentManager symbiote={symbiote} />
-            </div>
-          )}
-
-          {/* TAB: SPACEDESK */}
-          {activeTab === 'spacedesk' && (
-            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
-              <SpacedeskPanel symbiote={symbiote} />
-            </div>
-          )}
-
-          {/* TAB: AIDA64 */}
-          {activeTab === 'aida64' && (
-            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
-              <Aida64Panel />
-            </div>
-          )}
-
-          {/* TAB: KIWIX */}
-          {activeTab === 'kiwix' && (
-            <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
-              <KiwixArchive symbiote={symbiote} />
-            </div>
-          )}
-
-          {/* TAB: GUARD */}
-          {activeTab === 'guard' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar pb-6">
-              <div className="space-y-6">
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
-                  title="РЕЕСТР ЭЛИТЫ" 
-                  desc="Глобальный рейтинг Магистратов. Отображает узлы с наивысшим влиянием на развитие Роя."
-                >
-                  <Leaderboard />
-                </LockedFeatureWrapper>
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
-                  title="СОВЕТ МАГИСТРАТОВ" 
-                  desc="Интерфейс прямого управления сетью. Право вето на протоколы маршрутизации и распределение ресурсов."
-                >
-                  <MagistrateCouncil />
-                </LockedFeatureWrapper>
-              </div>
-              <div className="space-y-6">
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
-                  title="ИСТОРИЯ ГОЛОСОВАНИЙ" 
-                  desc="Архив принятых решений Совета. Прозрачный блокчейн-реестр эволюции Роя."
-                >
-                  <GovernanceHistory />
-                </LockedFeatureWrapper>
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
-                  title="ХРОНИКИ АКАШИ" 
-                  desc="Абсолютная память Роя. Доступ к децентрализованному хранилищу критически важных данных."
-                >
-                  <AkashicRecords />
-                </LockedFeatureWrapper>
-                <LockedFeatureWrapper 
-                  isLocked={trustScore < 10000} reqKarma={10000} currentKarma={trustScore}
-                  title="КАРМИЧЕСКИЙ РЕЕСТР" 
-                  desc="Аудит распределения Кармы. Магистраты контролируют справедливость вознаграждений в сети."
-                >
-                  <KarmaLedger />
-                </LockedFeatureWrapper>
               </div>
             </div>
           )}
