@@ -40,7 +40,7 @@ export function calculateTrustScore(
   let cappedEarned = Math.min(earned, KPOW_CONSTANTS.KARMA_MAX_PER_DAY);
 
   // Apply Aikido Protocol logical limits on growth
-  if (aikidoStatus === 'Stationary Asset') {
+  if (aikidoStatus === 'BOT_FARM_NODE') {
     // Боты и фермы: режем рост Кармы до нуля
     cappedEarned = 0;
   }

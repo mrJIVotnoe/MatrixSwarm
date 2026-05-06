@@ -1,7 +1,7 @@
 import { TrustLevel } from './permissions';
-import { Device } from './models';
+import { Device, DeviceType } from './models';
 
-export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'Stable Guardian' | 'Home Anchor' | 'Static Suspect' | 'Stationary Asset';
+export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE';
 
 export interface NodeMetrics {
   nodeId: string;
@@ -17,6 +17,7 @@ export class AikidoProtocol {
 
   /**
    * Evaluates if a node exhibits bot-farm behavior based on its mobility score, device type, and power state.
+   * "Справедливая меритократия Роя" - Project Canon.
    */
   public evaluateNode(
     device: Device,
@@ -41,7 +42,7 @@ export class AikidoProtocol {
     stats.hoursInSameCell = hoursInSameCell;
 
     // 1. Hardware-Aware Mobility Check
-    // Static hardware is exempt from Aikido mobility penalties
+    // Стационарные касты (ПК, ТВ, Роутеры) игнорируют проверку мобильности
     if (['pc', 'smart_tv', 'router'].includes(device.deviceType)) {
       stats.aikidoStatus = 'Hardware Anchor';
       this.metrics.set(device.id, stats);
@@ -61,23 +62,23 @@ export class AikidoProtocol {
       }
     }
 
-    // 2. Differentiation for Smartphones/Tablets
+    // 2. Логика «Смартфона на зарядке» (Smartphones/Tablets)
     if (stats.mobilityScore === 0) {
       if (isCharging) {
-        // 3. New Role: Home Anchor (Домашний Якорь)
-        // If > 72 hours in same cell & charging -> gets stability bonus and "Honey" storage rights
+        // HOME_ANCHOR — доверенное домашнее устройство (смартфон/планшет > 72ч в одной соте)
         if (stats.hoursInSameCell > 72) {
-          stats.aikidoStatus = 'Home Anchor';
+          stats.aikidoStatus = 'HOME_ANCHOR';
         } else {
-          stats.aikidoStatus = 'Stable Guardian'; // Stable but not yet an anchor
+          // STABLE_GUARDIAN — смартфон на зарядке, локальное хранилище. Растет как ПК.
+          stats.aikidoStatus = 'STABLE_GUARDIAN';
         }
       } else {
-        // Not charging and mobility is 0 -> might be a bot farm sitting unpowered (or on battery)
-        // Let's mark as Static Suspect if it's been static for a while
+        // Смартфон с нулевой мобильностью без зарядки
         if (stats.gpsUpdatesCount > 10) {
-          stats.aikidoStatus = 'Stationary Asset'; // Demoted to asset to restrict consensus influence
+          // BOT_FARM_NODE — статичный смартфон, ресурс без политических прав
+          stats.aikidoStatus = 'BOT_FARM_NODE';
         } else {
-          stats.aikidoStatus = 'Static Suspect';
+          stats.aikidoStatus = 'Static Suspect'; // Маркировка «Подозрительного статика»
         }
       }
     } else {
@@ -90,48 +91,98 @@ export class AikidoProtocol {
 
   /**
    * Applies the Aikido penalty appropriately based on AikidoStatus.
-   * Modifies consensus weight and returns effective TrustLevel logic if needed.
-   * Note: We NEVER assign TRAITOR just for not moving.
-   * Only malicious nodes (handled elsewhere) get TRAITOR.
+   * Контрмеры "Айкидо": Поглощение мощи у бот-ферм.
    */
-  public applyAikidoPenalty(nodeId: string, currentTrustScore: number, aikidoStatus: AikidoStatus): { effectiveKarma: number, isConsensusRestricted: boolean } {
+  public applyAikidoPenalty(nodeId: string, currentTrustScore: number, aikidoStatus: AikidoStatus): { effectiveKarma: number, votingWeight: number, forcedHeavyCompute: boolean } {
     let effectiveKarma = currentTrustScore;
-    let isConsensusRestricted = false;
+    let votingWeight = 1.0;
+    let forcedHeavyCompute = false;
 
     switch (aikidoStatus) {
-      case 'Stationary Asset':
-        // Подозрительные статичные смартфоны (фермы)
-        // Забираем вычислительную мощность, ограничиваем политический вес (консенсус)
-        // Но не лишаем Кармы полностью.
-        console.log(`[Aikido Protocol] Node ${nodeId} is STATIONARY_ASSET. Restricting consensus influence.`);
+      case 'BOT_FARM_NODE':
+        // Поглощение мощи: лишаются полит.веса, принудительные вычисления.
+        console.log(`[Aikido] Node ${nodeId} is BOT_FARM_NODE. Power absorption active. Voting weight = 0.`);
         effectiveKarma = Math.min(effectiveKarma, 50); // Cap karma
-        isConsensusRestricted = true;
+        votingWeight = 0; // Игнорируются в консенсус-реестре
+        forcedHeavyCompute = true; // Обязаны выполнять тяжелые задачи
         break;
       
       case 'Static Suspect':
         // Under investigation, slight restriction
-        isConsensusRestricted = true;
+        votingWeight = 0.5;
         break;
 
-      case 'Home Anchor':
+      case 'HOME_ANCHOR':
         // Домашний якорь получает бонус к стабильности (локальное хранилище Мёда)
         console.log(`[Aikido Protocol] Node ${nodeId} is HOME_ANCHOR. Granting stability bonus.`);
         effectiveKarma += 100; // Bonus karma for being an anchor
         break;
 
-      case 'Stable Guardian':
+      case 'STABLE_GUARDIAN':
+      case 'Hardware Anchor':
         // Стабильный Страж: зарядка подключена, но неподвижен. Растет как ПК.
-        console.log(`[Aikido Protocol] Node ${nodeId} is STABLE_GUARDIAN. Legitimate static node.`);
+        console.log(`[Aikido Protocol] Node ${nodeId} is ${aikidoStatus}. Legitimate static node.`);
         break;
 
-      case 'Hardware Anchor':
       case 'Nomad':
       default:
         // Normal behavior
         break;
     }
 
-    return { effectiveKarma, isConsensusRestricted };
+    return { effectiveKarma, votingWeight, forcedHeavyCompute };
+  }
+
+  /**
+   * Акустический набат (Proximity Check)
+   * Если несколько узлов слышат один паттерн, считаем их единым логическим узлом в голосовании.
+   * Возвращает список "Sybil/Логических" групп из списка подписей
+   */
+  public checkAcousticProximity(signatures: { nodeId: string, audioPatternHash: string }[]): Map<string, string[]> {
+    const groups = new Map<string, string[]>();
+    for (const sig of signatures) {
+      if (!groups.has(sig.audioPatternHash)) {
+        groups.set(sig.audioPatternHash, []);
+      }
+      groups.get(sig.audioPatternHash)!.push(sig.nodeId);
+    }
+
+    // Логируем объединение физических устройств в единые логические кластеры
+    for (const [hash, nodes] of groups.entries()) {
+      if (nodes.length > 1) {
+         console.warn(`[Aikido] Acoustic Nabbat: Merging nodes ${nodes.join(', ')} into a single logical entity due to shared proximity pattern ${hash}.`);
+      }
+    }
+    return groups;
+  }
+
+  /**
+   * Межклассовый консенсус (Cross-Caste Consensus)
+   * Для предотвращения атаки 51%, требуется подтверждение от разных каст железа.
+   * Минимум 20% одобрения от Magistrates(PC), 20% от Relays(Routers), 20% Scouts(Smartphones).
+   */
+  public checkCrossCasteConsensus(votes: { deviceType: DeviceType, isPositive: boolean }[]): boolean {
+    const totalVotesByType = { pc: 0, router: 0, smartphone: 0, tablet: 0, smart_tv: 0 };
+    const positiveVotesByType = { pc: 0, router: 0, smartphone: 0, tablet: 0, smart_tv: 0 };
+
+    for (const vote of votes) {
+      totalVotesByType[vote.deviceType]++;
+      if (vote.isPositive) {
+        positiveVotesByType[vote.deviceType]++;
+      }
+    }
+
+    const pcApproval = totalVotesByType.pc > 0 ? (positiveVotesByType.pc / totalVotesByType.pc) : 1; // If 0, assume 1 to not block if no PC
+    const routerApproval = totalVotesByType.router > 0 ? (positiveVotesByType.router / totalVotesByType.router) : 1;
+    const smartphoneApproval = totalVotesByType.smartphone > 0 ? (positiveVotesByType.smartphone / totalVotesByType.smartphone) : 1;
+
+    // Requirement: at least 20% (0.2) from each core caste. 
+    // In actual implementation, we'd need minimum absolute numbers too.
+    const isConsensusReached = pcApproval >= 0.2 && routerApproval >= 0.2 && smartphoneApproval >= 0.2;
+
+    console.log(`[Aikido] Cross-Caste Consensus: PC=${(pcApproval*100).toFixed(1)}%, Router=${(routerApproval*100).toFixed(1)}%, App=${(smartphoneApproval*100).toFixed(1)}%. Result: ${isConsensusReached}`);
+
+    return isConsensusReached;
   }
 
   private calculateDistance(pos1: { lat: number; lng: number }, pos2: { lat: number; lng: number }): number {
