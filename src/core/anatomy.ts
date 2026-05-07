@@ -1,6 +1,9 @@
+import { PermissionToken, PermissionEngine } from './permissions';
+
 /**
  * Digital Anatomy: Surrogate Senses
  * Base classes for fallback communication channels.
+ * L5 Application Layer using Digital Shell (Sandboxing + Tokens).
  */
 
 export class AcousticPheromones {
@@ -15,8 +18,12 @@ export class AcousticPheromones {
 
   /**
    * Concept: Listen for high-frequency bursts via microphone.
+   * Requires cryptographically signed PermissionToken.
    */
-  public static async startListening(callback: (payload: string) => void): Promise<void> {
+  public static async startListening(token: PermissionToken, callback: (payload: string) => void): Promise<void> {
+    if (!PermissionEngine.validateToken(token, 'microphone')) {
+        throw new Error("[SECURITY] Digital Shell: Invalid or expired Permission Token for Microphone access.");
+    }
     console.log(`[Acoustic Pheromones] Listening for ultrasonic signatures...`);
     // In a real implementation: AnalyserNode -> FFT to detect specific frequencies
   }
@@ -33,8 +40,12 @@ export class Kinopsis {
 
   /**
    * Concept: Use the device camera to decode visual signals from another screen.
+   * Requires cryptographically signed PermissionToken.
    */
-  public static async startDecoding(videoElementId: string, callback: (data: string) => void): Promise<void> {
+  public static async startDecoding(token: PermissionToken, videoElementId: string, callback: (data: string) => void): Promise<void> {
+    if (!PermissionEngine.validateToken(token, 'camera')) {
+        throw new Error("[SECURITY] Digital Shell: Invalid or expired Permission Token for Camera access.");
+    }
     console.log(`[Kinopsis] Activating camera ${videoElementId} to decode visual data...`);
     // In a real implementation: getUserMedia -> Video Element -> Canvas Analysis at 60fps
   }

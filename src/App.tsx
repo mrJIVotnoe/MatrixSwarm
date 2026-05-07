@@ -20,6 +20,11 @@ import { UserProfile } from './components/UserProfile';
 import { UserOnboarding } from './components/UserOnboarding';
 import { BriarComm } from './components/BriarComm';
 import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
+import { symbioteCore, UserLevel } from './core/symbiosis';
+import { DigitalKitchen, BlockchainIngredient, MeshIngredient, LlmIngredient } from './core/kitchen';
+import { WeChatChameleonBridge } from './apps/wechat_bridge';
+import { useTranslation } from 'react-i18next';
+import { setLanguage } from './core/i18n';
 
 type Tab = 'nexus' | 'briar';
 
@@ -88,6 +93,8 @@ function LockedFeatureWrapper({ isLocked, reqKarma, currentKarma, title, desc, c
 }
 
 function MainDashboard() {
+  const { t, i18n } = useTranslation();
+  
   const [activeTab, setActiveTab] = useState<Tab>('nexus');
   const [symbiote, setSymbiote] = useState<SwarmSymbiote | null>(null);
   const [status, setStatus] = useState<SymbioteStatus>("sleeping");
@@ -112,6 +119,10 @@ function MainDashboard() {
   };
 
   useEffect(() => {
+    // WeChat Chameleon Initialization
+    const wechatBridge = new WeChatChameleonBridge();
+    wechatBridge.initializeLiteMode(symbioteCore);
+
     const s = new SwarmSymbiote((newStatus, msg, newTrustScore) => {
       setStatus(newStatus);
       if (msg) addLog(msg);
@@ -119,6 +130,15 @@ function MainDashboard() {
     });
     setSymbiote(s);
     addLog("Инициализация системы... Готов к запуску Симбионта.");
+
+    // "One-Click" Kitchen deployment for the Observer
+    const kitchen = new DigitalKitchen();
+    kitchen.addIngredient(BlockchainIngredient);
+    kitchen.addIngredient(MeshIngredient);
+    kitchen.addIngredient(LlmIngredient);
+    kitchen.bakeUniversalBread().then(success => {
+      addLog(success ? "Universal Bread baked successfully (All subsystems online)." : "Bread partially baked. Running degraded.");
+    });
   }, []);
 
   useEffect(() => {
@@ -208,7 +228,16 @@ function MainDashboard() {
     try {
       const res = await fetch(`/api/v1/observers/${id}`);
       if (res.ok) {
-        setObserverData(await res.json());
+        const data = await res.json();
+        setObserverData(data);
+        
+        // Setup UserLevel based on their Onboarding choice
+        if (data.user_mode) {
+           const ul = data.user_mode as UserLevel;
+           if (Object.values(UserLevel).includes(ul)) {
+              symbioteCore.setUserLevel(ul);
+           }
+        }
       }
     } catch (e) {
       console.error(e);
@@ -279,11 +308,21 @@ function MainDashboard() {
           <div className="flex items-center gap-3">
             <Network className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
             <div>
-              <h1 className="text-3xl font-bold tracking-tighter text-cyan-400 text-glow-cyan">MATRIX_SWARM</h1>
-              <p className="text-xs text-cyan-600 tracking-widest uppercase">The Consensus Network // v0.2.0-omega</p>
+              <h1 className="text-3xl font-bold tracking-tighter text-cyan-400 text-glow-cyan">{t('matrix_swarm')}</h1>
+              <p className="text-xs text-cyan-600 tracking-widest uppercase">{t('responsible_network')} // Babel Swarm v1.6</p>
             </div>
           </div>
           <div className="flex gap-4">
+            <select 
+              className="hud-panel bg-transparent border-cyan-500/30 text-cyan-400 text-xs tracking-widest px-2 outline-none cursor-pointer"
+              onChange={(e) => setLanguage(e.target.value as any)}
+              value={i18n.language}
+            >
+              <option className="bg-slate-900" value="ru">RU (CIS)</option>
+              <option className="bg-slate-900" value="en">EN (Global)</option>
+              <option className="bg-slate-900" value="zh">ZH (Mandarin)</option>
+              <option className="bg-slate-900" value="ar">AR (RTL)</option>
+            </select>
             <button 
               onClick={() => setShowCanon(!showCanon)}
               className="flex items-center gap-2 px-4 py-2 hud-panel text-cyan-400 hover:bg-cyan-900/30 transition-colors text-sm shrink-0"

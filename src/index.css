@@ -90,3 +90,25 @@ body::after {
   border-left: none;
   border-top: none;
 }
+
+/* L5 Lite - WeChat Chameleon Mode */
+html.lite-wechat-ui body {
+  background-image: none;
+  background-color: #f7f7f8;
+  color: #333;
+}
+html.lite-wechat-ui body::after {
+  display: none;
+}
+html.lite-wechat-ui .hud-panel {
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  color: #333;
+}
+html.lite-wechat-ui .hud-panel::before, html.lite-wechat-ui .hud-panel::after {
+  display: none;
+}
+html.lite-wechat-ui * {
+  text-shadow: none !important;
+}

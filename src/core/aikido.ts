@@ -1,6 +1,8 @@
 import { TrustLevel } from './permissions';
 import { Device, DeviceType } from './models';
 
+import { MathCore } from './math';
+
 export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE';
 
 export interface NodeMetrics {
@@ -50,7 +52,7 @@ export class AikidoProtocol {
     }
 
     if (currentGps && stats.lastKnownGps) {
-      const isStatic = this.calculateDistance(stats.lastKnownGps, currentGps) < 1; // less than 1 meter
+      const isStatic = MathCore.haversineDistance(stats.lastKnownGps, currentGps) < 1; // less than 1 meter
       stats.gpsUpdatesCount++;
       
       if (isStatic) {
@@ -185,16 +187,5 @@ export class AikidoProtocol {
     console.log(`[Aikido] Cross-Caste Consensus: PC=${(pcApproval*100).toFixed(1)}%, Router=${(routerApproval*100).toFixed(1)}%, App=${(smartphoneApproval*100).toFixed(1)}%. Result: ${isConsensusReached}`);
 
     return isConsensusReached;
-  }
-
-  private calculateDistance(pos1: { lat: number; lng: number }, pos2: { lat: number; lng: number }): number {
-    const R = 6371e3; // Earth's radius in meters
-    const dLat = (pos2.lat - pos1.lat) * Math.PI / 180;
-    const dLng = (pos2.lng - pos1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(pos1.lat * Math.PI / 180) * Math.cos(pos2.lat * Math.PI / 180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distance in meters
   }
 }

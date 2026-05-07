@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use instant::Instant; // WebAssembly compatible timing
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeRole {
@@ -36,22 +37,24 @@ impl Capabilities {
     }
 }
 
+// Zero-cost abstractions using Rc<str> to prevent memory duplication of strings
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskStatus {
     Pending,
-    Assigned(String), // String holds the Node ID currently processing it
+    Assigned(Rc<str>), // Rc pointer avoids duplicating node_id strings in RAM
     Completed,
 }
 
 pub struct SwarmTask {
-    pub id: String,
+    pub id: Rc<str>,
     pub status: TaskStatus,
     pub last_heartbeat: Option<Instant>,
 }
 
 /// L4 - Swarm Logic (The Orchestrator)
+/// Optimized for RAM efficiency on legacy routers
 pub struct TaskOrchestrator {
-    pub tasks: HashMap<String, SwarmTask>,
+    pub tasks: HashMap<Rc<str>, SwarmTask>,
     pub heartbeat_timeout_ms: u64,
 }
 
@@ -59,14 +62,16 @@ impl TaskOrchestrator {
     pub fn new() -> Self {
         Self {
             tasks: HashMap::new(),
-            heartbeat_timeout_ms: 10000, // 10 seconds of silence kills the assignment
+            heartbeat_timeout_ms: 10_000, // 10 seconds of silence kills the assignment
         }
     }
 
     pub fn unwrap_or_create(&mut self, task_id: &str) {
+        // Zero-cost abstraction pattern: only allocate if missing
         if !self.tasks.contains_key(task_id) {
-            self.tasks.insert(task_id.to_string(), SwarmTask {
-                id: task_id.to_string(),
+            let id: Rc<str> = Rc::from(task_id);
+            self.tasks.insert(id.clone(), SwarmTask {
+                id,
                 status: TaskStatus::Pending,
                 last_heartbeat: None,
             });
@@ -75,7 +80,7 @@ impl TaskOrchestrator {
 
     pub fn assign_task(&mut self, task_id: &str, node_id: &str) {
         if let Some(task) = self.tasks.get_mut(task_id) {
-            task.status = TaskStatus::Assigned(node_id.to_string());
+            task.status = TaskStatus::Assigned(Rc::from(node_id));
             task.last_heartbeat = Some(Instant::now());
         }
     }
@@ -92,7 +97,7 @@ impl TaskOrchestrator {
     /// Iterates through assigned tasks. If physical heartbeats are dropped,
     /// we instantaneously revoke the assignment and reincarnate it to a free Magistrate.
     /// Железо смертно. Информация бессмертна. Рой вечен.
-    pub fn reincarnate_dead_tasks(&mut self, available_magistrates: &[String]) -> Vec<String> {
+    pub fn reincarnate_dead_tasks(&mut self, available_magistrates: &[Rc<str>]) -> Vec<Rc<str>> {
         let now = Instant::now();
         let mut reincarnated = Vec::new();
         let mut curr_magi_idx = 0;
@@ -104,15 +109,15 @@ impl TaskOrchestrator {
                         // Reincarnation triggered.
                         // Assign to nearest free magistrate if available, otherwise Pending
                         if curr_magi_idx < available_magistrates.len() {
-                            let newly_assigned = &available_magistrates[curr_magi_idx];
-                            task.status = TaskStatus::Assigned(newly_assigned.clone());
+                            let newly_assigned = Rc::clone(&available_magistrates[curr_magi_idx]);
+                            task.status = TaskStatus::Assigned(newly_assigned);
                             curr_magi_idx += 1;
                         } else {
                             task.status = TaskStatus::Pending;
                         }
                         
                         task.last_heartbeat = Some(Instant::now());
-                        reincarnated.push(id.clone());
+                        reincarnated.push(Rc::clone(id));
                     }
                 }
             }

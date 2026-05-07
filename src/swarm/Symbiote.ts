@@ -1,8 +1,10 @@
 import SHA256 from 'crypto-js/sha256';
+import { MathCore } from '../core/math';
 import { getSystemSpecs } from '../lib/aida64';
 import { SwarmSandbox, ResourceQuotas } from '../core/isolation';
 import { PermissionEngine, TrustLevel, PermissionScope } from '../core/permissions';
 import { IntegrityGuard } from '../core/integrity';
+import { MagistrateBridge } from './magistrate';
 
 export type SymbioteStatus = 
   | "sleeping" 
@@ -25,6 +27,7 @@ export class SwarmSymbiote {
   public hardwareClass: string = "smartphone";
   public mobilityScore: number = 0;
   public cellId: string | null = null;
+  public magistrateBridge: MagistrateBridge | null = null;
   private lastCoords: { lat: number, lng: number } | null = null;
   public sensors = {
     vision: false,
@@ -48,13 +51,13 @@ export class SwarmSymbiote {
     
     // Fallback private key for demonstration. In prod, comes from Wallet/Seed.
     const privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const granted = await PermissionEngine.requestTemporaryConsent(
+    const token = await PermissionEngine.requestTemporaryConsent(
       this.ownerId || 'mock_pub_key',
       privateKey,
       scope, 
       "Sensory organ required for Swarm intelligence operations."
     );
-    return granted;
+    return token !== null;
   }
 
   private async initSenses() {
@@ -82,13 +85,8 @@ export class SwarmSymbiote {
         navigator.geolocation.watchPosition((pos) => {
           const { latitude, longitude } = pos.coords;
           if (this.lastCoords) {
-             const dLat = (latitude - this.lastCoords.lat) * Math.PI / 180;
-             const dLng = (longitude - this.lastCoords.lng) * Math.PI / 180;
-             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                       Math.cos(this.lastCoords.lat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) *
-                       Math.sin(dLng/2) * Math.sin(dLng/2);
-             const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // dist in km
-             if (dist > 0.01) { // > 10 meters 
+             const distMeters = MathCore.haversineDistance(this.lastCoords, {lat: latitude, lng: longitude});
+             if (distMeters > 10) { // > 10 meters 
                 this.mobilityScore += 1;
              }
           }
@@ -253,6 +251,12 @@ export class SwarmSymbiote {
              else if (this.trustScore < 100) this.trustLevel = TrustLevel.RECRUIT;
              else if (this.trustScore < 500) this.trustLevel = TrustLevel.ADEPT;
              else if (this.trustScore >= 1000) this.trustLevel = TrustLevel.MAGISTRATE;
+
+             // Initialize Magistrate services if eligible
+             if (!this.magistrateBridge && this.trustLevel >= TrustLevel.MAGISTRATE) {
+               this.magistrateBridge = new MagistrateBridge(this.trustLevel);
+               this.magistrateBridge.announceTranslationService();
+             }
 
             this.onUpdate(this.status, undefined, this.trustScore);
           }

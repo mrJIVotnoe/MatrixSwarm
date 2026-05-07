@@ -19,7 +19,7 @@ export type PermissionScope =
   | 'camera' 
   | 'microphone';
 
-export interface TemporaryPermission {
+export interface PermissionToken {
   scope: PermissionScope;
   expiresAt: number;
   signature: string;
@@ -35,7 +35,7 @@ export class PermissionEngine {
     [TrustLevel.MAGISTRATE]: ['system_ping', 'p2p_signaling', 'bramble_relay'] // Sensors require explicit User Consent Flow
   };
 
-  private static activePermissions: Map<string, TemporaryPermission> = new Map();
+  private static activePermissions: Map<string, PermissionToken> = new Map();
 
   public static hasPermission(trustLevel: TrustLevel, scope: PermissionScope, pubKey: string): boolean {
     if (trustLevel === TrustLevel.QUARANTINE && scope !== 'system_ping') {
@@ -52,6 +52,13 @@ export class PermissionEngine {
     return false;
   }
 
+  public static validateToken(token: PermissionToken, scope: PermissionScope): boolean {
+    if (token.scope !== scope) return false;
+    if (token.expiresAt <= Date.now()) return false;
+    // In production, we would cryptographically verify the signature against the Observer's public key here.
+    return true;
+  }
+
   public static evaluateHardwareConnection(portType: HardwarePort): TrustLevel {
     if (portType === 'usb') {
       console.warn('[PermissionEngine] Physical USB connection identified. Enforcing L0 Hardware Quarantine.');
@@ -66,7 +73,7 @@ export class PermissionEngine {
      scope: PermissionScope, 
      message: string,
      durationMs: number = 3600000 // 1 hour default
-  ): Promise<boolean> {
+  ): Promise<PermissionToken | null> {
     console.warn(`[UserConsentFlow] SYSTEM INTERRUPT: Swarm requires explicit consent for [${scope}]`);
     console.log(`[UserConsentFlow] Reason: ${message}`);
     
@@ -81,16 +88,18 @@ export class PermissionEngine {
       // Temporary permission intrinsically tied to Observer cryptographic identity
       const signature = await signData(privateKey, `${scope}_${expiresAt}`);
       
-      this.activePermissions.set(`${pubKey}_${scope}`, {
+      const token: PermissionToken = {
         scope,
         expiresAt,
         signature
-      });
+      };
+
+      this.activePermissions.set(`${pubKey}_${scope}`, token);
       console.log(`[UserConsentFlow] Consent GRANTED and cryptographically signed for ${scope}. Valid for ${durationMs/1000}s.`);
-      return true;
+      return token;
     }
     
     console.warn(`[UserConsentFlow] Consent DENIED for ${scope}.`);
-    return false;
+    return null;
   }
 }

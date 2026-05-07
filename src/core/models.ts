@@ -32,15 +32,13 @@ export interface Connection {
 }
 
 /**
- * Deterministically derives a Node ID from a User's Public Key.
- * In a production environment, this would use SHA-256.
+ * Deterministically derives a Node ID from a User's Public Key using SHA-256 (Web Crypto API).
  */
-export function deriveNodeId(publicKey: string): string {
-  let hash = 0;
-  for (let i = 0; i < publicKey.length; i++) {
-    const char = publicKey.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return `nx_${Math.abs(hash).toString(16)}`;
+export async function deriveNodeId(publicKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(publicKey);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `nx_${hashHex.substring(0, 16)}`;
 }

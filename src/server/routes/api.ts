@@ -80,21 +80,11 @@ apiRouter.get("/swarm/senses", async (req, res) => {
 });
 
 
+import { MathCore } from '../../core/math.js';
+
 // ==========================================
 // MESH TOPOLOGY & BRAMBLE
 // ==========================================
-
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Radius of the Earth in km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-    Math.sin(dLon / 2) * Math.sin(dLon / 2); 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
-  return R * c; // Distance in km
-}
 
 apiRouter.get("/mesh/topology", async (req, res) => {
   const db = await getDb();
@@ -105,7 +95,8 @@ apiRouter.get("/mesh/topology", async (req, res) => {
   
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      const dist = haversineDistance(nodes[i].lat, nodes[i].lng, nodes[j].lat, nodes[j].lng);
+      const distMeters = MathCore.haversineDistance({lat: nodes[i].lat, lng: nodes[i].lng}, {lat: nodes[j].lat, lng: nodes[j].lng});
+      const dist = distMeters / 1000; // convert to km
       
       if (dist < MAX_DISTANCE_KM) {
         links.push({ source: nodes[i].id, target: nodes[j].id, distance: dist });

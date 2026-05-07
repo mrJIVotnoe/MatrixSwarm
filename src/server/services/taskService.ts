@@ -51,7 +51,24 @@ export async function assignTask(options: TaskAssignmentOptions): Promise<any | 
   const rand = Math.random();
   const farmSuspect = isFarmSuspect(deviceType, mobilityScore, currentTrust);
 
-  if (rand < 0.2 && !farmSuspect) {
+  // AIKIDO 3.0: Chaos Absorption
+  // Malicious / Scammer nodes are not instantly blocked, but weaponized for heavy KPoW
+  if (farmSuspect) {
+    const taskId = uuidv4();
+    assignedTask = {
+      id: taskId,
+      type: "compute_hash",
+      target: rand > 0.5 ? "seismic_calc" : "starlink_mapping", // Beneficial heavy tasks
+      difficulty: state.currentPowDifficulty + 2, // Harder difficulty for chaos absorption
+      seed: uuidv4(),
+      isp: isp
+    };
+    state.activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
+    console.info(`[INFO] [AIKIDO 3.0] Farm suspect weaponized. Assigned ${assignedTask.target} task.`);
+    return assignedTask;
+  }
+
+  if (rand < 0.2) {
     // BYEDPI Routing Task
     const taskId = uuidv4();
     const targets = ["twitter.com", "facebook.com", "instagram.com", "news.bbc.co.uk", "rutracker.org", "youtube.com", "discord.com"];
@@ -68,7 +85,7 @@ export async function assignTask(options: TaskAssignmentOptions): Promise<any | 
       isp: isp
     };
     state.activeTasks.set(taskId, { ...assignedTask, status: "assigned", assigned_to: nodeId });
-  } else if ((rand < 0.4 || farmSuspect) && canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
+  } else if (rand < 0.4 && canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
     // Compute Task
     const taskId = uuidv4();
     assignedTask = {
