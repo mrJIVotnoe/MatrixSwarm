@@ -2,7 +2,10 @@ import { Router } from "express";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "../../db.js";
-import { SIMULATION_CONFIG } from "../config/simulation.js";
+import { SIMULATION_CONFIG } from "../../config/simulation.js";
+
+import { initializeDeviceTrust } from "../../core/trust.js";
+import { TrustLevel } from "../../core/permissions.js";
 
 const router = Router();
 
@@ -87,7 +90,8 @@ router.post("/nodes/register", async (req, res) => {
     let initial_trust = is_purified ? 50 : 10;
     
     // ZERO-TRUST PERIMETER: Hardware Quarantine
-    if (connection_type === "usb") {
+    const deviceTrustLevel = initializeDeviceTrust(connection_type === "usb" ? "usb" : "wifi");
+    if (deviceTrustLevel === TrustLevel.QUARANTINE) {
       initial_trust = 0;
       console.warn(`[SECURITY] [ZERO-TRUST] Node ${nodeId} connected via USB. Quarantined (Trust = 0). Explicit Seed Phrase authorization required.`);
     } else {
@@ -96,15 +100,19 @@ router.post("/nodes/register", async (req, res) => {
       }
     }
 
-    // REINCARNATION: Inherit highest karma from previous nodes of this owner
-    if (owner_id && initial_trust > 0) {
+    // REINCARNATION & CRYPTOGRAPHIC AUTHORIZATION
+    if (owner_id) {
       const pastNodes = await db.all('SELECT trust_score FROM nodes WHERE owner_id = ?', [owner_id]);
       if (pastNodes.length > 0) {
         const highestKarma = Math.max(...pastNodes.map(n => n.trust_score));
         if (highestKarma > initial_trust) {
            initial_trust = highestKarma;
-           console.info(`[INFO] [SWARM] Soul Reincarnation successful for owner ${owner_id}. Inherited Karma: ${initial_trust}`);
+           console.info(`[INFO] [SWARM] Soul Reincarnation successful for owner ${owner_id}. Inherited Karma: ${initial_trust}. Quarantine lifted.`);
         }
+      } else if (deviceTrustLevel === TrustLevel.QUARANTINE) {
+        // If no past karma but cryptographically authorized
+        initial_trust = is_purified ? 50 : 10;
+        console.info(`[INFO] [SWARM] Cryptographic authorization for new owner ${owner_id}. USB Quarantine lifted.`);
       }
     }
 

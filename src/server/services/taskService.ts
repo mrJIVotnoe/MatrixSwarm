@@ -18,6 +18,12 @@ export async function assignTask(options: TaskAssignmentOptions): Promise<any | 
   const { nodeId, isp, currentTrust, mobilityScore, deviceType, canDoHeavyTasks, batteryHealth, cellId } = options;
   let assignedTask = null;
 
+  // 0. ZERO-TRUST PERIMETER ENFORCEMENT
+  if (currentTrust <= 0) {
+    // Quarantine mode: strict data exchange prohibition
+    return null;
+  }
+
   // 1. Prioritize Distributed Cluster Jobs (PlayStation Supercomputer)
   if (canDoHeavyTasks && (batteryHealth === 'good' || batteryHealth === 'unknown')) {
     for (const job of state.distributedJobs.values()) {
