@@ -82,10 +82,30 @@ router.post("/nodes/register", async (req, res) => {
     const battery_level = req.body.battery_level !== undefined ? req.body.battery_level : 100;
     const is_charging = req.body.is_charging !== undefined ? (req.body.is_charging ? 1 : 0) : 1;
     const owner_id = req.body.owner_id || null;
+    const connection_type = req.body.connection_type || "wireless"; // usb, wifi, cellular
     
     let initial_trust = is_purified ? 50 : 10;
-    if (battery_level < 20 && !is_charging) {
-      initial_trust = Math.min(initial_trust, 20);
+    
+    // ZERO-TRUST PERIMETER: Hardware Quarantine
+    if (connection_type === "usb") {
+      initial_trust = 0;
+      console.warn(`[SECURITY] [ZERO-TRUST] Node ${nodeId} connected via USB. Quarantined (Trust = 0). Explicit Seed Phrase authorization required.`);
+    } else {
+      if (battery_level < 20 && !is_charging) {
+        initial_trust = Math.min(initial_trust, 20);
+      }
+    }
+
+    // REINCARNATION: Inherit highest karma from previous nodes of this owner
+    if (owner_id && initial_trust > 0) {
+      const pastNodes = await db.all('SELECT trust_score FROM nodes WHERE owner_id = ?', [owner_id]);
+      if (pastNodes.length > 0) {
+        const highestKarma = Math.max(...pastNodes.map(n => n.trust_score));
+        if (highestKarma > initial_trust) {
+           initial_trust = highestKarma;
+           console.info(`[INFO] [SWARM] Soul Reincarnation successful for owner ${owner_id}. Inherited Karma: ${initial_trust}`);
+        }
+      }
     }
 
     const address = req.ip || req.socket.remoteAddress || "unknown";

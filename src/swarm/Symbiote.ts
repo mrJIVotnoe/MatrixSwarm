@@ -82,10 +82,13 @@ export class SwarmSymbiote {
         navigator.geolocation.watchPosition((pos) => {
           const { latitude, longitude } = pos.coords;
           if (this.lastCoords) {
-             const dLat = latitude - this.lastCoords.lat;
-             const dLng = longitude - this.lastCoords.lng;
-             const dist = Math.sqrt(dLat * dLat + dLng * dLng); 
-             if (dist > 0.0001) { 
+             const dLat = (latitude - this.lastCoords.lat) * Math.PI / 180;
+             const dLng = (longitude - this.lastCoords.lng) * Math.PI / 180;
+             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                       Math.cos(this.lastCoords.lat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) *
+                       Math.sin(dLng/2) * Math.sin(dLng/2);
+             const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // dist in km
+             if (dist > 0.01) { // > 10 meters 
                 this.mobilityScore += 1;
              }
           }
@@ -183,6 +186,11 @@ export class SwarmSymbiote {
       effectors
     };
 
+    let connection_type = 'wireless';
+    if ('connection' in navigator && (navigator as any).connection.type) {
+      connection_type = (navigator as any).connection.type;
+    }
+
     try {
       const res = await fetch('/api/v1/nodes/register', {
         method: 'POST',
@@ -199,7 +207,8 @@ export class SwarmSymbiote {
           device_type: this.hardwareClass,
           mobility_score: this.mobilityScore,
           cell_id: this.cellId,
-          senses: this.sensors
+          senses: this.sensors,
+          connection_type: connection_type
         })
       });
 

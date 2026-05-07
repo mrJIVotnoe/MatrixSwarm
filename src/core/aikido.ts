@@ -122,6 +122,8 @@ export class AikidoProtocol {
       case 'Hardware Anchor':
         // Стабильный Страж: зарядка подключена, но неподвижен. Растет как ПК.
         console.log(`[Aikido Protocol] Node ${nodeId} is ${aikidoStatus}. Legitimate static node.`);
+        const uptimeBonus = (this.metrics.get(nodeId)?.hoursInSameCell || 1) * 2;
+        effectiveKarma += uptimeBonus;
         break;
 
       case 'Nomad':
@@ -186,6 +188,13 @@ export class AikidoProtocol {
   }
 
   private calculateDistance(pos1: { lat: number; lng: number }, pos2: { lat: number; lng: number }): number {
-    return Math.sqrt(Math.pow(pos1.lat - pos2.lat, 2) + Math.pow(pos1.lng - pos2.lng, 2)) * 111000; // rough meters
+    const R = 6371e3; // Earth's radius in meters
+    const dLat = (pos2.lat - pos1.lat) * Math.PI / 180;
+    const dLng = (pos2.lng - pos1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(pos1.lat * Math.PI / 180) * Math.cos(pos2.lat * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in meters
   }
 }
