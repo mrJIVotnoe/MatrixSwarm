@@ -90,18 +90,28 @@ impl TaskOrchestrator {
 
     /// Mechanism of "Task Reincarnation".
     /// Iterates through assigned tasks. If physical heartbeats are dropped,
-    /// we instantaneously revoke the assignment and move it to Pending for another Ant.
-    pub fn reincarnate_dead_tasks(&mut self) -> Vec<String> {
+    /// we instantaneously revoke the assignment and reincarnate it to a free Magistrate.
+    /// Железо смертно. Информация бессмертна. Рой вечен.
+    pub fn reincarnate_dead_tasks(&mut self, available_magistrates: &[String]) -> Vec<String> {
         let now = Instant::now();
         let mut reincarnated = Vec::new();
+        let mut curr_magi_idx = 0;
 
         for (id, task) in self.tasks.iter_mut() {
             if let TaskStatus::Assigned(_) = task.status {
                 if let Some(hb) = task.last_heartbeat {
                     if now.duration_since(hb).as_millis() as u64 > self.heartbeat_timeout_ms {
-                        // Reincarnation triggered
-                        task.status = TaskStatus::Pending;
-                        task.last_heartbeat = None;
+                        // Reincarnation triggered.
+                        // Assign to nearest free magistrate if available, otherwise Pending
+                        if curr_magi_idx < available_magistrates.len() {
+                            let newly_assigned = &available_magistrates[curr_magi_idx];
+                            task.status = TaskStatus::Assigned(newly_assigned.clone());
+                            curr_magi_idx += 1;
+                        } else {
+                            task.status = TaskStatus::Pending;
+                        }
+                        
+                        task.last_heartbeat = Some(Instant::now());
                         reincarnated.push(id.clone());
                     }
                 }

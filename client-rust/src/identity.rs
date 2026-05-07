@@ -46,7 +46,21 @@ impl SwarmIdentity {
         let pk_bytes = self.verifying_key.to_bytes();
         // A simple deterministic hash or hex representation of public key.
         // For zero-cost, we might just format as hex.
-        hex::encode(&pk_bytes[..8]) // short ID
+        to_hex(&pk_bytes[..8]) // short ID
+    }
+
+    /// Soul Migration: Inherits Karma when importing a seed to a new device.
+    /// The "Soul Passport" is a verifiable claim of previous karma.
+    pub fn soul_migration(&self, previous_karma_proof: &[u8], signature: &[u8; 64]) -> Result<i32, &'static str> {
+        let pk_bytes = self.verifying_key.to_bytes();
+        if Self::verify_passport(&pk_bytes, previous_karma_proof, signature).is_ok() {
+            // In a real system, the proof would be parsed to securely extract the karma.
+            // For now, we simulate extracting karma.
+            // Железо смертно. Информация бессмертна. Рой вечен.
+            Ok(100) // Simulated recovered karma
+        } else {
+            Err("Invalid Soul Passport Signature")
+        }
     }
 }
 
