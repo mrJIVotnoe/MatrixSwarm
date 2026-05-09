@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SwarmSymbiote, SymbioteStatus } from './swarm/Symbiote';
 import { fetchSwarmStatus, fetchNodes, fetchRecentTasks, SwarmStatus } from './services/swarmService';
-import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database, Star, Crosshair, Wifi, Download, Monitor } from 'lucide-react';
+import { Terminal, Cpu, Network, Shield, Zap, CheckCircle2, Award, Activity, Server, AlertTriangle, BookOpen, Lock, BrainCircuit, Database, Star, Crosshair, Wifi, Download, Monitor, Hash } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, CartesianGrid, Tooltip, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { TelegramMiniApp } from './TelegramMiniApp';
@@ -19,6 +19,7 @@ import { WelcomeBanner } from './components/WelcomeBanner';
 import { UserProfile } from './components/UserProfile';
 import { UserOnboarding } from './components/UserOnboarding';
 import { BriarComm } from './components/BriarComm';
+import { DualPurposeGame } from './components/DualPurposeGame';
 import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { DigitalKitchen, BlockchainIngredient, MeshIngredient, LlmIngredient } from './core/kitchen';
@@ -26,7 +27,7 @@ import { WeChatChameleonBridge } from './apps/wechat_bridge';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from './core/i18n';
 
-type Tab = 'nexus' | 'briar';
+type Tab = 'nexus' | 'briar' | 'entropy';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -377,6 +378,7 @@ function MainDashboard() {
           {[
             { id: 'nexus', label: 'NEXUS (СЕНСОРНАЯ ПАНЕЛЬ)', icon: Activity },
             { id: 'briar', label: 'P2P MESH (СВЯЗЬ)', icon: Wifi },
+            { id: 'entropy', label: 'ИГРОВАЯ ЭНТРОПИЯ L3', icon: Hash },
           ].map(tab => (
             <button
               key={tab.id}
@@ -485,12 +487,12 @@ function MainDashboard() {
                           <div className="mt-4 pt-4 border-t border-cyan-500/20">
                             <p className="flex items-center justify-between text-cyan-400 font-bold">
                               <span className="flex items-center gap-2"><Award className="w-4 h-4" /> УРОВЕНЬ ДОВЕРИЯ (TRUST)</span>
-                              <span className="text-glow-cyan">{trustScore}/100</span>
+                              <span className="text-glow-cyan">{trustScore} (PoW Карма)</span>
                             </p>
                             <div className="w-full bg-slate-950 h-2 mt-2 rounded-full overflow-hidden border border-cyan-500/30">
                               <div 
                                 className="bg-cyan-500 h-full transition-all duration-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]" 
-                                style={{ width: `${Math.min(100, (trustScore / 100) * 100)}%` }}
+                                style={{ width: `${Math.min(100, (trustScore / 1000) * 100)}%` }}
                               />
                             </div>
                           </div>
@@ -552,6 +554,13 @@ function MainDashboard() {
                   <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: ENTROPY */}
+          {activeTab === 'entropy' && (
+            <div className="flex-1 w-full flex flex-col pt-4">
+              <DualPurposeGame onEarnKarma={(amount) => setTrustScore(prev => Math.min(1000, prev + amount))} />
             </div>
           )}
 
