@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Terminal, Shield, User, Globe, Cpu, Radio, Key, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { generateSeedPhrase, getKeysFromSeed, validateSeedPhrase } from '../lib/crypto';
+import { WasmIdentity } from '../core/wasm_bridge';
 
 export type UserMode = 'ark' | 'symbiote' | 'magistrate';
 
@@ -21,10 +22,10 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
 
   const generateKeys = async () => {
     try {
-      const phrase = await generateSeedPhrase();
-      const keys = getKeysFromSeed(phrase);
-      setSeedPhrase(phrase);
-      setPublicKeyStr(keys.publicKey);
+      // Rust WASM-Hardened Ed25519 "Soul Passport" Generation
+      const passport = await WasmIdentity.forgePassport();
+      setSeedPhrase(passport.seed_phrase);
+      setPublicKeyStr(passport.public_key);
       setStep(4); // Move to key backup step
     } catch (e) {
       console.error(e);
@@ -42,7 +43,7 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
         return;
       }
 
-      const keys = getKeysFromSeed(phrase);
+      const keys = await getKeysFromSeed(phrase);
       setSeedPhrase(phrase);
       setPublicKeyStr(keys.publicKey);
       setStep(2); // continue to role selection

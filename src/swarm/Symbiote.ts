@@ -1,10 +1,10 @@
 import SHA256 from 'crypto-js/sha256';
-import { MathCore } from '../core/math';
 import { getSystemSpecs } from '../lib/aida64';
 import { SwarmSandbox, ResourceQuotas } from '../core/isolation';
-import { PermissionEngine, TrustLevel, PermissionScope } from '../core/permissions';
+import { PermissionEngine, PermissionScope } from '../core/permissions';
 import { IntegrityGuard } from '../core/integrity';
 import { MagistrateBridge } from './magistrate';
+import { WasmTrustEngine, WasmAikidoMath, TrustLevel } from '../core/wasm_bridge';
 
 export type SymbioteStatus = 
   | "sleeping" 
@@ -21,8 +21,9 @@ export class SwarmSymbiote {
   public status: SymbioteStatus = "sleeping";
   public nodeId: string | null = null;
   public hardwareStats = { cores: 1, ram: 2 };
-  public trustScore: number = 50;
-  public trustLevel: TrustLevel = TrustLevel.RECRUIT;
+  public trustEngine: WasmTrustEngine;
+  public get trustScore() { return (this.trustEngine as any).karmic_score; }
+  public get trustLevel() { return this.trustEngine.get_level(); }
   public isp: string = "BrowserISP"; 
   public hardwareClass: string = "smartphone";
   public mobilityScore: number = 0;
@@ -38,14 +39,18 @@ export class SwarmSymbiote {
   };
 
   private magistratePublicKey = "DEMO_MAGISTRATE_PUBKEY";
+  public ownerId?: string;
 
   constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {
+    this.trustEngine = new WasmTrustEngine();
     this.detectHardwareClass();
-    this.trustLevel = PermissionEngine.evaluateHardwareConnection('wifi'); // Default web simulation
+    
+    // Simulate initial hardware signature verification (e.g. valid USB Quarantine device)
+    this.trustEngine.verify_hardware("simulated_signature_from_usb_" + Date.now());
   }
 
   private async requestSensorAccess(scope: PermissionScope): Promise<boolean> {
-    if (PermissionEngine.hasPermission(this.trustLevel, scope, this.ownerId || '')) {
+    if (PermissionEngine.hasPermission(this.trustLevel as any, scope, this.ownerId || '')) {
        return true;
     }
     
@@ -85,7 +90,7 @@ export class SwarmSymbiote {
         navigator.geolocation.watchPosition((pos) => {
           const { latitude, longitude } = pos.coords;
           if (this.lastCoords) {
-             const distMeters = MathCore.haversineDistance(this.lastCoords, {lat: latitude, lng: longitude});
+             const distMeters = WasmAikidoMath.haversine_distance(this.lastCoords.lat, this.lastCoords.lng, latitude, longitude) * 1000;
              if (distMeters > 10) { // > 10 meters 
                 this.mobilityScore += 1;
              }
@@ -131,8 +136,6 @@ export class SwarmSymbiote {
     if (cores >= 4 && ram >= 4) return "slm_capable (Medium)";
     return "router_node (Light)";
   }
-
-  private ownerId: string | null = null;
 
   public async ignite(ownerId?: string | null) {
     if (ownerId) this.ownerId = ownerId;
@@ -244,14 +247,8 @@ export class SwarmSymbiote {
           const data = await res.json();
           
           if (data.trust_score !== undefined) {
-            this.trustScore = data.trust_score;
-             // Update TrustLevel Enum
-             if (this.trustScore < 0) this.trustLevel = TrustLevel.TRAITOR;
-             else if (this.trustScore < 10) this.trustLevel = TrustLevel.QUARANTINE;
-             else if (this.trustScore < 100) this.trustLevel = TrustLevel.RECRUIT;
-             else if (this.trustScore < 500) this.trustLevel = TrustLevel.ADEPT;
-             else if (this.trustScore >= 1000) this.trustLevel = TrustLevel.MAGISTRATE;
-
+             (this.trustEngine as any).karmic_score = data.trust_score;
+             
              // Initialize Magistrate services if eligible
              if (!this.magistrateBridge && this.trustLevel >= TrustLevel.MAGISTRATE) {
                this.magistrateBridge = new MagistrateBridge(this.trustLevel);
@@ -423,7 +420,7 @@ export class SwarmSymbiote {
       const data = await res.json();
       
       if (data.trust_score !== undefined) {
-        this.trustScore = data.trust_score;
+        (this.trustEngine as any).karmic_score = data.trust_score;
       }
       
       if (success) {

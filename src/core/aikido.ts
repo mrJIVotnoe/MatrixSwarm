@@ -1,7 +1,6 @@
 import { TrustLevel } from './permissions';
 import { Device, DeviceType } from './models';
-
-import { MathCore } from './math';
+import { WasmAikidoMath, WasmCovertOps } from './wasm_bridge';
 
 export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE';
 
@@ -52,7 +51,12 @@ export class AikidoProtocol {
     }
 
     if (currentGps && stats.lastKnownGps) {
-      const isStatic = MathCore.haversineDistance(stats.lastKnownGps, currentGps) < 1; // less than 1 meter
+      // WASM-Hardened Haversine
+      const distKm = WasmAikidoMath.haversine_distance(
+         stats.lastKnownGps.lat, stats.lastKnownGps.lng, 
+         currentGps.lat, currentGps.lng
+      );
+      const isStatic = (distKm * 1000) < 1; // less than 1 meter
       stats.gpsUpdatesCount++;
       
       if (isStatic) {
@@ -142,6 +146,15 @@ export class AikidoProtocol {
    * Если несколько узлов слышат один паттерн, считаем их единым логическим узлом в голосовании.
    * Возвращает список "Sybil/Логических" групп из списка подписей
    */
+  public emitAcousticNabbat(payload: string) {
+    if (typeof window !== 'undefined') {
+       // Rust WASM Steganography to 18-20kHZ acoustic signal
+       const buffer = WasmCovertOps.encode_nabbat(payload);
+       console.log(`[Aikido] Acoustic Nabbat Active. Emitting ${buffer.length} samples at 19kHz...`);
+       // Further WebAudio API integration would go here.
+    }
+  }
+
   public checkAcousticProximity(signatures: { nodeId: string, audioPatternHash: string }[]): Map<string, string[]> {
     const groups = new Map<string, string[]>();
     for (const sig of signatures) {

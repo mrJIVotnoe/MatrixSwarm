@@ -22,8 +22,6 @@ import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
 import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 import { symbioteCore, UserLevel } from './core/symbiosis';
-import { DigitalKitchen, BlockchainIngredient, MeshIngredient, LlmIngredient } from './core/kitchen';
-import { WeChatChameleonBridge } from './apps/wechat_bridge';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from './core/i18n';
 
@@ -120,9 +118,7 @@ function MainDashboard() {
   };
 
   useEffect(() => {
-    // WeChat Chameleon Initialization
-    const wechatBridge = new WeChatChameleonBridge();
-    wechatBridge.initializeLiteMode(symbioteCore);
+    // WeChat Chameleon Integration Disabled / Removed until true WebTransport layer is active
 
     const s = new SwarmSymbiote((newStatus, msg, newTrustScore) => {
       setStatus(newStatus);
@@ -132,14 +128,8 @@ function MainDashboard() {
     setSymbiote(s);
     addLog("Инициализация системы... Готов к запуску Симбионта.");
 
-    // "One-Click" Kitchen deployment for the Observer
-    const kitchen = new DigitalKitchen();
-    kitchen.addIngredient(BlockchainIngredient);
-    kitchen.addIngredient(MeshIngredient);
-    kitchen.addIngredient(LlmIngredient);
-    kitchen.bakeUniversalBread().then(success => {
-      addLog(success ? "Universal Bread baked successfully (All subsystems online)." : "Bread partially baked. Running degraded.");
-    });
+    // "One-Click" Kitchen removed to enforce engineering realism (use rust WASM core)
+    addLog("[WASM-CORE] Железо смертно. Информация бессмертна. Рой вечен.");
   }, []);
 
   useEffect(() => {
@@ -208,20 +198,21 @@ function MainDashboard() {
   useEffect(() => {
     const passport = localStorage.getItem('soul_passport');
     if (passport && !observerId) {
-       try {
-          if (validateSeedPhrase(passport)) {
-             const keys = getKeysFromSeed(passport);
-             deriveId(keys.publicKey).then(id => {
-                localStorage.setItem('observerId', id);
-                setObserverId(id);
-             });
-          } else {
-             localStorage.removeItem('soul_passport');
-          }
-       } catch (e) {
-          console.error("Failed to derive ID from passport", e);
-          localStorage.removeItem('soul_passport');
-       }
+       (async () => {
+         try {
+            if (await validateSeedPhrase(passport)) {
+               const keys = await getKeysFromSeed(passport);
+               const id = await deriveId(keys.publicKey);
+               localStorage.setItem('observerId', id);
+               setObserverId(id);
+            } else {
+               localStorage.removeItem('soul_passport');
+            }
+         } catch (e) {
+            console.error("Failed to derive ID from passport", e);
+            localStorage.removeItem('soul_passport');
+         }
+       })();
     }
   }, [observerId]);
 
@@ -560,7 +551,14 @@ function MainDashboard() {
           {/* TAB: ENTROPY */}
           {activeTab === 'entropy' && (
             <div className="flex-1 w-full flex flex-col pt-4">
-              <DualPurposeGame onEarnKarma={(amount) => setTrustScore(prev => Math.min(1000, prev + amount))} />
+              <DualPurposeGame onEarnKarma={(amount) => {
+                if (symbiote) {
+                  symbiote.trustEngine.add_karma(amount);
+                  setTrustScore(symbiote.trustScore);
+                } else {
+                  setTrustScore(prev => Math.min(1000, prev + amount));
+                }
+              }} />
             </div>
           )}
 

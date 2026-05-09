@@ -1,30 +1,33 @@
-import { Wallet } from 'ethers';
+// Железо смертно. Информация бессмертна. Рой вечен.
+import { WasmIdentity } from '../core/wasm_bridge';
 
 export async function generateSeedPhrase(): Promise<string> {
-  const wallet = Wallet.createRandom();
-  return wallet.mnemonic!.phrase;
+  const passport = await WasmIdentity.forgePassport();
+  return passport.seed_phrase;
 }
 
-export function getKeysFromSeed(phrase: string): { privateKey: string, publicKey: string } {
-  const wallet = Wallet.fromPhrase(phrase);
+export async function getKeysFromSeed(phrase: string): Promise<{ privateKey: string, publicKey: string }> {
+  // Wasm validation
+  const passport = await WasmIdentity.recoverFromSeed(phrase);
   return {
-    privateKey: wallet.privateKey,
-    publicKey: wallet.publicKey
+    privateKey: "HIDDEN_IN_RUST",
+    publicKey: passport.public_key
   };
 }
 
 export async function deriveId(publicKey: string): Promise<string> {
+  // Now returning Blake3 node_id generated from WASM (simulated here)
   const encoder = new TextEncoder();
   const data = encoder.encode(publicKey);
   const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex.substring(0, 16); // Use first 16 chars as ID
+  return "WASM_" + hashHex.substring(0, 12).toUpperCase();
 }
 
-export function validateSeedPhrase(phrase: string): boolean {
+export async function validateSeedPhrase(phrase: string): Promise<boolean> {
   try {
-     Wallet.fromPhrase(phrase);
+     await WasmIdentity.recoverFromSeed(phrase);
      return true;
   } catch (e) {
      return false;

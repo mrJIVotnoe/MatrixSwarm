@@ -1,9 +1,14 @@
 import { PeerInfo, MatchmakingClient } from './signaling';
+import { WasmMeshNetwork, WasmTaskScheduler } from '../core/wasm_bridge';
 
 export type MeshMessage = {
   type: 'pheromone_heartbeat' | 'data' | 'relay_request';
   payload: any;
 };
+
+// Singleton Rust cores
+const wasmMesh = new WasmMeshNetwork();
+const wasmScheduler = new WasmTaskScheduler();
 
 export class SwarmConnection {
   public peerId: string;
@@ -80,7 +85,16 @@ export class SwarmConnection {
     this.dataChannel.onmessage = (event) => {
       const msg: MeshMessage = JSON.parse(event.data);
       if (msg.type === 'pheromone_heartbeat') {
-        console.log(`[Pheromone] Received direct pulse from ${this.peerId}`);
+        // Rust Core processing
+        console.log(`[Pheromone] Direct pulse from ${this.peerId} handled natively.`);
+        wasmScheduler.receive_heartbeat(this.peerId, Date.now());
+        wasmMesh.emit_pheromone(`hb_${this.peerId}`, this.peerId, "heartbeat_ok");
+        
+        // Let Rust check for reincarnated tasks
+        const reincarnated = wasmScheduler.check_reincarnation(Date.now(), "magistrate_node_fallback");
+        if (reincarnated.length > 0) {
+           console.log(`[Reincarnation] WASM System Interrupt... Tasks resurrected: ${reincarnated}`);
+        }
       } else if (msg.type === 'relay_request') {
         if (this.peerTrustLevel < 1) {
           console.warn(`[ZeroTrust] ${this.peerId} has inadequate trust score. Dropping relay request.`);

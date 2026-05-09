@@ -1,12 +1,19 @@
+import { WasmDigitalShell } from './wasm_bridge';
+
 export interface ResourceQuotas {
   maxCpuPercentage: number;
   maxRamMb: number;
   maxExecutionTimeMs: number;
 }
 
+const digitalShell = new WasmDigitalShell();
+
 export class SwarmSandbox {
   // Execute task securely using a sandboxed Web Worker (Zero-Trust context)
   public static async executeTask(taskCode: string, taskPayload: any, quotas: ResourceQuotas): Promise<any> {
+    const wasmPid = digitalShell.spawn_process("task_runner");
+    console.log(`[SwarmSandbox] Digital Shell WASM PID: ${wasmPid}`);
+    
     return new Promise((resolve, reject) => {
       if (typeof window === 'undefined') {
         // Fallback for non-browser environments

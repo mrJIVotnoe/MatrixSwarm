@@ -1,0 +1,19 @@
+[package]
+name = "swarm-wasm"
+version = "2.0.0"
+edition = "2021"
+authors = ["MatrixSwarm System Engineer"]
+description = "High-performance Rust core for MatrixSwarm Edge Network"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2.84"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+bip39 = "2.0.0"
+rand = "0.8.5"
+getrandom = { version = "0.2", features = ["js"] }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.5"
+blake3 = "1.4"

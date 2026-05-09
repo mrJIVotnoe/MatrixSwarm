@@ -3,6 +3,7 @@ import { globalEntropyPool } from '../core/entropy';
 import { Shield, Target, Zap, Hash, Grid3x3, Palette, Orbit } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import { WasmCovertOps } from '../core/wasm_bridge';
 
 // ----------------------------------------------------------------------
 // ФИЛОСОФИЯ: "Игра — это высшая форма ответственности перед Роем."
@@ -93,9 +94,13 @@ export const DualPurposeGame = ({ onEarnKarma }: { onEarnKarma: (amount: number)
     
     // Внедрение скрытых "Цифровых феромонов" (метаданных L3)
     globalEntropyPool.addEntropy('stegano_pixel', e.clientX, e.clientY, performance.now());
-    setSteganoPackets(p => p + 1);
     
-    earnKarma();
+    // Rust-Core WASM LSB processing simulation
+    const wasmProcessing = WasmCovertOps.inject_pheromone("0FA9C3"); 
+    if (wasmProcessing) {
+       setSteganoPackets(p => p + 1);
+       earnKarma();
+    }
   };
 
   return (

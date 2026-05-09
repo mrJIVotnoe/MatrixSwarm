@@ -80,7 +80,7 @@ apiRouter.get("/swarm/senses", async (req, res) => {
 });
 
 
-import { MathCore } from '../../core/math.js';
+import { WasmAikidoMath } from '../../core/wasm_bridge.js';
 
 // ==========================================
 // MESH TOPOLOGY & BRAMBLE
@@ -95,8 +95,7 @@ apiRouter.get("/mesh/topology", async (req, res) => {
   
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      const distMeters = MathCore.haversineDistance({lat: nodes[i].lat, lng: nodes[i].lng}, {lat: nodes[j].lat, lng: nodes[j].lng});
-      const dist = distMeters / 1000; // convert to km
+      const dist = WasmAikidoMath.haversine_distance(nodes[i].lat, nodes[i].lng, nodes[j].lat, nodes[j].lng);
       
       if (dist < MAX_DISTANCE_KM) {
         links.push({ source: nodes[i].id, target: nodes[j].id, distance: dist });
