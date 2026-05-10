@@ -34,3 +34,7 @@ export async function validateSeedPhrase(phrase: string): Promise<boolean> {
   }
 }
 
+export async function soulMigration(oldPhrase: string, newPhrase: string, legacyKarma: number) {
+  return await WasmIdentity.soulMigration(oldPhrase, newPhrase, legacyKarma);
+}
+

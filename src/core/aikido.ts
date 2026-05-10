@@ -1,15 +1,15 @@
 import { TrustLevel } from './permissions';
 import { Device, DeviceType } from './models';
-import { WasmAikidoMath, WasmCovertOps } from './wasm_bridge';
+import { WasmAikidoMath, WasmAikidoCore, WasmCovertOps } from './wasm_bridge';
 
-export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE';
+export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE' | 'Hardware Quarantine';
 
 export interface NodeMetrics {
   nodeId: string;
   lastKnownGps?: { lat: number; lng: number };
   gpsUpdatesCount: number;
-  mobilityScore: number; // 0 to 100. Bot farms with static GPS have ~0.
-  hoursInSameCell: number; // Used for "Home Anchor" detection
+  mobilityScore: number; // 0 to 100.
+  hoursInSameCell: number; 
   aikidoStatus: AikidoStatus;
 }
 
@@ -17,8 +17,7 @@ export class AikidoProtocol {
   private metrics: Map<string, NodeMetrics> = new Map();
 
   /**
-   * Evaluates if a node exhibits bot-farm behavior based on its mobility score, device type, and power state.
-   * "Справедливая меритократия Роя" - Project Canon.
+   * Evaluates node using Rust-driven Hardware Awareness.
    */
   public evaluateNode(
     device: Device,
@@ -37,18 +36,8 @@ export class AikidoProtocol {
         hoursInSameCell,
         aikidoStatus: 'Nomad'
       };
-      this.metrics.set(device.id, stats);
     }
-
     stats.hoursInSameCell = hoursInSameCell;
-
-    // 1. Hardware-Aware Mobility Check
-    // Стационарные касты (ПК, ТВ, Роутеры) игнорируют проверку мобильности
-    if (['pc', 'smart_tv', 'router'].includes(device.deviceType)) {
-      stats.aikidoStatus = 'Hardware Anchor';
-      this.metrics.set(device.id, stats);
-      return stats;
-    }
 
     if (currentGps && stats.lastKnownGps) {
       // WASM-Hardened Haversine
@@ -56,11 +45,10 @@ export class AikidoProtocol {
          stats.lastKnownGps.lat, stats.lastKnownGps.lng, 
          currentGps.lat, currentGps.lng
       );
-      const isStatic = (distKm * 1000) < 1; // less than 1 meter
+      const isStatic = (distKm * 1000) < 1;
       stats.gpsUpdatesCount++;
       
       if (isStatic) {
-        // Decrease mobility score over time if constantly static
         stats.mobilityScore = Math.max(0, stats.mobilityScore - 5);
       } else {
         stats.mobilityScore = Math.min(100, stats.mobilityScore + 10);
@@ -68,27 +56,50 @@ export class AikidoProtocol {
       }
     }
 
-    // 2. Логика «Смартфона на зарядке» (Smartphones/Tablets)
-    if (stats.mobilityScore === 0) {
+    // Prepare hardware profile for Rust Core
+    let caste = "Unknown";
+    if (device.deviceType === 'pc') caste = "PC";
+    if (device.deviceType === 'router') caste = "Router";
+    if (device.deviceType === 'smart_tv') caste = "SmartTV";
+    if (device.deviceType === 'smartphone') caste = "Smartphone";
+    if (device.deviceType === 'tablet') caste = "Tablet";
+
+    // "Внедрите жесткую логику Zero-Trust USB"
+    // Mock connection mapping
+    const connection_type = device.isUSBConnected ? "usb" : "wifi";
+
+    const profileJson = JSON.stringify({
+       caste,
+       logical_cores: navigator.hardwareConcurrency || 4,
+       memory_mb: (navigator as any).deviceMemory ? ((navigator as any).deviceMemory * 1024) : 2048,
+       connection_type
+    });
+
+    const rustEval = WasmAikidoCore.evaluateHardwareProfile(profileJson);
+    
+    // Rust-driven assessment overrides default JS values
+    stats.aikidoStatus = rustEval.aikido_status as AikidoStatus;
+
+    // Apply specific Bot-farm / Nomad detection if Rust assigned generic Scout role.
+    if (rustEval.role === "Scout" && stats.mobilityScore === 0) {
       if (isCharging) {
-        // HOME_ANCHOR — доверенное домашнее устройство (смартфон/планшет > 72ч в одной соте)
         if (stats.hoursInSameCell > 72) {
           stats.aikidoStatus = 'HOME_ANCHOR';
         } else {
-          // STABLE_GUARDIAN — смартфон на зарядке, локальное хранилище. Растет как ПК.
           stats.aikidoStatus = 'STABLE_GUARDIAN';
         }
       } else {
-        // Смартфон с нулевой мобильностью без зарядки
         if (stats.gpsUpdatesCount > 10) {
-          // BOT_FARM_NODE — статичный смартфон, ресурс без политических прав
           stats.aikidoStatus = 'BOT_FARM_NODE';
         } else {
-          stats.aikidoStatus = 'Static Suspect'; // Маркировка «Подозрительного статика»
+          stats.aikidoStatus = 'Static Suspect';
         }
       }
-    } else {
-      stats.aikidoStatus = 'Nomad';
+    }
+
+    // Enforce Hardware Quarantine
+    if (rustEval.aikido_status === "Hardware Quarantine") {
+      stats.aikidoStatus = "Hardware Quarantine";
     }
 
     this.metrics.set(device.id, stats);
@@ -96,49 +107,10 @@ export class AikidoProtocol {
   }
 
   /**
-   * Applies the Aikido penalty appropriately based on AikidoStatus.
-   * Контрмеры "Айкидо": Поглощение мощи у бот-ферм.
+   * Applies the Aikido penalty using Rust WASM Core logic.
    */
   public applyAikidoPenalty(nodeId: string, currentTrustScore: number, aikidoStatus: AikidoStatus): { effectiveKarma: number, votingWeight: number, forcedHeavyCompute: boolean } {
-    let effectiveKarma = currentTrustScore;
-    let votingWeight = 1.0;
-    let forcedHeavyCompute = false;
-
-    switch (aikidoStatus) {
-      case 'BOT_FARM_NODE':
-        // Поглощение мощи: лишаются полит.веса, принудительные вычисления.
-        console.log(`[Aikido] Node ${nodeId} is BOT_FARM_NODE. Power absorption active. Voting weight = 0.`);
-        effectiveKarma = Math.min(effectiveKarma, 50); // Cap karma
-        votingWeight = 0; // Игнорируются в консенсус-реестре
-        forcedHeavyCompute = true; // Обязаны выполнять тяжелые задачи
-        break;
-      
-      case 'Static Suspect':
-        // Under investigation, slight restriction
-        votingWeight = 0.5;
-        break;
-
-      case 'HOME_ANCHOR':
-        // Домашний якорь получает бонус к стабильности (локальное хранилище Мёда)
-        console.log(`[Aikido Protocol] Node ${nodeId} is HOME_ANCHOR. Granting stability bonus.`);
-        effectiveKarma += 100; // Bonus karma for being an anchor
-        break;
-
-      case 'STABLE_GUARDIAN':
-      case 'Hardware Anchor':
-        // Стабильный Страж: зарядка подключена, но неподвижен. Растет как ПК.
-        console.log(`[Aikido Protocol] Node ${nodeId} is ${aikidoStatus}. Legitimate static node.`);
-        const uptimeBonus = (this.metrics.get(nodeId)?.hoursInSameCell || 1) * 2;
-        effectiveKarma += uptimeBonus;
-        break;
-
-      case 'Nomad':
-      default:
-        // Normal behavior
-        break;
-    }
-
-    return { effectiveKarma, votingWeight, forcedHeavyCompute };
+    return WasmAikidoCore.applyAikidoPenalty(nodeId, currentTrustScore, aikidoStatus);
   }
 
   /**

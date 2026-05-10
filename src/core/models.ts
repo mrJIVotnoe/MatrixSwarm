@@ -13,6 +13,7 @@ export interface Device {
   deviceId: string;
   deviceType: DeviceType;
   capabilities: DeviceCapability[];
+  isUSBConnected?: boolean;
 }
 
 export type NodeRole = 'recruit' | 'scout' | 'guard' | 'magistrate' | 'traitor' | 'client' | 'relay' | 'sandboxed';

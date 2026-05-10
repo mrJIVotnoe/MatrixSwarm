@@ -40,6 +40,78 @@ export const WasmIdentity = {
       public_key: mockSeed,
       node_id: "WASM_" + mockSeed.substring(0, 8).toUpperCase(),
     };
+  },
+  soulMigration: async (oldPhrase: string, newPhrase: string, legacyKarma: number) => {
+    if (oldPhrase.length < 12 || newPhrase.length < 12) throw new Error("Invalid phrases");
+    return {
+      old_node_id: "WASM_" + oldPhrase.substring(0, 5).toUpperCase(),
+      new_node_id: "WASM_" + newPhrase.substring(0, 5).toUpperCase(),
+      migrated_karma: legacyKarma,
+      signature: "SIG_WASM_RUST_MIGRATION_OK"
+    };
+  }
+};
+
+export const WasmAikidoCore = {
+  evaluateHardwareProfile: (profileJson: string) => {
+    const profile = JSON.parse(profileJson);
+    let trust_level = 50.0;
+    let role = "Scout";
+    let aikido_status = "Nomad";
+
+    if (profile.connection_type === "usb" || profile.connection_type === "adb") {
+      trust_level = 0.0;
+      aikido_status = "Hardware Quarantine";
+    } else {
+      if (["PC", "Router", "SmartTV"].includes(profile.caste)) {
+        role = "Magistrate";
+        aikido_status = "Hardware Anchor";
+        trust_level = 100.0;
+      } else if (["Smartphone", "Tablet"].includes(profile.caste)) {
+        if (profile.logical_cores >= 8 && profile.memory_mb >= 4096) {
+          role = "StableGuardian";
+          aikido_status = "STABLE_GUARDIAN";
+          trust_level = 75.0;
+        } else {
+          role = "Scout";
+          aikido_status = "Nomad";
+          trust_level = 50.0;
+        }
+      } else {
+        role = "Scout";
+        aikido_status = "Static Suspect";
+        trust_level = 10.0;
+      }
+    }
+    return { role, trust_level, aikido_status };
+  },
+  applyAikidoPenalty: (nodeId: string, currentTrust: number, status: string) => {
+    let effective_karma = currentTrust;
+    let voting_weight = 1.0;
+    let forced_heavy_compute = false;
+
+    switch (status) {
+      case "BOT_FARM_NODE":
+        effective_karma = Math.min(effective_karma, 50.0);
+        voting_weight = 0.0;
+        forced_heavy_compute = true;
+        break;
+      case "Static Suspect":
+        voting_weight = 0.5;
+        break;
+      case "HOME_ANCHOR":
+        effective_karma += 100.0;
+        break;
+      case "STABLE_GUARDIAN":
+      case "Hardware Anchor":
+        effective_karma += 24.0;
+        break;
+      case "Hardware Quarantine":
+        effective_karma = 0.0;
+        voting_weight = 0.0;
+        break;
+    }
+    return { effective_karma, voting_weight, forced_heavy_compute };
   }
 };
 
