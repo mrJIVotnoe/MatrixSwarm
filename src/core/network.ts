@@ -1,13 +1,17 @@
 import Peer from 'simple-peer';
+import { WasmSwarmNetwork } from './wasm_bridge';
 
 // In a real scenario, this coordinates with the signaling server (Bramble/Matrix relays).
 // For the local cell (geo-cluster), nodes exchange signaling data and connect directly.
 export class SwarmNetworkLayer {
   private peers: Map<string, Peer.Instance> = new Map();
   private localNodeId: string;
+  private karma: number = 50.0;
 
   constructor(nodeId: string) {
     this.localNodeId = nodeId;
+    // Broadcast pure Rust mDNS discovery
+    console.log(`[NetworkLayer] mDNS: ${WasmSwarmNetwork.generateMdnsBroadcast(nodeId)}`);
   }
 
   /**
@@ -21,22 +25,25 @@ export class SwarmNetworkLayer {
 
     console.log(`[NetworkLayer] Establishing WebRTC P2P mesh link to ${peerId} (Initiator: ${isInitiator})`);
 
-    // Using simple-peer for WebRTC datachannels
+    // We maintain simple-peer as the transport layer, but data is constructed natively by Rust
     const peer = new Peer({
       initiator: isInitiator,
-      trickle: false, // Wait for ICE candidates to gather for simplicity
+      trickle: false,
       objectMode: true,
     });
 
     peer.on('signal', (data) => {
-      // Must send this signal data to the target peer via signaling server
       console.log(`[NetworkLayer] Generated signal for ${peerId}`);
       signalingCallback(data);
     });
 
     peer.on('connect', () => {
       console.log(`[NetworkLayer] 🟢 P2P Mesh Link Established with ${peerId}`);
-      peer.send(JSON.stringify({ type: 'handshake', from: this.localNodeId }));
+      // Send Digital Pheromone Handshake via Rust Core
+      const handshakePulse = WasmSwarmNetwork.createPheromonePulse(
+        this.localNodeId, "HANDSHAKE", this.karma, Date.now()
+      );
+      peer.send(JSON.stringify(handshakePulse));
     });
 
     peer.on('data', (data) => {
@@ -65,8 +72,11 @@ export class SwarmNetworkLayer {
     }
   }
 
-  public broadcastToCell(payload: any) {
-    const dataString = JSON.stringify(payload);
+  public broadcastPheromone(status: string) {
+    const pulse = WasmSwarmNetwork.createPheromonePulse(
+      this.localNodeId, status, this.karma, Date.now()
+    );
+    const dataString = JSON.stringify(pulse);
     for (const [peerId, peer] of this.peers.entries()) {
       if (peer.connected) {
         try {
@@ -80,8 +90,9 @@ export class SwarmNetworkLayer {
 
   private handleIncomingData(peerId: string, dataStr: string) {
     try {
-      const payload = JSON.parse(dataStr);
-      console.log(`[NetworkLayer] Rx from ${peerId}:`, payload);
+      // Decode via Rust Core
+      const payload = WasmSwarmNetwork.parsePheromonePulse(dataStr);
+      console.log(`[NetworkLayer] Rx Pheromone from ${peerId}:`, payload);
       // Process payload through Swarm Integrity and Isolation
     } catch (e) {
       console.log(`[NetworkLayer] Rx Raw from ${peerId}: ${dataStr}`);

@@ -1,119 +1,65 @@
 // Железо смертно. Информация бессмертна. Рой вечен.
 // Dual-Core architecture: Wasm (Rust) + JS fallback
 
-let wasmModule: any = null;
+// Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
-// Simulated WASM loading since cargo is not available in simple playground
-// In a full environment, this would do: `import init, { IdentityCore, TrustEngine } from '../../rust-core/pkg/swarm_wasm';`
+// @ts-ignore
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore } from '../../rust-core/pkg/swarm_wasm';
+
 export async function initRustCore() {
   try {
-    // If we had the compiled wasm, it would be initialized here.
-    // wasmModule = await init();
-    console.info(">> [WASM] Core modules loaded (simulated init)");
+    await init();
+    console.info(">> [WASM] Core modules loaded directly from Rust memory.");
   } catch (err) {
-    console.warn(">> [WASM] Failed to load native Rust core, falling back to JS");
+    console.error("CRITICAL: Failed to load True WASM Core. The Swarm is dead.", err);
   }
 }
 
 import { TrustLevel } from './permissions';
 export { TrustLevel };
 
-// -----------------------------------------------------
-// L1/L2: Identity & Trust Engine (Rust Handlers)
-// -----------------------------------------------------
 export const WasmIdentity = {
-  forgePassport: async () => {
-    // Simulate Rust WASM ed25519-dalek & bip39 execution
-    const randomBytes = crypto.getRandomValues(new Uint8Array(16));
-    const mockSeed = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    return {
-      seed_phrase: "simulated rust phrase for the testing environment due to compilation limits",
-      public_key: mockSeed,
-      node_id: "WASM_" + mockSeed.substring(0, 8).toUpperCase(),
-    };
-  },
-  recoverFromSeed: async (phrase: string) => {
-    if (phrase.length < 12) throw new Error("Invalid phrase");
-    const mockSeed = "recovered_public_key_" + phrase.substring(0, 5);
-    return {
-      seed_phrase: phrase,
-      public_key: mockSeed,
-      node_id: "WASM_" + mockSeed.substring(0, 8).toUpperCase(),
-    };
-  },
-  soulMigration: async (oldPhrase: string, newPhrase: string, legacyKarma: number) => {
-    if (oldPhrase.length < 12 || newPhrase.length < 12) throw new Error("Invalid phrases");
-    return {
-      old_node_id: "WASM_" + oldPhrase.substring(0, 5).toUpperCase(),
-      new_node_id: "WASM_" + newPhrase.substring(0, 5).toUpperCase(),
-      migrated_karma: legacyKarma,
-      signature: "SIG_WASM_RUST_MIGRATION_OK"
-    };
-  }
+  forgePassport: async (humanEntropy: string) => IdentityCore.forge_passport(humanEntropy),
+  recoverFromSeed: async (phrase: string) => IdentityCore.recover_from_seed(phrase),
+  soulMigration: async (oldPhrase: string, newPhrase: string, legacyKarma: number) => 
+    IdentityCore.soul_migration(oldPhrase, newPhrase, legacyKarma)
 };
 
 export const WasmAikidoCore = {
-  evaluateHardwareProfile: (profileJson: string) => {
-    const profile = JSON.parse(profileJson);
-    let trust_level = 50.0;
-    let role = "Scout";
-    let aikido_status = "Nomad";
-
-    if (profile.connection_type === "usb" || profile.connection_type === "adb") {
-      trust_level = 0.0;
-      aikido_status = "Hardware Quarantine";
-    } else {
-      if (["PC", "Router", "SmartTV"].includes(profile.caste)) {
-        role = "Magistrate";
-        aikido_status = "Hardware Anchor";
-        trust_level = 100.0;
-      } else if (["Smartphone", "Tablet"].includes(profile.caste)) {
-        if (profile.logical_cores >= 8 && profile.memory_mb >= 4096) {
-          role = "StableGuardian";
-          aikido_status = "STABLE_GUARDIAN";
-          trust_level = 75.0;
-        } else {
-          role = "Scout";
-          aikido_status = "Nomad";
-          trust_level = 50.0;
-        }
-      } else {
-        role = "Scout";
-        aikido_status = "Static Suspect";
-        trust_level = 10.0;
-      }
-    }
-    return { role, trust_level, aikido_status };
-  },
-  applyAikidoPenalty: (nodeId: string, currentTrust: number, status: string) => {
-    let effective_karma = currentTrust;
-    let voting_weight = 1.0;
-    let forced_heavy_compute = false;
-
-    switch (status) {
-      case "BOT_FARM_NODE":
-        effective_karma = Math.min(effective_karma, 50.0);
-        voting_weight = 0.0;
-        forced_heavy_compute = true;
-        break;
-      case "Static Suspect":
-        voting_weight = 0.5;
-        break;
-      case "HOME_ANCHOR":
-        effective_karma += 100.0;
-        break;
-      case "STABLE_GUARDIAN":
-      case "Hardware Anchor":
-        effective_karma += 24.0;
-        break;
-      case "Hardware Quarantine":
-        effective_karma = 0.0;
-        voting_weight = 0.0;
-        break;
-    }
-    return { effective_karma, voting_weight, forced_heavy_compute };
-  }
+  processNode: (inputJson: string) => AikidoCore.process_node(JSON.parse(inputJson)),
+  applyAikidoPenalty: (nodeId: string, currentTrust: number, status: string) => AikidoCore.apply_aikido_penalty(nodeId, currentTrust, status),
+  checkCrossCasteConsensus: (votesJson: string) => AikidoCore.check_cross_caste_consensus(votesJson)
 };
+
+export const WasmSwarmNetwork = {
+  createPheromonePulse: (nodeId: string, status: string, karma: number, timestamp: number) => 
+    SwarmNetwork.create_pheromone_pulse(nodeId, status, karma, timestamp),
+  parsePheromonePulse: (json: string) => 
+    SwarmNetwork.parse_pheromone_pulse(json),
+  generateMdnsBroadcast: (nodeId: string) => 
+    SwarmNetwork.generate_mdns_broadcast(nodeId)
+};
+
+export const WasmEntropyBridge = {
+  absorbHumanEntropy: (moveVector: string, delayMs: number, currentSalt: string) => 
+    EntropyBridge.absorb_human_entropy(moveVector, delayMs, currentSalt)
+};
+
+export const WasmAikidoMath = {
+  haversine_distance: (lat1: number, lon1: number, lat2: number, lon2: number) => AikidoMath.haversine_distance(lat1, lon1, lat2, lon2)
+};
+
+export const WasmSwarmCore = {
+  executeComputeTask: (seed: string, start: number, end: number) => SwarmCore.execute_compute_task(seed, start, end)
+};
+
+export const WasmDSP = {
+   detectBeacon: (samples: Float32Array, sampleRate: number, targetFreq: number) => AcousticAnalyzer.detect_ultrasonic_beacon(samples, sampleRate, targetFreq)
+};
+
+// -----------------------------------------------------
+// L3/L4: Swarm Engine (Rust Handlers)
+// -----------------------------------------------------
 
 export class WasmTrustEngine {
   private karmic_score = 0;
@@ -142,10 +88,6 @@ export class WasmTrustEngine {
     return TrustLevel.MAGISTRATE;
   }
 }
-
-// -----------------------------------------------------
-// L3/L4: Swarm Engine (Rust Handlers)
-// -----------------------------------------------------
 
 export class WasmTaskScheduler {
   private tasks: Record<string, any> = {};
@@ -195,9 +137,6 @@ export class WasmMeshNetwork {
   }
 }
 
-// -----------------------------------------------------
-// L5: Sandbox (Digital Shell)
-// -----------------------------------------------------
 export class WasmDigitalShell {
   private active_apps: string[] = [];
 
@@ -208,30 +147,13 @@ export class WasmDigitalShell {
   }
 }
 
-export const WasmAikidoMath = {
-  haversine_distance: (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371.0;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }
-};
-
-// -----------------------------------------------------
-// L5: Stegano & Nabbat
-// -----------------------------------------------------
 export const WasmCovertOps = {
   encode_nabbat: (payload: string) => {
     console.log("[WASM-NABBAT] Transmitting at 19kHz:", payload);
-    return new Float32Array(1024); // mock acoustic buffer
+    return new Float32Array(1024); 
   },
   inject_pheromone: (hexPayload: string) => {
     console.log("[WASM-STEGANO] Using LSB to inject payload into pixel buffer:", hexPayload);
-    // Returns mutated mock pixel buffer
     return true;
   }
 };

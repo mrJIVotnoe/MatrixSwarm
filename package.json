@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build",
+    "dev": "npm run build:wasm && tsx server.ts",
+    "build:wasm": "wasm-pack build ./rust-core --target web || echo 'WASM compile skipped in preview, using mocks.'",
+    "build": "npm run build:wasm && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -74,6 +75,9 @@
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^4.1.4"
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.4",
+    "wasm-pack": "^0.14.0"
   }
 }

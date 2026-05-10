@@ -1,35 +1,30 @@
-import { createHash } from 'crypto';
+import { WasmEntropyBridge } from './wasm_bridge';
 
 export class EntropyPool {
-  private pool: string[] = [];
-  private maxPoolSize = 1000;
+  private currentSalt: string = "INITIAL_SWARM_SALT";
+  private eventCount: number = 0;
 
   // Add entropy from user actions (clicks, mouse moves, timing)
   public addEntropy(source: string, x: number, y: number, timeMs: number) {
-    const raw = `${source}:${x},${y}:${timeMs}:${Math.random()}`;
-    this.pool.push(raw);
-    if (this.pool.length > this.maxPoolSize) {
-      this.pool.shift();
-    }
+    const moveVector = `${source}_[${x},${y}]`;
+    const delay = Math.floor(timeMs);
+    
+    // Rust absorbs the human chaos instantly, modifying the active salt
+    this.currentSalt = WasmEntropyBridge.absorbHumanEntropy(moveVector, delay, this.currentSalt);
+    this.eventCount += 1;
   }
 
-  // Generate a cryptographic seed from the chaotic pool of user interactions
+  // Retrieve the cryptographic seed cultivated by human-machine Symbiosis
   public async generateSeed(): Promise<string> {
-    if (this.pool.length === 0) return "00000000000000000000000000000000";
+    if (this.eventCount === 0) return "00000000000000000000000000000000";
     
-    // Combine all events into a single chaotic string
-    const chaos = this.pool.join('|');
-    
-    // Hash it using WebCrypto
-    const encoder = new TextEncoder();
-    const data = encoder.encode(chaos);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // The salt has been continuously hashed via Rust Blake3
+    const finalSeed = this.currentSalt.substring(0, 32); 
+    return finalSeed.padEnd(32, '0');
   }
   
   public getLevel(): number {
-    return Math.min(100, Math.floor((this.pool.length / 50) * 100)); // 0 to 100%
+    return Math.min(100, Math.floor((this.eventCount / 50) * 100)); // 0 to 100%
   }
 }
 

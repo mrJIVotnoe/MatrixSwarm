@@ -3,6 +3,7 @@ import { Terminal, Shield, User, Globe, Cpu, Radio, Key, Upload } from 'lucide-r
 import { motion } from 'motion/react';
 import { generateSeedPhrase, getKeysFromSeed, validateSeedPhrase } from '../lib/crypto';
 import { WasmIdentity } from '../core/wasm_bridge';
+import { globalEntropyPool } from '../core/entropy';
 
 export type UserMode = 'ark' | 'symbiote' | 'magistrate';
 
@@ -23,7 +24,8 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
   const generateKeys = async () => {
     try {
       // Rust WASM-Hardened Ed25519 "Soul Passport" Generation
-      const passport = await WasmIdentity.forgePassport();
+      const humanEntropy = await globalEntropyPool.generateSeed();
+      const passport = await WasmIdentity.forgePassport(humanEntropy);
       setSeedPhrase(passport.seed_phrase);
       setPublicKeyStr(passport.public_key);
       setStep(4); // Move to key backup step

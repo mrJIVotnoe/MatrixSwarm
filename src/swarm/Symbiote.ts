@@ -367,20 +367,12 @@ export class SwarmSymbiote {
       if (task.job_type === "prime_search") {
         const computePrimes = async () => {
           let count = 0;
-          const isPrime = (n: number) => {
-            if (n < 2) return false;
-            for (let i = 2; i <= Math.sqrt(n); i++) {
-              if (n % i === 0) return false;
-            }
-            return true;
-          };
 
           let current = task.start;
           const processBatch = () => {
             const batchEnd = Math.min(current + 5000, task.end);
-            for (; current < batchEnd; current++) {
-              if (isPrime(current)) count++;
-            }
+            count += WasmSwarmCore.executeComputeTask("seed", current, batchEnd);
+            current = batchEnd;
             if (current < task.end) {
               setTimeout(processBatch, 0);
             } else {

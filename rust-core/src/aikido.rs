@@ -75,61 +75,130 @@ pub struct NodeEvaluation {
     pub aikido_status: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct AikidoInput {
+    pub node_id: String,
+    pub caste: HardwareCaste,
+    pub logical_cores: u32,
+    pub memory_mb: u32,
+    pub connection_type: String, // "wifi", "cellular", "usb", "adb"
+    
+    // Previous State
+    pub prev_lat: Option<f64>,
+    pub prev_lng: Option<f64>,
+    pub curr_lat: Option<f64>,
+    pub curr_lng: Option<f64>,
+    pub is_charging: bool,
+    pub hours_in_same_cell: f32,
+    
+    pub mobility_score: f32,
+    pub gps_updates_count: u32,
+    pub karma: f32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AikidoOutput {
+    pub node_id: String,
+    pub new_lat: Option<f64>,
+    pub new_lng: Option<f64>,
+    pub mobility_score: f32,
+    pub gps_updates_count: u32,
+    pub karma: f32,
+    pub role: SwarmRole,
+    pub aikido_status: String,
+    pub untrusted_link_event: bool,
+}
+
 #[wasm_bindgen]
 pub struct AikidoCore;
 
 #[wasm_bindgen]
 impl AikidoCore {
     #[wasm_bindgen]
-    pub fn evaluate_hardware_profile(profile_val: JsValue) -> Result<JsValue, JsValue> {
-        let profile: HardwareProfile = serde_wasm_bindgen::from_value(profile_val)
+    pub fn process_node(input_val: JsValue) -> Result<JsValue, JsValue> {
+        let input: AikidoInput = serde_wasm_bindgen::from_value(input_val)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        
-        let mut trust_level = 50.0;
-        let mut role = SwarmRole::Scout;
-        let mut aikido_status = "Nomad".to_string();
+            
+        let mut out = AikidoOutput {
+            node_id: input.node_id.clone(),
+            new_lat: input.curr_lat.or(input.prev_lat),
+            new_lng: input.curr_lng.or(input.prev_lng),
+            mobility_score: input.mobility_score,
+            gps_updates_count: input.gps_updates_count,
+            karma: input.karma,
+            role: SwarmRole::Scout,
+            aikido_status: "Nomad".to_string(),
+            untrusted_link_event: false,
+        };
 
-        // 1) "Zero-Trust USB: при физическом подключении trust_level должен принудительно сбрасываться в 0"
-        if profile.connection_type == "usb" || profile.connection_type == "adb" || profile.connection_type == "serial" {
-            trust_level = 0.0;
-            aikido_status = "Hardware Quarantine".to_string();
-        } else {
-            // 2) Hardware Profiles
-            match profile.caste {
-                HardwareCaste::PC | HardwareCaste::Router | HardwareCaste::SmartTV => {
-                    // Стационарные касты (ПК, ТВ, Роутеры) игнорируют проверку мобильности
-                    role = SwarmRole::Magistrate;
-                    aikido_status = "Hardware Anchor".to_string();
-                    trust_level = 100.0;
-                },
-                HardwareCaste::Smartphone | HardwareCaste::Tablet => {
-                    // Узел на Rust автоматически проверяет мощности
-                    if profile.logical_cores >= 8 && profile.memory_mb >= 4096 {
-                        role = SwarmRole::StableGuardian;
-                        aikido_status = "STABLE_GUARDIAN".to_string();
-                        trust_level = 75.0;
-                    } else {
-                        role = SwarmRole::Scout;
-                        aikido_status = "Nomad".to_string();
-                        trust_level = 50.0;
-                    }
-                },
-                HardwareCaste::Unknown => {
-                    role = SwarmRole::Scout;
-                    aikido_status = "Static Suspect".to_string();
-                    trust_level = 10.0;
-                }
+        // 1. Zero-Trust USB check
+        if input.connection_type == "usb" || input.connection_type == "adb" || input.connection_type == "serial" {
+            out.untrusted_link_event = true;
+            out.aikido_status = "Hardware Quarantine".to_string();
+            out.karma = 0.0;
+            return Ok(serde_wasm_bindgen::to_value(&out)?);
+        }
+
+        // 2. Mobility Score Calculation
+        if let (Some(clat), Some(clng), Some(plat), Some(plng)) = (input.curr_lat, input.curr_lng, input.prev_lat, input.prev_lng) {
+            let dist_km = AikidoMath::haversine_distance(plat, plng, clat, clng);
+            let is_static = dist_km < 0.001; // less than 1 meter
+            out.gps_updates_count += 1;
+            
+            if is_static {
+                out.mobility_score = (out.mobility_score - 5.0).max(0.0);
+            } else {
+                out.mobility_score = (out.mobility_score + 10.0).min(100.0);
+                out.new_lat = Some(clat);
+                out.new_lng = Some(clng);
             }
         }
 
-        let eval = NodeEvaluation {
-            role,
-            trust_level,
-            aikido_status,
-        };
+        // 3. Hardware Profiles & Stable Guardian logic
+        match input.caste {
+            HardwareCaste::PC | HardwareCaste::Router | HardwareCaste::SmartTV => {
+                out.role = SwarmRole::Magistrate;
+                out.aikido_status = "Hardware Anchor".to_string();
+                
+                // Rust accrues Karma for uptime, ignoring lack of mobility
+                out.karma += (input.hours_in_same_cell * 2.0).min(100.0);
+            },
+            HardwareCaste::Smartphone | HardwareCaste::Tablet => {
+                let is_powerful = input.logical_cores >= 8 && input.memory_mb >= 4096;
+                
+                if out.mobility_score == 0.0 {
+                    if input.is_charging {
+                        // "Смартфон в режиме зарядки: Rust начисляет Карму за аптайм, игнорируя отсутствие перемещения"
+                        if input.hours_in_same_cell > 72.0 {
+                            out.aikido_status = "HOME_ANCHOR".to_string();
+                        } else {
+                            out.aikido_status = "STABLE_GUARDIAN".to_string();
+                            out.role = if is_powerful { SwarmRole::StableGuardian } else { SwarmRole::Scout };
+                        }
+                        out.karma += (input.hours_in_same_cell * 1.5).min(50.0);
+                    } else {
+                        if out.gps_updates_count > 10 {
+                            out.aikido_status = "BOT_FARM_NODE".to_string();
+                            out.karma = out.karma.min(50.0);
+                        } else {
+                            out.aikido_status = "Static Suspect".to_string();
+                        }
+                    }
+                } else {
+                    out.role = SwarmRole::Scout;
+                    out.aikido_status = "Nomad".to_string();
+                }
+            },
+            HardwareCaste::Unknown => {
+                out.role = SwarmRole::Scout;
+                out.aikido_status = "Static Suspect".to_string();
+                out.karma = out.karma.min(10.0);
+            }
+        }
 
-        Ok(serde_wasm_bindgen::to_value(&eval)?)
+        Ok(serde_wasm_bindgen::to_value(&out)?)
     }
+
 
     #[wasm_bindgen]
     pub fn apply_aikido_penalty(node_id: &str, current_trust: f32, status: &str) -> Result<JsValue, JsValue> {
@@ -169,5 +238,36 @@ impl AikidoCore {
         }
 
         Ok(serde_wasm_bindgen::to_value(&res)?)
+    }
+
+    #[wasm_bindgen]
+    pub fn check_cross_caste_consensus(votes_json: &str) -> bool {
+        // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса.
+        #[derive(Deserialize)]
+        struct Vote {
+            device_type: String, // "pc", "router", "smartphone", "tablet", "smart_tv"
+            is_positive: bool,
+        }
+
+        let votes: Vec<Vote> = serde_json::from_str(votes_json).unwrap_or_default();
+
+        let mut pc_total = 0; let mut pc_pos = 0;
+        let mut router_total = 0; let mut router_pos = 0;
+        let mut smart_total = 0; let mut smart_pos = 0;
+
+        for v in votes {
+            match v.device_type.as_str() {
+                "pc" => { pc_total += 1; if v.is_positive { pc_pos += 1; } },
+                "router" => { router_total += 1; if v.is_positive { router_pos += 1; } },
+                "smartphone" | "tablet" => { smart_total += 1; if v.is_positive { smart_pos += 1; } },
+                _ => {}
+            }
+        }
+
+        let pc_approval = if pc_total > 0 { pc_pos as f32 / pc_total as f32 } else { 1.0 };
+        let router_approval = if router_total > 0 { router_pos as f32 / router_total as f32 } else { 1.0 };
+        let smart_approval = if smart_total > 0 { smart_pos as f32 / smart_total as f32 } else { 1.0 };
+
+        pc_approval >= 0.2 && router_approval >= 0.2 && smart_approval >= 0.2
     }
 }

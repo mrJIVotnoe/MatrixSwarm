@@ -37,26 +37,7 @@ export class AikidoProtocol {
         aikidoStatus: 'Nomad'
       };
     }
-    stats.hoursInSameCell = hoursInSameCell;
 
-    if (currentGps && stats.lastKnownGps) {
-      // WASM-Hardened Haversine
-      const distKm = WasmAikidoMath.haversine_distance(
-         stats.lastKnownGps.lat, stats.lastKnownGps.lng, 
-         currentGps.lat, currentGps.lng
-      );
-      const isStatic = (distKm * 1000) < 1;
-      stats.gpsUpdatesCount++;
-      
-      if (isStatic) {
-        stats.mobilityScore = Math.max(0, stats.mobilityScore - 5);
-      } else {
-        stats.mobilityScore = Math.min(100, stats.mobilityScore + 10);
-        stats.lastKnownGps = currentGps;
-      }
-    }
-
-    // Prepare hardware profile for Rust Core
     let caste = "Unknown";
     if (device.deviceType === 'pc') caste = "PC";
     if (device.deviceType === 'router') caste = "Router";
@@ -64,43 +45,34 @@ export class AikidoProtocol {
     if (device.deviceType === 'smartphone') caste = "Smartphone";
     if (device.deviceType === 'tablet') caste = "Tablet";
 
-    // "Внедрите жесткую логику Zero-Trust USB"
-    // Mock connection mapping
-    const connection_type = device.isUSBConnected ? "usb" : "wifi";
-
-    const profileJson = JSON.stringify({
+    const inputData = {
+       node_id: device.id,
        caste,
        logical_cores: navigator.hardwareConcurrency || 4,
        memory_mb: (navigator as any).deviceMemory ? ((navigator as any).deviceMemory * 1024) : 2048,
-       connection_type
-    });
+       connection_type: device.isUSBConnected ? "usb" : "wifi",
+       
+       prev_lat: stats.lastKnownGps?.lat ?? null,
+       prev_lng: stats.lastKnownGps?.lng ?? null,
+       curr_lat: currentGps?.lat ?? null,
+       curr_lng: currentGps?.lng ?? null,
+       is_charging: isCharging,
+       hours_in_same_cell: hoursInSameCell,
+       
+       mobility_score: stats.mobilityScore,
+       gps_updates_count: stats.gpsUpdatesCount,
+       karma: 50.0 // Could pull real karma from Trust Engine
+    };
 
-    const rustEval = WasmAikidoCore.evaluateHardwareProfile(profileJson);
+    const rustEval = WasmAikidoCore.processNode(JSON.stringify(inputData));
     
-    // Rust-driven assessment overrides default JS values
+    stats.mobilityScore = rustEval.mobility_score;
+    stats.gpsUpdatesCount = rustEval.gps_updates_count;
     stats.aikidoStatus = rustEval.aikido_status as AikidoStatus;
-
-    // Apply specific Bot-farm / Nomad detection if Rust assigned generic Scout role.
-    if (rustEval.role === "Scout" && stats.mobilityScore === 0) {
-      if (isCharging) {
-        if (stats.hoursInSameCell > 72) {
-          stats.aikidoStatus = 'HOME_ANCHOR';
-        } else {
-          stats.aikidoStatus = 'STABLE_GUARDIAN';
-        }
-      } else {
-        if (stats.gpsUpdatesCount > 10) {
-          stats.aikidoStatus = 'BOT_FARM_NODE';
-        } else {
-          stats.aikidoStatus = 'Static Suspect';
-        }
-      }
+    if (rustEval.new_lat !== null && rustEval.new_lng !== null) {
+       stats.lastKnownGps = { lat: rustEval.new_lat, lng: rustEval.new_lng };
     }
-
-    // Enforce Hardware Quarantine
-    if (rustEval.aikido_status === "Hardware Quarantine") {
-      stats.aikidoStatus = "Hardware Quarantine";
-    }
+    stats.hoursInSameCell = hoursInSameCell;
 
     this.metrics.set(device.id, stats);
     return stats;
@@ -151,26 +123,11 @@ export class AikidoProtocol {
    * Минимум 20% одобрения от Magistrates(PC), 20% от Relays(Routers), 20% Scouts(Smartphones).
    */
   public checkCrossCasteConsensus(votes: { deviceType: DeviceType, isPositive: boolean }[]): boolean {
-    const totalVotesByType = { pc: 0, router: 0, smartphone: 0, tablet: 0, smart_tv: 0 };
-    const positiveVotesByType = { pc: 0, router: 0, smartphone: 0, tablet: 0, smart_tv: 0 };
-
-    for (const vote of votes) {
-      totalVotesByType[vote.deviceType]++;
-      if (vote.isPositive) {
-        positiveVotesByType[vote.deviceType]++;
-      }
-    }
-
-    const pcApproval = totalVotesByType.pc > 0 ? (positiveVotesByType.pc / totalVotesByType.pc) : 1; // If 0, assume 1 to not block if no PC
-    const routerApproval = totalVotesByType.router > 0 ? (positiveVotesByType.router / totalVotesByType.router) : 1;
-    const smartphoneApproval = totalVotesByType.smartphone > 0 ? (positiveVotesByType.smartphone / totalVotesByType.smartphone) : 1;
-
-    // Requirement: at least 20% (0.2) from each core caste. 
-    // In actual implementation, we'd need minimum absolute numbers too.
-    const isConsensusReached = pcApproval >= 0.2 && routerApproval >= 0.2 && smartphoneApproval >= 0.2;
-
-    console.log(`[Aikido] Cross-Caste Consensus: PC=${(pcApproval*100).toFixed(1)}%, Router=${(routerApproval*100).toFixed(1)}%, App=${(smartphoneApproval*100).toFixed(1)}%. Result: ${isConsensusReached}`);
-
-    return isConsensusReached;
+    // Rust-driven Cross-Caste Consensus
+    const rustVotes = votes.map(v => ({
+      device_type: v.deviceType === 'smart_tv' ? 'smart_tv' : v.deviceType,
+      is_positive: v.isPositive
+    }));
+    return WasmAikidoCore.checkCrossCasteConsensus(JSON.stringify(rustVotes));
   }
 }

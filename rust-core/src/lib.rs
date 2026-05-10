@@ -9,6 +9,11 @@ mod stegano;
 mod network;
 mod sandbox;
 mod swarm_core;
+mod identity;
+mod aikido;
+mod acoustic_dsp;
+mod swarm_network;
+mod entropy_bridge;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {

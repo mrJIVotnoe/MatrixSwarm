@@ -1,3 +1,5 @@
+import { WasmSwarmCore } from '../core/wasm_bridge';
+
 /**
  * MatrixSwarm Benchmark Engine
  * Used to verify node performance and detect virtualization.
@@ -15,17 +17,7 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
   
   // CPU Benchmark: Simple prime calculation
   const cpuStart = Date.now();
-  let primes = 0;
-  for (let i = 2; i < 500000; i++) {
-    let isPrime = true;
-    for (let j = 2; j <= Math.sqrt(i); j++) {
-      if (i % j === 0) {
-        isPrime = false;
-        break;
-      }
-    }
-    if (isPrime) primes++;
-  }
+  let primes = WasmSwarmCore.executeComputeTask("benchmark", 2, 500000);
   const cpuDuration = Date.now() - cpuStart;
   const cpuScore = Math.floor(1000000 / cpuDuration);
 
@@ -43,7 +35,7 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
   // In a real browser/node environment, we'd check for specific hardware signatures
   // Here we use a heuristic based on timing jitter
   const jitterStart = performance.now();
-  for(let i=0; i<1000; i++) { Math.sqrt(i); }
+  for(let i=0; i<1000; i++) { const _ = i ** 0.5; }
   const jitterEnd = performance.now();
   const isVM = (jitterEnd - jitterStart) > 0.5; // Heuristic: VMs often have higher jitter
 

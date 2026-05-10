@@ -1,8 +1,10 @@
 // Железо смертно. Информация бессмертна. Рой вечен.
 import { WasmIdentity } from '../core/wasm_bridge';
+import { globalEntropyPool } from '../core/entropy';
 
 export async function generateSeedPhrase(): Promise<string> {
-  const passport = await WasmIdentity.forgePassport();
+  const entropy = await globalEntropyPool.generateSeed();
+  const passport = await WasmIdentity.forgePassport(entropy);
   return passport.seed_phrase;
 }
 
