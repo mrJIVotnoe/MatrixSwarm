@@ -1,5 +1,6 @@
 import { Device, Node, NodeRole } from './models';
 import { TrustLevel } from './permissions';
+import { WasmCasteAutonomy } from './wasm_bridge';
 
 /**
  * Automatically determine the node role based on device profile and karma (Trust Level)
@@ -13,28 +14,23 @@ export function determineNodeRole(deviceTrustLevel: TrustLevel, device: Device):
     return 'recruit'; // Just joining
   }
 
-  const { capabilities } = device;
-  const isComputeHeavy = capabilities.includes('compute');
-  const isStorageHeavy = capabilities.includes('storage');
-  const isNetworkHeavy = capabilities.includes('network_routing');
+  // Use Rust-based Meritocracy engine
+  const metricsJson = JSON.stringify({
+    cpu_cores: navigator.hardwareConcurrency || 4,
+    ram_gb: (navigator as any).deviceMemory || 4.0,
+    is_plugged_in: device.isUSBConnected || false,
+    device_type: device.deviceType === 'pc' ? 'desktop' : device.deviceType === 'smartphone' ? 'mobile' : device.deviceType
+  });
 
-  // PC profile (Compute + Storage)
-  if (isComputeHeavy && isStorageHeavy) {
-    // Requires high Karma to be a Magistrate
-    if (deviceTrustLevel >= TrustLevel.MAGISTRATE) {
-      return 'magistrate';
-    } else {
-      return 'guard'; // Middle tier
-    }
+  const rustRole = WasmCasteAutonomy.determineRole(metricsJson);
+
+  switch(rustRole) {
+    case "Magistrate": return "magistrate";
+    case "StableGuardian": return "guard";
+    case "Scout": return "scout";
+    case "Relay": return "relay";
+    default: return "scout";
   }
-
-  // Router profile
-  if (isNetworkHeavy && !isComputeHeavy) {
-    return 'relay';
-  }
-
-  // default / smartphone / display / sensor
-  return 'scout';
 }
 
 /**

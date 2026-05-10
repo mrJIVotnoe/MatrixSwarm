@@ -36,10 +36,14 @@ export const AikidoCore = {
   },
   check_cross_caste_consensus: (votes_json) => {
     return true; // Simplified for mock
+  },
+  validate_mobility: (device_type, dist, time) => {
+    return true;
   }
 };
 
 export const SwarmNetwork = {
+
   create_pheromone_pulse: (id, st, k, ts) => {
     return { node_id: id, status: st, karma: k, timestamp: ts };
   },
@@ -48,6 +52,9 @@ export const SwarmNetwork = {
   },
   generate_mdns_broadcast: (node_id) => {
     return `MDNS_DISC_REQ::${node_id}::_matrixswarm._udp.local`;
+  },
+  poll_mdns_peers: () => {
+    return ["LOCAL_PEER_A0F9", "LOCAL_PEER_B221"];
   }
 };
 
@@ -92,5 +99,47 @@ export const AikidoMath = {
 };
 
 export const AcousticAnalyzer = {
-  detect_ultrasonic_beacon: () => 0.0
+  detect_ultrasonic_beacon: () => 0.0,
+  generate_ultrasonic_marker: (sample_rate, duration_ms, freq) => new Float32Array(),
+  encode_acoustic_payload: (payload, sample_rate) => new Float32Array(),
+  decode_acoustic_payload: (samples, sample_rate) => "RECOVERED_VIA_SONAR"
+};
+
+export const CasteAutonomy = {
+  determine_role: (json) => "Drone"
+};
+
+export class CrdtRegister {
+  constructor() {}
+  merge_state(node_id, status, karma, ts) {}
+  get_node_state(node_id) { return null; }
+  export_state() { return "{}"; }
+}
+
+export const HolographicCore = {
+  fragment_honey: (data, total_shards, min_shards) => {
+    return Array(total_shards).fill(0).map((_, i) => ({ id: i, payload: `frag_${i}:MOCK` }));
+  },
+  reconstruct_honey: (shards_json) => {
+    return "RECONSTRUCTED_HOLOGRAPHIC_DATA";
+  },
+  distribute_city_scale: (data, castes_json) => {
+    return JSON.parse(castes_json).map((caste, i) => ({ caste, role: caste === 'Magistrate' ? 'PRIMARY_ARCHIVE' : 'VOLATILE_SHARD', payload: `mirror_${i}:MOCK` }));
+  }
+};
+
+export const VisualKinopsis = {
+  analyze_visual_pheromone: (frame_data) => "NORMAL_CONDITIONS",
+  generate_visual_pheromone: (status) => new Uint8Array([100, 200, 100, 200]),
+  collective_threat_analysis: (logs_json) => {
+    const logs = JSON.parse(logs_json);
+    const sosCount = logs.filter(l => l === "FLASH_DETECTED_SOS").length;
+    return sosCount >= 3 ? "CRITICAL_LOCKDOWN_ZERO_TRUST" : (sosCount > 0 ? "ELEVATED_RISK" : "ALL_CLEAR");
+  }
+};
+
+export const ReverseStarlink = {
+  triangulate_position: (beacons_json) => {
+    return "TRIANGULATED:0,0";
+  }
 };

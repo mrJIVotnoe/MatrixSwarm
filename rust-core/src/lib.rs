@@ -14,6 +14,12 @@ mod aikido;
 mod acoustic_dsp;
 mod swarm_network;
 mod entropy_bridge;
+mod holographic_core;
+mod visual_kinopsis;
+mod caste;
+mod crdt;
+
+mod reverse_starlink;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {

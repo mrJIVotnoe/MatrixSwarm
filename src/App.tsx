@@ -20,6 +20,7 @@ import { UserProfile } from './components/UserProfile';
 import { UserOnboarding } from './components/UserOnboarding';
 import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
+import { ObserverHUD } from './components/ObserverHUD';
 import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { useTranslation } from 'react-i18next';
@@ -527,6 +528,9 @@ function MainDashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
+              <div className="mt-6">
+                 <ObserverHUD />
               </div>
             </div>
           )}

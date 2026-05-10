@@ -270,4 +270,17 @@ impl AikidoCore {
 
         pc_approval >= 0.2 && router_approval >= 0.2 && smart_approval >= 0.2
     }
+
+    /// L2 - Global Trust: GPS Anti-Spoofing and Mobility Check
+    #[wasm_bindgen]
+    pub fn validate_mobility(device_type: &str, distance_moved: f32, elapsed_minutes: f32) -> bool {
+        if device_type == "smartphone" || device_type == "tablet" {
+            if elapsed_minutes > 120.0 && distance_moved < 0.05 {
+                // Device claims to be mobile but hasn't moved 50 meters in 2 hours
+                // Potentially an emulator or static farm spoofing as a mobile Scout
+                return false;
+            }
+        }
+        true
+    }
 }

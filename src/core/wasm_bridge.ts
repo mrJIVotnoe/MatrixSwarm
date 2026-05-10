@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -28,7 +28,12 @@ export const WasmIdentity = {
 export const WasmAikidoCore = {
   processNode: (inputJson: string) => AikidoCore.process_node(JSON.parse(inputJson)),
   applyAikidoPenalty: (nodeId: string, currentTrust: number, status: string) => AikidoCore.apply_aikido_penalty(nodeId, currentTrust, status),
-  checkCrossCasteConsensus: (votesJson: string) => AikidoCore.check_cross_caste_consensus(votesJson)
+  checkCrossCasteConsensus: (votesJson: string) => AikidoCore.check_cross_caste_consensus(votesJson),
+  validateMobility: (deviceType: string, distance: number, minutes: number) => AikidoCore.validate_mobility(deviceType, distance, minutes)
+};
+
+export const WasmCasteAutonomy = {
+  determineRole: (metricsJson: string) => CasteAutonomy.determine_role(metricsJson)
 };
 
 export const WasmSwarmNetwork = {
@@ -37,7 +42,9 @@ export const WasmSwarmNetwork = {
   parsePheromonePulse: (json: string) => 
     SwarmNetwork.parse_pheromone_pulse(json),
   generateMdnsBroadcast: (nodeId: string) => 
-    SwarmNetwork.generate_mdns_broadcast(nodeId)
+    SwarmNetwork.generate_mdns_broadcast(nodeId),
+  pollMdnsPeers: () => 
+    SwarmNetwork.poll_mdns_peers()
 };
 
 export const WasmEntropyBridge = {
@@ -54,8 +61,29 @@ export const WasmSwarmCore = {
 };
 
 export const WasmDSP = {
-   detectBeacon: (samples: Float32Array, sampleRate: number, targetFreq: number) => AcousticAnalyzer.detect_ultrasonic_beacon(samples, sampleRate, targetFreq)
+   detectBeacon: (samples: Float32Array, sampleRate: number, targetFreq: number) => AcousticAnalyzer.detect_ultrasonic_beacon(samples, sampleRate, targetFreq),
+   generateMarker: (sampleRate: number, durationMs: number, freq: number) => AcousticAnalyzer.generate_ultrasonic_marker(sampleRate, durationMs, freq),
+   encodeAcousticPayload: (payload: string, sampleRate: number) => AcousticAnalyzer.encode_acoustic_payload(payload, sampleRate),
+   decodeAcousticPayload: (samples: Float32Array, sampleRate: number) => AcousticAnalyzer.decode_acoustic_payload(samples, sampleRate)
 };
+
+export const WasmHolographicCore = {
+  fragmentHoney: (data: string, totalShards: number, minShards: number) => HolographicCore.fragment_honey(data, totalShards, minShards),
+  reconstructHoney: (shardsJson: string) => HolographicCore.reconstruct_honey(shardsJson),
+  distributeCityScale: (data: string, castesJson: string) => HolographicCore.distribute_city_scale(data, castesJson)
+};
+
+export const WasmVisualKinopsis = {
+  analyzeVisualPheromone: (frameData: Uint8Array) => VisualKinopsis.analyze_visual_pheromone(frameData),
+  generateVisualPheromone: (status: string) => VisualKinopsis.generate_visual_pheromone(status),
+  collectiveThreatAnalysis: (logsJson: string) => VisualKinopsis.collective_threat_analysis(logsJson)
+};
+
+export const WasmReverseStarlink = {
+  triangulatePosition: (beaconsJson: string) => ReverseStarlink.triangulate_position(beaconsJson)
+};
+
+export { CrdtRegister };
 
 // -----------------------------------------------------
 // L3/L4: Swarm Engine (Rust Handlers)

@@ -51,13 +51,21 @@ export class AcousticCellLink {
     if (!this.audioContext) {
         this.audioContext = new AudioContext();
     }
-    const osc = this.audioContext.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(this.targetFreq, this.audioContext.currentTime);
-    osc.connect(this.audioContext.destination);
-    osc.start();
-    osc.stop(this.audioContext.currentTime + 0.1); // Short 100ms chirp
-    console.log(`[ACOUSTIC_L3] Emitted Ultrasonic Chirp at ${this.targetFreq}Hz.`);
+    const sampleRate = this.audioContext.sampleRate;
+    const durationMs = 100;
+    
+    // Get raw audio samples from Rust DSP
+    const samples = WasmDSP.generateMarker(sampleRate, durationMs, this.targetFreq);
+    
+    const buffer = this.audioContext.createBuffer(1, samples.length, sampleRate);
+    buffer.getChannelData(0).set(samples);
+    
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.audioContext.destination);
+    source.start();
+    
+    console.log(`[ACOUSTIC_L3] Emitted Ultrasonic Chirp at ${this.targetFreq}Hz via Rust DSP.`);
   }
 
   public stop() {

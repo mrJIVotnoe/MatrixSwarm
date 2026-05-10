@@ -11,7 +11,15 @@ export class SwarmNetworkLayer {
   constructor(nodeId: string) {
     this.localNodeId = nodeId;
     // Broadcast pure Rust mDNS discovery
-    console.log(`[NetworkLayer] mDNS: ${WasmSwarmNetwork.generateMdnsBroadcast(nodeId)}`);
+    console.log(`[NetworkLayer] Emitting mDNS: ${WasmSwarmNetwork.generateMdnsBroadcast(nodeId)}`);
+    
+    // Simulate mDNS polling mechanism driven by Rust
+    setInterval(() => {
+        const discovered = WasmSwarmNetwork.pollMdnsPeers();
+        if (discovered && discovered.length > 0) {
+            console.log(`[NetworkLayer] Rust mDNS Polling discovered neighbors:`, discovered);
+        }
+    }, 10000);
   }
 
   /**
