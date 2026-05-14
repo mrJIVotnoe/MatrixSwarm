@@ -19,7 +19,9 @@ export function determineNodeRole(deviceTrustLevel: TrustLevel, device: Device):
     cpu_cores: navigator.hardwareConcurrency || 4,
     ram_gb: (navigator as any).deviceMemory || 4.0,
     is_plugged_in: device.isUSBConnected || false,
-    device_type: device.deviceType === 'pc' ? 'desktop' : device.deviceType === 'smartphone' ? 'mobile' : device.deviceType
+    device_type: device.deviceType === 'pc' ? 'desktop' : device.deviceType === 'smartphone' ? 'mobile' : device.deviceType,
+    has_gps: !!navigator.geolocation,
+    battery_level: 100 // Simulated for now
   });
 
   const rustRole = WasmCasteAutonomy.determineRole(metricsJson);

@@ -16,7 +16,7 @@ impl GlobalKnowledge {
         format!("ZIM_ARCHIVE_{}_SHARDED_INTO_{}_PIECES", archive_name.to_uppercase(), required_shards)
     }
 
-    /// L5 - Global Home-Lab: Recover archive from minimal nodes
+    /// Recover archive from minimal nodes
     #[wasm_bindgen]
     pub fn recover_from_abyss(available_shards: u32, total_shards: u32) -> String {
         // Holographic recovery: 1% of nodes implies we need extreme redundancy (e.g. fountain codes)
@@ -26,6 +26,22 @@ impl GlobalKnowledge {
             "RECOVERY_SUCCESSFUL_VIA_FOUNTAIN_CODES".to_string()
         } else {
             "CRITICAL_DATA_LOSS_SEEKING_ACOUSTIC_PEERS".to_string()
+        }
+    }
+
+    /// L5 - Native Ark: Auto-distribute critical fragments by Magistrate
+    #[wasm_bindgen]
+    pub fn pollinate_critical_knowledge(knowledge_type: &str, node_role: &str) -> String {
+        if node_role == "Magistrate" || node_role == "Guard" {
+            // "Узлы-Магистраты должны автоматически распределять фрагменты критических знаний (медицина, выживание)"
+            match knowledge_type {
+                "medicine" | "survival" | "water_purification" => {
+                    format!("EXTRACTING_AND_BROADCASTING_{}_VIA_ACOUSTIC_NABAT", knowledge_type.to_uppercase())
+                },
+                _ => "KNOWLEDGE_TYPE_LOW_PRIORITY_FOR_POLLINATION".to_string(),
+            }
+        } else {
+            "ONLY_MAGISTRATES_CAN_POLLINATE".to_string()
         }
     }
 }

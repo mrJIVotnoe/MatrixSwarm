@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, MessageCRDT as _MessageCRDT } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -22,7 +22,11 @@ export const WasmIdentity = {
   forgePassport: async (humanEntropy: string) => IdentityCore.forge_passport(humanEntropy),
   recoverFromSeed: async (phrase: string) => IdentityCore.recover_from_seed(phrase),
   soulMigration: async (oldPhrase: string, newPhrase: string, legacyKarma: number) => 
-    IdentityCore.soul_migration(oldPhrase, newPhrase, legacyKarma)
+    IdentityCore.soul_migration(oldPhrase, newPhrase, legacyKarma),
+  exportLegacyContainer: async (phrase: string, karma: number, isGuard: boolean) => 
+    IdentityCore.export_legacy_container(phrase, karma, isGuard),
+  importLegacyContainer: async (encryptedHex: string, newPhrase: string) => 
+    IdentityCore.import_legacy_container(encryptedHex, newPhrase)
 };
 
 export const WasmAikidoCore = {
@@ -82,12 +86,13 @@ export const WasmReverseStarlink = {
 };
 
 export const WasmPlanetaryShield = {
-  analyzeSeismicActivity: (sensorBatchJson: string) => PlanetaryShield.analyze_seismic_activity(sensorBatchJson)
+  analyzeSeismicActivity: (sensorBatchJson: string, nodeLocationHash: string) => PlanetaryShield.analyze_seismic_activity(sensorBatchJson, nodeLocationHash)
 };
 
 export const WasmGlobalKnowledge = {
   ingestArchive: (archiveName: string, rawDataSizeMb: number) => GlobalKnowledge.ingest_archive(archiveName, rawDataSizeMb),
-  recoverFromAbyss: (availableShards: number, totalShards: number) => GlobalKnowledge.recover_from_abyss(availableShards, totalShards)
+  recoverFromAbyss: (availableShards: number, totalShards: number) => GlobalKnowledge.recover_from_abyss(availableShards, totalShards),
+  pollinateCriticalKnowledge: (knowledgeType: string, nodeRole: string) => GlobalKnowledge.pollinate_critical_knowledge(knowledgeType, nodeRole)
 };
 
 export { CrdtRegister };
@@ -121,29 +126,26 @@ export class WasmTrustEngine {
 }
 
 export class WasmTaskScheduler {
-  private tasks: Record<string, any> = {};
-  private heartbeats: Record<string, number> = {};
+  private inner: _TaskScheduler;
+
+  constructor() {
+    this.inner = new _TaskScheduler();
+  }
 
   assign_task(id: string, node_id: string, payload: string, current_time: number) {
-    this.tasks[id] = { assigned_to: node_id, payload, deadline: current_time + 5000 };
-    this.heartbeats[node_id] = current_time;
+    this.inner.assign_task(id, node_id, payload, BigInt(current_time) as any);
   }
 
   receive_heartbeat(node_id: string, current_time: number) {
-    this.heartbeats[node_id] = current_time;
+    this.inner.receive_heartbeat(node_id, BigInt(current_time) as any);
   }
 
   check_reincarnation(current_time: number, fallback_node: string): string {
-    let reincarnated: string[] = [];
-    for (const [task_id, state] of Object.entries(this.tasks)) {
-      const last_hb = this.heartbeats[state.assigned_to] || 0;
-      if (current_time - last_hb > 5000) {
-        state.assigned_to = fallback_node;
-        state.deadline = current_time + 5000;
-        reincarnated.push(task_id);
-      }
-    }
-    return reincarnated.join(",");
+    return this.inner.check_reincarnation(BigInt(current_time) as any, fallback_node);
+  }
+
+  distribute_global_intent(intent: string, num_recruits: number, num_scouts: number): string {
+    return this.inner.distribute_global_intent(intent, num_recruits, num_scouts);
   }
 }
 

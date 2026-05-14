@@ -97,6 +97,73 @@ impl IdentityCore {
         
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
+
+    /// L1 - Legacy Transfer: Export encrypted soul container containing karma and Guard status
+    #[wasm_bindgen]
+    pub fn export_legacy_container(phrase: &str, karma: f32, is_guard: bool) -> Result<String, JsValue> {
+        let passport = Self::recover_internal(phrase)?;
+        
+        #[derive(Serialize)]
+        struct LegacyContainer {
+            pub node_id: String,
+            pub karma: f32,
+            pub is_guard: bool,
+            pub signature: String,
+        }
+        
+        let container = LegacyContainer {
+            node_id: passport.node_id.clone(),
+            karma,
+            is_guard,
+            signature: format!("SIGNED_BY_{}", passport.public_key[..16].to_string()),
+        };
+        
+        let json = serde_json::to_string(&container).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        
+        // Simple mock encryption wrapping
+        Ok(format!("ENCRYPTED_LEGACY_CONTAINER[{}]", hex::encode(json.as_bytes())))
+    }
+
+    /// L1 - Legacy Transfer: Import encrypted soul container
+    #[wasm_bindgen]
+    pub fn import_legacy_container(encrypted_hex: &str, new_phrase: &str) -> Result<JsValue, JsValue> {
+        let new_passport = Self::recover_internal(new_phrase)?;
+        
+        let payload = encrypted_hex.strip_prefix("ENCRYPTED_LEGACY_CONTAINER[").unwrap_or(encrypted_hex);
+        let payload = payload.strip_suffix("]").unwrap_or(payload);
+        
+        let json_bytes = hex::decode(payload).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let json_str = String::from_utf8(json_bytes).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        
+        #[derive(Deserialize, Serialize)]
+        struct LegacyContainer {
+            pub node_id: String,
+            pub karma: f32,
+            pub is_guard: bool,
+            pub signature: String,
+        }
+        
+        let container: LegacyContainer = serde_json::from_str(&json_str).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        
+        #[derive(Serialize)]
+        struct ImportResult {
+            pub original_node_id: String,
+            pub new_node_id: String,
+            pub restored_karma: f32,
+            pub restored_guard_status: bool,
+            pub verification: String,
+        }
+        
+        let res = ImportResult {
+            original_node_id: container.node_id,
+            new_node_id: new_passport.node_id,
+            restored_karma: container.karma,
+            restored_guard_status: container.is_guard,
+            verification: "SUCCESS".to_string(),
+        };
+        
+        Ok(serde_wasm_bindgen::to_value(&res)?)
+    }
 }
 
 #[cfg(test)]

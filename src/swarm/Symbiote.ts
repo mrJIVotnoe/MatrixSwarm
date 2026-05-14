@@ -4,7 +4,7 @@ import { SwarmSandbox, ResourceQuotas } from '../core/isolation';
 import { PermissionEngine, PermissionScope } from '../core/permissions';
 import { IntegrityGuard } from '../core/integrity';
 import { MagistrateBridge } from './magistrate';
-import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore } from '../core/wasm_bridge';
+import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore, WasmAikidoCore } from '../core/wasm_bridge';
 
 export type SymbioteStatus = 
   | "sleeping" 
@@ -30,6 +30,7 @@ export class SwarmSymbiote {
   public cellId: string | null = null;
   public magistrateBridge: MagistrateBridge | null = null;
   private lastCoords: { lat: number, lng: number } | null = null;
+  private lastCoordsTime: number = Date.now();
   public sensors = {
     vision: false,
     hearing: false,
@@ -91,10 +92,26 @@ export class SwarmSymbiote {
           const { latitude, longitude } = pos.coords;
           if (this.lastCoords) {
              const distMeters = WasmAikidoMath.haversine_distance(this.lastCoords.lat, this.lastCoords.lng, latitude, longitude) * 1000;
+             const elapsedMinutes = (Date.now() - this.lastCoordsTime) / 60000;
+             
+             // AIKIDO: L2 - Global Trust 
+             // "Если узел со статусом «Смартфон» не меняет геопозицию (GPS-спуфинг), Rust-модуль должен автоматически ограничивать его права"
+             if (elapsedMinutes >= 1.0) {
+                 const isMobileValid = WasmAikidoCore.validateMobility(this.hardwareClass, distMeters, elapsedMinutes);
+                 if (!isMobileValid && this.hardwareClass === 'smartphone') {
+                     // GPS Spoofing or BotFarm detected
+                     this.trustEngine.revoke_trust("GPS_SPOOFING");
+                     this.status = "quarantined";
+                     this.onUpdate(this.status, "[АЙКИДО] Узел помещен в карантин: Аномальная (нулевая) мобильность для профиля 'Смартфон'. Подозрение на бот-ферму.");
+                     return;
+                 }
+             }
+
              if (distMeters > 10) { // > 10 meters 
                 this.mobilityScore += 1;
              }
           }
+          this.lastCoordsTime = Date.now();
           this.lastCoords = { lat: latitude, lng: longitude };
           const cellLat = latitude.toFixed(3);
           const cellLng = longitude.toFixed(3);

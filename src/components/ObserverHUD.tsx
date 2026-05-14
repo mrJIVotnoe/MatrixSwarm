@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -12,13 +12,17 @@ export const ObserverHUD: React.FC = () => {
   const [globalIntent, setGlobalIntent] = useState('');
   const [intentStatus, setIntentStatus] = useState<string | null>(null);
 
+  const schedulerRef = useRef(new WasmTaskScheduler());
+
   const handleGlobalIntent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!globalIntent.trim()) return;
     setIntentStatus("Dispersing intent via Probability Waves... Magistrates analyzing task.");
     
     setTimeout(() => {
-        setIntentStatus(`Intent "${globalIntent}" collapsed into 424 executable actions across 15 sectors.`);
+        // "Собрать медицинский архив в моем районе" -> rust-core самостоятельно распределит нагрузку
+        const res = schedulerRef.current.distribute_global_intent(globalIntent, Math.floor(Math.random() * 20) + 5, Math.floor(Math.random() * 50) + 10);
+        setIntentStatus(res);
         setGlobalIntent('');
         setIsAlert(true);
         setTimeout(() => setIsAlert(false), 800);

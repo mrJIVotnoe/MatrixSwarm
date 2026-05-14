@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity } from 'lucide-react';
+import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity, Share2 } from 'lucide-react';
+import { WasmGlobalKnowledge } from '../core/wasm_bridge';
 
 // ... other constants ...
 const ZIM_LIBRARIES = [
   { id: 'wiki_ru_all_maxi', name: 'Wikipedia (RU) - Maxi', size: '38.2 GB', seeds: 142, status: 'available', progress: 0 },
   { id: 'wiki_en_all_nopic', name: 'Wikipedia (EN) - No Pics', size: '45.1 GB', seeds: 890, status: 'available', progress: 0 },
   { id: 'math_stackexchange', name: 'Mathematics StackExchange', size: '4.2 GB', seeds: 56, status: 'available', progress: 0 },
-  { id: 'med_board_survival', name: 'Field Medicine & Survival', size: '1.8 GB', seeds: 312, status: 'available', progress: 0 },
+  { id: 'medicine_survival', name: 'Field Medicine & Survival', size: '1.8 GB', seeds: 312, status: 'available', progress: 0 },
   { id: 'ifitxer_sec_audit', name: 'SecTools & OpSec Manuals', size: '0.8 GB', seeds: 1045, status: 'downloaded', progress: 100 } // Pre-downloaded for demo
 ];
 
@@ -24,8 +25,15 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
   const [viewMode, setViewMode] = useState<'manager' | 'reader'>('manager');
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [sandboxLog, setSandboxLog] = useState<string | null>(null);
+  const [pollinationLog, setPollinationLog] = useState<string | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
+
+  const handlePollinate = (knowledgeType: string) => {
+     // Simulating node role 'Magistrate' for demo
+     const rs = WasmGlobalKnowledge.pollinateCriticalKnowledge(knowledgeType, 'Magistrate');
+     setPollinationLog(`[L5 RK] ${rs}`);
+  };
 
   useEffect(() => {
     // Initialize Web Worker for Sandboxing archive reads (L4/L5 Isolation)
@@ -118,55 +126,75 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
       <div className="flex-1 overflow-hidden flex flex-col pt-2">
         {viewMode === 'manager' && (
           <div className="h-full flex flex-col space-y-4">
-             <div className="bg-emerald-950/30 border border-emerald-500/20 p-4 shrink-0">
-                <div className="flex items-center gap-4 text-emerald-400 mb-2">
+             <div className="bg-emerald-950/30 border border-emerald-500/20 p-4 shrink-0 flex flex-col gap-2">
+                <div className="flex items-center gap-4 text-emerald-400">
                   <Database className="w-5 h-5 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm font-bold">РАСПРЕДЕЛЕННОЕ ХРАНИЛИЩЕ</p>
                     <p className="text-xs text-emerald-600">Загрузка ZIM-архивов происходит через P2P-сеть Роя. После загрузки интернет не требуется.</p>
                   </div>
                 </div>
+                {pollinationLog && (
+                   <div className="text-[10px] text-yellow-400 font-mono mt-2 break-all bg-yellow-900/20 p-2 border border-yellow-500/20">
+                      {pollinationLog}
+                   </div>
+                )}
              </div>
              
              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                {libraries.map(lib => (
-                 <div key={lib.id} className="bg-slate-900/40 border border-emerald-500/20 p-4 flex items-center justify-between">
-                   <div className="flex-1">
-                     <h3 className="text-sm font-bold text-emerald-400">{lib.name}</h3>
-                     <div className="flex items-center gap-4 text-xs text-emerald-600 mt-1">
-                       <span className="flex items-center gap-1"><HardDrive className="w-3 h-3" /> {lib.size}</span>
-                       <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> {lib.seeds} Seeds</span>
+                 <div key={lib.id} className="bg-slate-900/40 border border-emerald-500/20 p-4 flex flex-col">
+                   <div className="flex items-center justify-between mb-2">
+                     <div className="flex-1">
+                       <h3 className="text-sm font-bold text-emerald-400">{lib.name}</h3>
+                       <div className="flex items-center gap-4 text-xs text-emerald-600 mt-1">
+                         <span className="flex items-center gap-1"><HardDrive className="w-3 h-3" /> {lib.size}</span>
+                         <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> {lib.seeds} Seeds</span>
+                       </div>
+                     </div>
+                     
+                     <div className="w-1/3 flex items-center justify-end">
+                       {lib.status === 'available' && (
+                         <button 
+                           onClick={() => startDownload(lib.id)}
+                           className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold transition-colors"
+                         >
+                           <Download className="w-4 h-4" /> ЗАГРУЗИТЬ
+                         </button>
+                       )}
+                       
+                       {lib.status === 'downloading' && (
+                         <div className="w-full max-w-[150px]">
+                           <div className="flex justify-between text-[10px] text-emerald-400 mb-1">
+                             <span>ЗАГРУЗКА ИЗ РОЯ</span>
+                             <span>{Math.floor(lib.progress)}%</span>
+                           </div>
+                           <div className="h-1 bg-emerald-950 overflow-hidden">
+                             <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${lib.progress}%` }}></div>
+                           </div>
+                         </div>
+                       )}
+                       
+                       {lib.status === 'downloaded' && (
+                         <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                           <CheckCircle2 className="w-4 h-4" /> ЛОКАЛЬНО
+                         </div>
+                       )}
                      </div>
                    </div>
                    
-                   <div className="w-1/3 flex items-center justify-end">
-                     {lib.status === 'available' && (
-                       <button 
-                         onClick={() => startDownload(lib.id)}
-                         className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold transition-colors"
-                       >
-                         <Download className="w-4 h-4" /> ЗАГРУЗИТЬ
-                       </button>
-                     )}
-                     
-                     {lib.status === 'downloading' && (
-                       <div className="w-full max-w-[150px]">
-                         <div className="flex justify-between text-[10px] text-emerald-400 mb-1">
-                           <span>ЗАГРУЗКА ИЗ РОЯ</span>
-                           <span>{Math.floor(lib.progress)}%</span>
-                         </div>
-                         <div className="h-1 bg-emerald-950 overflow-hidden">
-                           <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${lib.progress}%` }}></div>
-                         </div>
-                       </div>
-                     )}
-                     
-                     {lib.status === 'downloaded' && (
-                       <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                         <CheckCircle2 className="w-4 h-4" /> ЛОКАЛЬНО
-                       </div>
-                     )}
-                   </div>
+                   {lib.status === 'downloaded' && lib.id === 'medicine_survival' && (
+                      <div className="mt-2 pt-2 border-t border-emerald-500/10 flex justify-end">
+                        <button 
+                          onClick={() => handlePollinate('medicine')}
+                          className="flex items-center gap-2 text-[10px] text-yellow-500 border border-yellow-500/30 px-3 py-1 hover:bg-yellow-500/10 transition-colors"
+                          title="Магистраты: Распределить через акустический набат"
+                        >
+                          <Share2 className="w-3 h-3" />
+                          АВТО-РАСПЫЛЕНИЕ (POLLINATE)
+                        </button>
+                      </div>
+                   )}
                  </div>
                ))}
              </div>

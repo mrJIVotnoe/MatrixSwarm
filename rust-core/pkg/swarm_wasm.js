@@ -14,7 +14,9 @@ export const IdentityCore = {
   },
   soul_migration: (o, n, k) => {
     return { old_node_id: "WASM", new_node_id: "WASM", migrated_karma: k, signature: "SIG" };
-  }
+  },
+  export_legacy_container: (p, k, isGuard) => `ENCRYPTED_LEGACY_CONTAINER[mock]`,
+  import_legacy_container: (enc, newPhrase) => ({ original_node_id: "OLD", new_node_id: "NEW", restored_karma: 100, restored_guard_status: true, verification: "SUCCESS" })
 };
 
 export const AikidoCore = {
@@ -145,7 +147,7 @@ export const ReverseStarlink = {
 };
 
 export const PlanetaryShield = {
-  analyze_seismic_activity: (sensor_batch_json) => {
+  analyze_seismic_activity: (sensor_batch_json, node_location_hash) => {
     return "STABLE";
   }
 };
@@ -157,8 +159,49 @@ export const GlobalKnowledge = {
   },
   recover_from_abyss: (available_shards, total_shards) => {
     return (available_shards / total_shards >= 0.01) ? "RECOVERY_SUCCESSFUL_VIA_FOUNTAIN_CODES" : "CRITICAL_DATA_LOSS_SEEKING_ACOUSTIC_PEERS";
+  },
+  pollinate_critical_knowledge: (knowledge_type, node_role) => {
+    if (node_role === "Magistrate" || node_role === "Guard") {
+      return ["medicine", "survival", "water_purification"].includes(knowledge_type) ? 
+        `EXTRACTING_AND_BROADCASTING_${knowledge_type.toUpperCase()}_VIA_ACOUSTIC_NABAT` : "KNOWLEDGE_TYPE_LOW_PRIORITY_FOR_POLLINATION";
+    }
+    return "ONLY_MAGISTRATES_CAN_POLLINATE";
   }
 };
+
+export class TaskScheduler {
+  constructor() {
+    this.tasks = {};
+    this.heartbeats = {};
+  }
+  assign_task(id, node_id, payload, current_time) {
+    this.tasks[id] = { assigned_to: node_id, payload, deadline: current_time + 5000 };
+    this.heartbeats[node_id] = current_time;
+  }
+  receive_heartbeat(node_id, current_time) {
+    this.heartbeats[node_id] = current_time;
+  }
+  check_reincarnation(current_time, fallback_node) {
+    let reincarnated = [];
+    for (const [task_id, state] of Object.entries(this.tasks)) {
+      const last_hb = this.heartbeats[state.assigned_to] || 0;
+      if (current_time - last_hb > 5000) {
+        state.assigned_to = fallback_node;
+        state.deadline = current_time + 5000;
+        reincarnated.push(task_id);
+      }
+    }
+    return reincarnated.join(",");
+  }
+  distribute_global_intent(intent, num_recruits, num_scouts) {
+    const required_tasks = num_recruits + num_scouts;
+    if (required_tasks === 0) return "GLOBAL_INTENT_QUEUED_AWAITING_NODES";
+    let plan = [];
+    if (num_recruits > 0) plan.push(`Assigned ${num_recruits} P2P storage sub-tasks to Recruits.`);
+    if (num_scouts > 0) plan.push(`Assigned ${num_scouts} physical network scanning sub-tasks to Scouts.`);
+    return `INTENT_ACCEPTED: [${intent}]. ${plan.join(" ")}`;
+  }
+}
 
 export class TrustEngine {
   constructor() {

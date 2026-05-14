@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, Hexagon, Radio } from 'lucide-react';
+import { Globe, Hexagon, Radio, Activity } from 'lucide-react';
+import { WasmPlanetaryShield } from '../core/wasm_bridge';
 
 interface HexCell {
   cell_id: string;
@@ -11,6 +12,7 @@ interface HexCell {
 
 export const PlanetaryGrid: React.FC = () => {
   const [cells, setCells] = useState<HexCell[]>([]);
+  const [seismicAlarm, setSeismicAlarm] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCells = async () => {
@@ -24,12 +26,45 @@ export const PlanetaryGrid: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+     // L3 - Planetary Proprioception (Accelerometer reading simulation)
+     const i = setInterval(() => {
+        if (Math.random() > 0.85) {
+            // Simulate 15 devices in the same location reporting vibration
+            const batch = Array.from({length: 15}).map((_, idx) => ({
+                 node_id: `node_${idx}`,
+                 accel_x: Math.random() * 2 + (Math.random() > 0.5 ? 1.5 : 0), // Occasional spikes
+                 accel_y: Math.random() * 2 + (Math.random() > 0.5 ? 1.5 : 0),
+                 accel_z: Math.random() * 2 + (Math.random() > 0.5 ? 1.5 : 0),
+                 timestamp: Date.now()
+            }));
+            const res = WasmPlanetaryShield.analyzeSeismicActivity(JSON.stringify(batch), "8h9b");
+            if (res.includes("NABAT")) {
+                setSeismicAlarm(res);
+                setTimeout(() => setSeismicAlarm(null), 5000);
+            }
+        }
+     }, 3000);
+     return () => clearInterval(i);
+  }, []);
+
   return (
-    <div className="bg-slate-900 border border-purple-500/30 p-5 rounded-sm">
-      <h2 className="text-sm font-bold mb-4 flex items-center gap-2 text-purple-400 uppercase">
+    <div className={`bg-slate-900 border p-5 rounded-sm transition-colors ${seismicAlarm ? 'border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)]' : 'border-purple-500/30'}`}>
+      <h2 className={`text-sm font-bold mb-4 flex items-center gap-2 uppercase ${seismicAlarm ? 'text-red-500' : 'text-purple-400'}`}>
         <Globe className="w-4 h-4" />
         Планетарная Сетка (Обратный StarLink)
       </h2>
+      
+      {seismicAlarm && (
+         <div className="p-3 mb-4 bg-red-950/80 border border-red-500 font-mono text-xs text-red-400 animate-pulse flex items-center gap-2">
+            <Activity className="w-4 h-4 text-red-500 shrink-0" />
+            <div className="flex flex-col gap-1">
+               <span className="font-bold text-[10px]">SEISMIC ANOMALY DETECTED</span>
+               <span className="break-words">{seismicAlarm}</span>
+            </div>
+         </div>
+      )}
+      
       <div className="grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
         {cells.length === 0 ? (
           <p className="text-[10px] text-purple-900 italic">Сбор геоданных...</p>
