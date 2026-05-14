@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity } from 'lucide-react';
 
+// ... other constants ...
 const ZIM_LIBRARIES = [
   { id: 'wiki_ru_all_maxi', name: 'Wikipedia (RU) - Maxi', size: '38.2 GB', seeds: 142, status: 'available', progress: 0 },
   { id: 'wiki_en_all_nopic', name: 'Wikipedia (EN) - No Pics', size: '45.1 GB', seeds: 890, status: 'available', progress: 0 },
@@ -22,6 +23,28 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<'manager' | 'reader'>('manager');
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
+  const [sandboxLog, setSandboxLog] = useState<string | null>(null);
+
+  const workerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    // Initialize Web Worker for Sandboxing archive reads (L4/L5 Isolation)
+    workerRef.current = new Worker(new URL('../workers/sandboxWorker.ts', import.meta.url), { type: 'module' });
+    
+    workerRef.current.onmessage = (e) => {
+       if (e.data.type === 'ZIM_QUERY_RESULT') {
+          setSandboxLog(e.data.result);
+          // Set real results (simulated mapping)
+          setSearchResults(MOCK_ARTICLES.filter(a => 
+            a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            a.abstract.toLowerCase().includes(searchQuery.toLowerCase())
+          ));
+          setIsSearching(false);
+       }
+    };
+    
+    return () => workerRef.current?.terminate();
+  }, [searchQuery]);
 
   const startDownload = (id: string) => {
     setLibraries(libs => libs.map(lib => 
@@ -52,15 +75,18 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
     setIsSearching(true);
     setViewMode('reader');
     setSelectedArticle(null);
+    setSandboxLog(null);
     
-    // Simulate local search latency
-    setTimeout(() => {
-      setSearchResults(MOCK_ARTICLES.filter(a => 
-        a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        a.abstract.toLowerCase().includes(searchQuery.toLowerCase())
-      ));
-      setIsSearching(false);
-    }, 800);
+    // Dispatch query to isolated Web Worker
+    if (workerRef.current) {
+        workerRef.current.postMessage({
+           type: 'EXECUTE_ZIM_QUERY',
+           payload: { query: searchQuery },
+           jobId: Date.now()
+        });
+    } else {
+        setIsSearching(false);
+    }
   };
 
   return (
@@ -168,8 +194,14 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
               <div className="flex-1 overflow-hidden flex bg-slate-900/20 border border-emerald-500/20">
                 <div className="w-1/3 border-r border-emerald-500/20 overflow-y-auto custom-scrollbar p-2 space-y-2">
                   <div className="text-[10px] text-emerald-600 mb-2 pl-2">
-                    {isSearching ? 'ПОИСК В ZIM...' : (searchResults.length > 0 ? `НАЙДЕНО: ${searchResults.length}` : 'НЕТ РЕЗУЛЬТАТОВ')}
+                    {isSearching ? 'ПОИСК В ZIM В ПЕСОЧНИЦЕ...' : (searchResults.length > 0 ? `НАЙДЕНО: ${searchResults.length}` : 'НЕТ РЕЗУЛЬТАТОВ')}
                   </div>
+                  
+                  {sandboxLog && (
+                    <div className="mx-2 mb-2 p-2 bg-emerald-950/40 border border-emerald-500/20 text-[9px] text-emerald-500/80 break-words">
+                      [WORKER_SANDBOX]: {sandboxLog}
+                    </div>
+                  )}
                   
                   {isSearching ? (
                      <div className="p-4 flex flex-col items-center justify-center text-emerald-500/50 space-y-4">

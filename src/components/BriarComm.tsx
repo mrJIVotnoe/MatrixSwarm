@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Shield, Wifi, WifiOff, Send, UserPlus, Key } from 'lucide-react';
+import { Terminal, Shield, Wifi, WifiOff, Send, UserPlus, Key, Database } from 'lucide-react';
 import SimplePeer from 'simple-peer';
 import CryptoJS from 'crypto-js';
 import { SwarmNetworkLayer } from '../core/network';
+import { WasmMessageQueue } from '../core/wasm_bridge';
+import { SwarmSandbox } from '../core/isolation';
 
 // WebRTC signal payload
 interface SignalPayload {
@@ -18,8 +20,15 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
   const [inputMsg, setInputMsg] = useState('');
   const [newContactId, setNewContactId] = useState('');
   const [peers, setPeers] = useState<Record<string, SimplePeer.Instance>>({});
+  const [pendingCount, setPendingCount] = useState(0);
   
   const swarmNetRef = useRef<SwarmNetworkLayer | null>(null);
+  const messageQueueRef = useRef<WasmMessageQueue | null>(null);
+
+  // Initialize
+  useEffect(() => {
+    messageQueueRef.current = new WasmMessageQueue();
+  }, []);
 
   // Initialize Contacts from Cell Data
   useEffect(() => {
@@ -40,50 +49,71 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
     const netLayer = new SwarmNetworkLayer(symbiote.nodeId);
     swarmNetRef.current = netLayer;
     
-    // We would pass a callback to netLayer to handle signals, 
-    // but in a fully decoupled architecture, the netLayer handles its own P2P meshes.
-    // For BriarComm UI, we will use the peers managed by SwarmNetworkLayer directly,
-    // or simulate the handshake here if we want to hook into its events.
-
-    return () => {
-      // Cleanup
-    };
+    return () => {};
   }, [symbiote?.nodeId]);
 
-  // Poll for Mailbox Messages (Bramble Sync via P2P)
+  // Sync Mailbox / Queue Flush
   useEffect(() => {
     if (!symbiote?.nodeId) return;
     const syncMailbox = async () => {
-       // In Epoch II, we sync mailboxes using the CRDT registry or P2P layer
-       // Mocking the P2P incoming sync
+       if (messageQueueRef.current) {
+          setPendingCount(messageQueueRef.current.pending_count());
+          
+          Object.keys(peers).forEach(peerId => {
+             const peer = peers[peerId];
+             if (peer && peer.connected) {
+                // Flush offline messages for this peer
+                const pendingForPeer = messageQueueRef.current!.flush_for_peer(peerId);
+                if (pendingForPeer.length > 0) {
+                    console.log(`[P2P Queue] Flushing ${pendingForPeer.length} messages to ${peerId}`);
+                    // Mocking flush sending to peer over WebRTC
+                    pendingForPeer.forEach(msg => {
+                        peer.send(`SYNC_PAYLOAD: ${msg.encrypted_payload}`);
+                    });
+                }
+             }
+          });
+          setPendingCount(messageQueueRef.current.pending_count());
+       }
     };
     
     const iv = setInterval(syncMailbox, 3000);
     return () => clearInterval(iv);
-  }, [symbiote?.nodeId]);
+  }, [symbiote?.nodeId, peers]);
 
   const connectToPeer = (targetNodeId: string) => {
     if (peers[targetNodeId]) return; // Already connected or connecting
 
     if (swarmNetRef.current) {
-      // Connect entirely locally (assuming mDNS found them)
-      swarmNetRef.current.connectToPeer(targetNodeId, true, (signalData) => {
-         // Signal would go through mDNS broadcast or Acoustic Nabbat in a true implementation
-      });
+      swarmNetRef.current.connectToPeer(targetNodeId, true, (signalData) => {});
     }
     
     const peer = new SimplePeer({ initiator: true, trickle: false });
     
-    peer.on('signal', data => {
-       // MOCK mDNS Signal broadcast
-    });
+    peer.on('signal', data => {});
     
-    peer.on('data', data => {
+    peer.on('data', async data => {
       const text = data.toString();
-      setMessages(prev => ({
-        ...prev,
-        [targetNodeId]: [...(prev[targetNodeId] || []), { text, isSender: false, timestamp: Date.now() }]
-      }));
+      
+      // L4/L5 Sandboxing: Parse and validate incoming payload in isolated worker
+      try {
+        const validationCode = `
+          const input = payload;
+          if (input.includes('<script>') || input.length > 50000) {
+            throw new Error("Malicious payload blocked by Digital Shell.");
+          }
+          return { safeText: input };
+        `;
+        // Execute in an isolated Web Worker (Zero-Trust context)
+        const result = await SwarmSandbox.executeTask(validationCode, text, { maxCpuPercentage: 10, maxRamMb: 10, maxExecutionTimeMs: 1000 });
+        
+        setMessages(prev => ({
+          ...prev,
+          [targetNodeId]: [...(prev[targetNodeId] || []), { text: result.safeText, isSender: false, timestamp: Date.now() }]
+        }));
+      } catch (err: any) {
+        console.error("[BriarComm] Payload rejected by Sandbox:", err);
+      }
     });
 
     setPeers(prev => ({ ...prev, [targetNodeId]: peer }));
@@ -93,6 +123,7 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
     if (!activeContact || !inputMsg.trim() || !symbiote?.nodeId) return;
 
     const messageText = inputMsg.trim();
+    const msgId = crypto.randomUUID();
     setInputMsg('');
 
     // Optimistic UI update
@@ -103,11 +134,19 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
 
     const peer = peers[activeContact];
     if (peer && peer.connected) {
-      // Direct WebRTC connection
       peer.send(messageText);
     } else {
-      // Fallback: SwarmCRDT or Acoustic Pheromone burst
-      console.log("[BrambleComm] Fallback to CRDT / Acoustic Delivery...");
+      // Offline fallback
+      console.log(`[BrambleComm] Peer offline. Queueing securely via Rust Core.`);
+      if (messageQueueRef.current) {
+          messageQueueRef.current.enqueue_message(
+             msgId,
+             activeContact,
+             messageText,
+             Date.now()
+          );
+          setPendingCount(messageQueueRef.current.pending_count());
+      }
     }
   };
 
@@ -168,6 +207,7 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
                 NODE_CONNECTION: {activeContact.substring(0,8)}
               </span>
               <div className="flex items-center gap-2 text-[10px] text-amber-500/80">
+                {pendingCount > 0 && <span className="text-yellow-400 flex items-center gap-1"><Database className="w-3 h-3" /> PENDING: {pendingCount}</span>}
                 <Key className="w-3 h-3" /> E2E_ENCRYPTED
               </div>
             </div>

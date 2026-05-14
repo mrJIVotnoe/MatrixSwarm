@@ -9,6 +9,21 @@ export const ObserverHUD: React.FC = () => {
   const [particles, setParticles] = useState(Array.from({ length: 42 }).map((_, i) => i));
   const [isAlert, setIsAlert] = useState(false);
   const [deadSectors, setDeadSectors] = useState<number[]>([]);
+  const [globalIntent, setGlobalIntent] = useState('');
+  const [intentStatus, setIntentStatus] = useState<string | null>(null);
+
+  const handleGlobalIntent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!globalIntent.trim()) return;
+    setIntentStatus("Dispersing intent via Probability Waves... Magistrates analyzing task.");
+    
+    setTimeout(() => {
+        setIntentStatus(`Intent "${globalIntent}" collapsed into 424 executable actions across 15 sectors.`);
+        setGlobalIntent('');
+        setIsAlert(true);
+        setTimeout(() => setIsAlert(false), 800);
+    }, 2500);
+  };
 
   // Simulating probability wave particles and planetary anchors
   useEffect(() => {
@@ -177,18 +192,43 @@ export const ObserverHUD: React.FC = () => {
         )}
       </div>
       
-      <div className="mt-4 grid grid-cols-3 gap-4 text-xs font-mono text-center">
+      <div className="mt-4 grid grid-cols-4 gap-4 text-xs font-mono text-center">
+        <div className="col-span-4 mb-2">
+            <form onSubmit={handleGlobalIntent} className="flex flex-col gap-2 bg-black/60 border border-cyan-900/50 p-3 rounded">
+               <div className="flex justify-between text-cyan-400 font-bold mb-1">
+                 <span>GLOBAL INTENT (EYE OF GOD)</span>
+                 <span className="text-yellow-400/80 uppercase text-[10px] tracking-widest">{intentStatus ? "ACTIVE" : "AWAITING"}</span>
+               </div>
+               <div className="flex gap-2">
+                 <input 
+                   type="text" 
+                   value={globalIntent}
+                   onChange={e => setGlobalIntent(e.target.value)}
+                   className="flex-1 bg-black/80 border border-blue-900/50 outline-none px-3 py-2 text-cyan-200 placeholder-blue-900/70"
+                   placeholder="e.g. Gather air quality telemetry in Sector 4..."
+                 />
+                 <button type="submit" className="bg-cyan-900/50 hover:bg-cyan-800 text-cyan-300 px-4 py-2 border border-cyan-700/50 transition-colors">
+                    TRANSMIT
+                 </button>
+               </div>
+               {intentStatus && <div className="text-left text-green-400 mt-2 animate-pulse">{intentStatus}</div>}
+            </form>
+        </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
            <span className="text-gray-500 block">RUST METRIC</span>
-           <span className="text-green-400">92% NATIVE</span>
+           <span className="text-green-400">99% NATIVE</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">REDUNDANCY [L4]</span>
-           <span className="text-cyan-400">MIRRORED (SURVIVES 95% LOSS)</span>
+           <span className="text-gray-500 block">KNOWLEDGE HONEY</span>
+           <span className="text-cyan-400">100% RECOVERABLE (1% NODES)</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">ACOUSTIC BACKBONE</span>
-           <span className="text-yellow-400">REVERSE STARLINK ACTIVE</span>
+           <span className="text-gray-500 block">PLANETARY SHIELD</span>
+           <span className="text-yellow-400">SEISMIC SENSORS ACTIVE</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
+           <span className="text-gray-500 block">LEGACY</span>
+           <span className="text-purple-400">SOUL MIGRATION READY</span>
         </div>
       </div>
     </div>

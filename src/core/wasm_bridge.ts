@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -83,6 +83,15 @@ export const WasmReverseStarlink = {
   triangulatePosition: (beaconsJson: string) => ReverseStarlink.triangulate_position(beaconsJson)
 };
 
+export const WasmPlanetaryShield = {
+  analyzeSeismicActivity: (sensorBatchJson: string) => PlanetaryShield.analyze_seismic_activity(sensorBatchJson)
+};
+
+export const WasmGlobalKnowledge = {
+  ingestArchive: (archiveName: string, rawDataSizeMb: number) => GlobalKnowledge.ingest_archive(archiveName, rawDataSizeMb),
+  recoverFromAbyss: (availableShards: number, totalShards: number) => GlobalKnowledge.recover_from_abyss(availableShards, totalShards)
+};
+
 export { CrdtRegister };
 
 // -----------------------------------------------------
@@ -90,30 +99,26 @@ export { CrdtRegister };
 // -----------------------------------------------------
 
 export class WasmTrustEngine {
-  private karmic_score = 0;
-  private is_hardware_verified = false;
+  private inner: TrustEngine;
 
-  constructor() {}
+  constructor() {
+    this.inner = new TrustEngine();
+  }
 
   verify_hardware(signature: string): boolean {
-    if (signature.length > 10) {
-      this.is_hardware_verified = true;
-      return true;
-    }
-    return false;
+    return this.inner.verify_hardware(signature);
   }
 
   add_karma(amount: number) {
-    this.karmic_score += amount;
+    this.inner.add_karma(amount);
   }
 
   get_level(): TrustLevel {
-    if (this.karmic_score < 0) return TrustLevel.TRAITOR;
-    if (!this.is_hardware_verified) return TrustLevel.QUARANTINE;
+    return this.inner.get_level() as unknown as TrustLevel;
+  }
 
-    if (this.karmic_score < 100) return TrustLevel.RECRUIT;
-    if (this.karmic_score < 1000) return TrustLevel.ADEPT;
-    return TrustLevel.MAGISTRATE;
+  check_physical_link(isUsbConnected: boolean): boolean {
+    return this.inner.check_physical_link(isUsbConnected);
   }
 }
 
@@ -185,3 +190,26 @@ export const WasmCovertOps = {
     return true;
   }
 };
+
+export class WasmMessageQueue {
+  private inner: MessageQueue;
+
+  constructor() {
+    this.inner = new MessageQueue();
+  }
+
+  enqueue_message(id: string, recipient_id: string, payload: string, timestamp: number) {
+    // Note: Rust takes u64, sending number (f64 in JS) is fine, it maps to bigints/numbers automatically with wasm-bindgen
+    this.inner.enqueue_message(id, recipient_id, payload, BigInt(timestamp) as any);
+  }
+
+  flush_for_peer(peer_id: string): any[] {
+    const json = this.inner.flush_for_peer(peer_id);
+    return JSON.parse(json);
+  }
+  
+  pending_count(): number {
+    return this.inner.pending_count();
+  }
+}
+

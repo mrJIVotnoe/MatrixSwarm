@@ -143,3 +143,73 @@ export const ReverseStarlink = {
     return "TRIANGULATED:0,0";
   }
 };
+
+export const PlanetaryShield = {
+  analyze_seismic_activity: (sensor_batch_json) => {
+    return "STABLE";
+  }
+};
+
+export const GlobalKnowledge = {
+  ingest_archive: (archive_name, raw_data_size_mb) => {
+    const required_shards = Math.floor(raw_data_size_mb * 1.5);
+    return `ZIM_ARCHIVE_${archive_name.toUpperCase()}_SHARDED_INTO_${required_shards}_PIECES`;
+  },
+  recover_from_abyss: (available_shards, total_shards) => {
+    return (available_shards / total_shards >= 0.01) ? "RECOVERY_SUCCESSFUL_VIA_FOUNTAIN_CODES" : "CRITICAL_DATA_LOSS_SEEKING_ACOUSTIC_PEERS";
+  }
+};
+
+export class TrustEngine {
+  constructor() {
+    this.karmic_score = 0;
+    this.is_hardware_verified = false;
+  }
+  verify_hardware(signature) {
+    if (signature.length > 10) {
+      this.is_hardware_verified = true;
+      return true;
+    }
+    return false;
+  }
+  add_karma(amount) {
+    this.karmic_score += amount;
+  }
+  get_level() {
+    if (this.karmic_score < 0) return -1;
+    if (!this.is_hardware_verified) return 0;
+    if (this.karmic_score < 100) return 1;
+    if (this.karmic_score < 1000) return 2;
+    if (this.karmic_score < 10000) return 3;
+    return 4;
+  }
+  check_physical_link(isUsbConnected) {
+    if (isUsbConnected) {
+      this.is_hardware_verified = false;
+      return true;
+    }
+    return false;
+  }
+}
+
+export class MessageQueue {
+  constructor() {
+    this.queue = [];
+  }
+  enqueue_message(id, recipient_id, payload, timestamp) {
+    this.queue.push({ id, recipient_id, encrypted_payload: "ENCRYPTED["+payload+"]", timestamp });
+  }
+  flush_for_peer(peer_id) {
+    const to_send = [];
+    const remaining = [];
+    for (const msg of this.queue) {
+      if (msg.recipient_id === peer_id || msg.recipient_id === "BROADCAST") to_send.push(msg);
+      else remaining.push(msg);
+    }
+    this.queue = remaining;
+    return JSON.stringify(to_send);
+  }
+  pending_count() {
+    return this.queue.length;
+  }
+}

@@ -4,7 +4,7 @@ import { SwarmSandbox, ResourceQuotas } from '../core/isolation';
 import { PermissionEngine, PermissionScope } from '../core/permissions';
 import { IntegrityGuard } from '../core/integrity';
 import { MagistrateBridge } from './magistrate';
-import { WasmTrustEngine, WasmAikidoMath, TrustLevel } from '../core/wasm_bridge';
+import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore } from '../core/wasm_bridge';
 
 export type SymbioteStatus = 
   | "sleeping" 

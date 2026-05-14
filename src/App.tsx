@@ -21,7 +21,7 @@ import { UserOnboarding } from './components/UserOnboarding';
 import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
 import { ObserverHUD } from './components/ObserverHUD';
-import { deriveId, getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
+import { getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from './core/i18n';
@@ -203,7 +203,7 @@ function MainDashboard() {
          try {
             if (await validateSeedPhrase(passport)) {
                const keys = await getKeysFromSeed(passport);
-               const id = await deriveId(keys.publicKey);
+               const id = keys.nodeId;
                localStorage.setItem('observerId', id);
                setObserverId(id);
             } else {

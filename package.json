@@ -77,7 +77,6 @@
     "vite": "^6.2.0",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.6.0",
-    "vitest": "^4.1.4",
-    "wasm-pack": "^0.14.0"
+    "vitest": "^4.1.4"
   }
 }

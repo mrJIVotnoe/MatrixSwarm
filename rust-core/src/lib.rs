@@ -1,15 +1,11 @@
 use wasm_bindgen::prelude::*;
 
-mod identity;
-mod trust;
-mod scheduler;
-mod aikido;
-mod stegano;
-
 mod network;
 mod sandbox;
 mod swarm_core;
 mod identity;
+mod trust;
+mod scheduler;
 mod aikido;
 mod acoustic_dsp;
 mod swarm_network;
@@ -18,8 +14,12 @@ mod holographic_core;
 mod visual_kinopsis;
 mod caste;
 mod crdt;
+mod stegano;
 
 mod reverse_starlink;
+mod planetary_shield;
+mod global_knowledge;
+mod p2p_queue;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {

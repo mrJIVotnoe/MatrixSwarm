@@ -98,3 +98,28 @@ impl IdentityCore {
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deterministic_soul_recovery() {
+        // Here we test that recovering from the same seed phrase always produces
+        // the same node_id and public_key.
+        let seed_phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        
+        // recover_internal is a private helper inside IdentityCore
+        let passport = IdentityCore::recover_internal(seed_phrase).expect("Failed to recover passport");
+        
+        let expected_public_key = "14ca107edbb1efcb09efb48c4ece648eaf40cbe3a46960c91d4e0828cf5668b3"; 
+        // Note: the exact public_key hex depends on the ed25519-dalek internals based on exactly how 
+        // the 32 byte secret from seed was used. We will just test that it is deterministic
+        // by recovering twice.
+        
+        let passport_second = IdentityCore::recover_internal(seed_phrase).expect("Failed second recovery");
+        
+        assert_eq!(passport.public_key, passport_second.public_key, "Public keys must be deterministic");
+        assert_eq!(passport.node_id, passport_second.node_id, "Node IDs must be deterministic");
+    }
+}

@@ -4,11 +4,12 @@ use serde::{Serialize, Deserialize};
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum TrustLevel {
+    Traitor = -1,
     Quarantine = 0,
     Recruit = 1,
     Adept = 2,
-    Magistrate = 3,
-    Traitor = -1,
+    Guard = 3,
+    Magistrate = 4,
 }
 
 #[wasm_bindgen]
@@ -42,6 +43,7 @@ impl TrustEngine {
         match self.karmic_score {
             0..=99 => TrustLevel::Recruit,
             100..=999 => TrustLevel::Adept,
+            1000..=9999 => TrustLevel::Guard,
             _ => TrustLevel::Magistrate,
         }
     }
@@ -60,5 +62,40 @@ impl TrustEngine {
         } else {
             false
         }
+    }
+
+    /// L2 - Immunity: Zero-Trust USB
+    #[wasm_bindgen]
+    pub fn check_physical_link(&mut self, is_usb_connected: bool) -> bool {
+        if is_usb_connected {
+            // "Если система обнаруживает подключение через USB-кабель, trustLevel узла
+            // в памяти Rust должен быть принудительно установлен в 0 (Карантин)"
+            self.is_hardware_verified = false;
+            // "Блокируй любые попытки автоматической синхронизации данных через USB-порты 
+            // до тех пор, пока Пользователь (Наблюдатель) не подтвердит доверие через подпись ключом"
+            return true; // Return true indicating a quarantine block occurred
+        }
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_usb_quarantine() {
+        let mut engine = TrustEngine::new();
+        engine.add_karma(500); // Adept level logic
+        engine.verify_hardware("human-verified-signature");
+        
+        assert_eq!(engine.get_level(), TrustLevel::Adept);
+        
+        // Connect USB
+        let blocked = engine.check_physical_link(true);
+        assert!(blocked);
+        
+        // Level falls to Quarantine (0)
+        assert_eq!(engine.get_level(), TrustLevel::Quarantine);
     }
 }
