@@ -213,3 +213,23 @@ export class MessageQueue {
     return this.queue.length;
   }
 }
+
+export class NativeNetworkLayer {
+  constructor(node_id) {
+    this.node_id = node_id;
+  }
+  initiate_peer_connection(peer_id, on_signal, on_msg) {
+    return;
+  }
+  broadcast_pheromone(payload) {}
+}
+
+export class MessageCRDT {
+  constructor() {
+    this.messages = [];
+  }
+  add_message(id, s, r, p, ts) { this.messages.push({id, s, r, p, ts}); }
+  get_messages_for(r) { return "[]"; }
+  merge_all(s) {}
+  export_all() { return "[]"; }
+}

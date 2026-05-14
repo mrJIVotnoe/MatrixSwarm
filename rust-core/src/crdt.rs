@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[wasm_bindgen]
 pub struct CrdtRegister {
@@ -69,5 +69,76 @@ impl CrdtRegister {
             });
         }
         serde_json::to_string(&serializable_state).unwrap_or_default()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CRDTMessage {
+    pub id: String,
+    pub sender: String,
+    pub recipient: String,
+    pub payload: String,
+    pub timestamp: u64,
+}
+
+#[wasm_bindgen]
+pub struct MessageCRDT {
+    // observed messages (using set of IDs to prevent duplicates)
+    messages: HashMap<String, CRDTMessage>,
+}
+
+#[wasm_bindgen]
+impl MessageCRDT {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> MessageCRDT {
+        MessageCRDT {
+            messages: HashMap::new(),
+        }
+    }
+
+    /// Add a message to the CRDT queue
+    #[wasm_bindgen]
+    pub fn add_message(&mut self, id: &str, sender: &str, recipient: &str, payload: &str, timestamp: u64) {
+        if !self.messages.contains_key(id) {
+            // L4 - Store in memory encrypted queue
+            self.messages.insert(id.to_string(), CRDTMessage {
+                id: id.to_string(),
+                sender: sender.to_string(),
+                recipient: recipient.to_string(),
+                payload: payload.to_string(),
+                timestamp,
+            });
+        }
+    }
+
+    /// Pull messages available for a recipient ("collapse" queue into delivery)
+    #[wasm_bindgen]
+    pub fn get_messages_for(&mut self, recipient: &str) -> String {
+        let mut to_deliver = Vec::new();
+        // Extract messages for the peer
+        for msg in self.messages.values() {
+            if msg.recipient == recipient || msg.recipient == "BROADCAST" {
+                to_deliver.push(msg.clone());
+            }
+        }
+        
+        to_deliver.sort_by_key(|m| m.timestamp);
+        serde_json::to_string(&to_deliver).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Sync internal state with another node's JSON dump
+    #[wasm_bindgen]
+    pub fn merge_all(&mut self, sync_data: &str) {
+        if let Ok(incoming) = serde_json::from_str::<Vec<CRDTMessage>>(sync_data) {
+            for msg in incoming {
+                self.messages.entry(msg.id.clone()).or_insert(msg);
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn export_all(&self) -> String {
+        let all: Vec<&CRDTMessage> = self.messages.values().collect();
+        serde_json::to_string(&all).unwrap_or_else(|_| "[]".to_string())
     }
 }

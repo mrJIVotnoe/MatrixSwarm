@@ -20,6 +20,7 @@ mod reverse_starlink;
 mod planetary_shield;
 mod global_knowledge;
 mod p2p_queue;
+mod network_layer;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {

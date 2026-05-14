@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, MessageCRDT as _MessageCRDT } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -32,9 +32,7 @@ export const WasmAikidoCore = {
   validateMobility: (deviceType: string, distance: number, minutes: number) => AikidoCore.validate_mobility(deviceType, distance, minutes)
 };
 
-export const WasmCasteAutonomy = {
-  determineRole: (metricsJson: string) => CasteAutonomy.determine_role(metricsJson)
-};
+// duplicate removed
 
 export const WasmSwarmNetwork = {
   createPheromonePulse: (nodeId: string, status: string, karma: number, timestamp: number) => 
@@ -212,4 +210,26 @@ export class WasmMessageQueue {
     return this.inner.pending_count();
   }
 }
+
+export class WasmMessageCRDT {
+  private inner: _MessageCRDT;
+  constructor() { this.inner = new _MessageCRDT(); }
+  add_message(id: string, s: string, r: string, p: string, ts: number) { this.inner.add_message(id, s, r, p, BigInt(ts) as any); }
+  get_messages_for(r: string): any[] { return JSON.parse(this.inner.get_messages_for(r)); }
+  merge_all(s: string) { this.inner.merge_all(s); }
+  export_all(): string { return this.inner.export_all(); }
+}
+
+export class WasmNativeNetworkLayer {
+  private inner: _NativeNetworkLayer;
+  constructor(node_id: string) { this.inner = new _NativeNetworkLayer(node_id); }
+  initiate_peer_connection(id: string, cb1: Function, cb2: Function) { this.inner.initiate_peer_connection(id, cb1, cb2); }
+  broadcast_pheromone(p: string) { this.inner.broadcast_pheromone(p); }
+}
+
+export const WasmCasteAutonomy = {
+  determineRole: (metrics: any) => {
+     return CasteAutonomy.determine_role(JSON.stringify(metrics));
+  }
+};
 

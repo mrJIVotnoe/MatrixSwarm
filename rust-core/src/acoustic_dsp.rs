@@ -61,6 +61,37 @@ impl AcousticAnalyzer {
     /// L3 - Acoustic Resurrection: Decode FSK ultrasound payloads
     #[wasm_bindgen]
     pub fn decode_acoustic_payload(samples: &[f32], sample_rate: f32) -> String {
-        "RECOVERED_VIA_SONAR".to_string()
+        // A naive sliding window FSK decoder matching the encode logic
+        let duration_ms = 20.0;
+        let samples_per_window = ((sample_rate * duration_ms) / 1000.0) as usize;
+        if samples_per_window == 0 { return String::new(); }
+        
+        let mut text_bytes: Vec<u8> = Vec::new();
+        
+        let mut i = 0;
+        while i + samples_per_window <= samples.len() {
+            let window = &samples[i..i+samples_per_window];
+            
+            // Find the frequency with highest energy between 18000 and 18000 + 255*50
+            let mut best_byte = 0;
+            let mut max_energy = 0.0;
+            
+            for b_guess in 0..=255 {
+                let test_freq = 18000.0 + (b_guess as f32) * 50.0;
+                let energy = Self::detect_ultrasonic_beacon(window, sample_rate, test_freq);
+                if energy > max_energy {
+                    max_energy = energy;
+                    best_byte = b_guess;
+                }
+            }
+            
+            // basic threshold to ignore noise
+            if max_energy > 0.1 {
+                text_bytes.push(best_byte as u8);
+            }
+            i += samples_per_window;
+        }
+        
+        String::from_utf8_lossy(&text_bytes).to_string()
     }
 }
