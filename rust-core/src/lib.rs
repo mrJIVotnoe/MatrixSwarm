@@ -24,6 +24,7 @@ mod network_layer;
 mod ark_storage;
 mod seismic_sensor;
 mod agent_logic;
+pub mod metrics;
 
 #[cfg(test)]
 mod tests;

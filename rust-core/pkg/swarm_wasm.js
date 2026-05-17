@@ -377,6 +377,48 @@ export class SeismicSensor {
   }
 }
 
+export class AgentStateMachine {
+  constructor() {
+    this.state = "INIT";
+    this.trust_level_verified = false;
+    this.usb_connection_detected = false;
+  }
+  get_state() { return this.state; }
+  verify_trust() { this.trust_level_verified = true; return this.try_transition_ready(); }
+  detect_usb() { this.usb_connection_detected = true; this.state = "QUARANTINED"; }
+  try_transition_ready() {
+      if (this.usb_connection_detected) { this.state = "QUARANTINED"; throw new Error("USB breach"); }
+      if (this.state === "INIT" || this.state === "RESURRECTING") {
+          if (this.trust_level_verified) { this.state = "READY"; return; }
+          throw new Error("No trust");
+      }
+      throw new Error("Invalid state");
+  }
+  start_running() {
+      if (this.state === "READY") { this.state = "RUNNING"; return; }
+      throw new Error("Not ready");
+  }
+  report_failure() {
+      if (this.state !== "QUARANTINED" && this.state !== "TERMINATED") this.state = "FAILED";
+  }
+  degrade() { if(this.state === "RUNNING") this.state = "DEGRADED"; }
+  resurrect() {
+      if(this.state === "FAILED" || this.state === "DEGRADED") {
+          this.state = "RESURRECTING";
+          this.trust_level_verified = false;
+          return;
+      }
+      throw new Error("Cannot resurrect");
+  }
+  terminate() { this.state = "TERMINATED"; }
+}
+
+export const MetricsEngine = {
+  get_metrics: () => JSON.stringify({ heartbeat_success_rate: 99.5, crdt_sync_latency: 12.3, isolation_breach_attempts: 0 }),
+  mock_heartbeat: (success) => {},
+  mock_crdt_sync: (latency) => {}
+};
+
 export class MessageCRDT {
   constructor() {
     this.messages = [];

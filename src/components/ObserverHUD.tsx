@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -11,8 +11,18 @@ export const ObserverHUD: React.FC = () => {
   const [deadSectors, setDeadSectors] = useState<number[]>([]);
   const [globalIntent, setGlobalIntent] = useState('');
   const [intentStatus, setIntentStatus] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState({ heartbeat_success_rate: 0, crdt_sync_latency: 0, isolation_breach_attempts: 0 });
 
   const schedulerRef = useRef(new WasmTaskScheduler());
+
+  useEffect(() => {
+     const interval = setInterval(() => {
+        try {
+            setMetrics(WasmMetricsEngine.get_metrics());
+        } catch(e) {}
+     }, 1000);
+     return () => clearInterval(interval);
+  }, []);
 
     const handleGlobalIntent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,16 +247,16 @@ export const ObserverHUD: React.FC = () => {
             </form>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">RUST METRIC</span>
-           <span className="text-green-400">99% NATIVE</span>
+           <span className="text-gray-500 block">HEARTBEAT SUCCESS</span>
+           <span className="text-green-400">{metrics.heartbeat_success_rate.toFixed(1)}%</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">KNOWLEDGE HONEY</span>
-           <span className="text-cyan-400">100% RECOVERABLE (1% NODES)</span>
+           <span className="text-gray-500 block">CRDT LATENCY</span>
+           <span className="text-cyan-400">{metrics.crdt_sync_latency.toFixed(1)}ms</span>
         </div>
-        <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">PLANETARY SHIELD</span>
-           <span className="text-yellow-400">SEISMIC SENSORS ACTIVE</span>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded" onClick={() => { WasmAgentStateMachine && new WasmAgentStateMachine().detect_usb(); }}>
+           <span className="text-gray-500 block">ISOLATION BREACHES</span>
+           <span className={metrics.isolation_breach_attempts > 0 ? "text-red-400" : "text-yellow-400"}>{metrics.isolation_breach_attempts}</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
            <span className="text-gray-500 block">LEGACY</span>

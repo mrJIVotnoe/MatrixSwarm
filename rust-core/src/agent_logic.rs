@@ -1,6 +1,110 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgentState {
+    INIT,
+    READY,
+    RUNNING,
+    DEGRADED,
+    FAILED,
+    QUARANTINED,
+    RESURRECTING,
+    TERMINATED,
+}
+
+#[wasm_bindgen]
+pub struct AgentStateMachine {
+    state: AgentState,
+    trust_level_verified: bool,
+    usb_connection_detected: bool,
+}
+
+#[wasm_bindgen]
+impl AgentStateMachine {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            state: AgentState::INIT,
+            trust_level_verified: false,
+            usb_connection_detected: false,
+        }
+    }
+
+    pub fn get_state(&self) -> String {
+        format!("{:?}", self.state)
+    }
+
+    pub fn verify_trust(&mut self) -> Result<(), JsValue> {
+        crate::metrics::track_event("verify_trust");
+        self.trust_level_verified = true;
+        self.try_transition_ready()
+    }
+
+    pub fn detect_usb(&mut self) -> Result<(), JsValue> {
+        crate::metrics::track_isolation_breach();
+        crate::metrics::track_event("usb_detected");
+        self.usb_connection_detected = true;
+        self.state = AgentState::QUARANTINED;
+        Ok(())
+    }
+
+    pub fn try_transition_ready(&mut self) -> Result<(), JsValue> {
+        if self.usb_connection_detected {
+            self.state = AgentState::QUARANTINED;
+            return Err(JsValue::from_str("Cannot become ready: UART/USB breach detected. Quarantined."));
+        }
+        if self.state == AgentState::INIT || self.state == AgentState::RESURRECTING {
+            if self.trust_level_verified {
+                self.state = AgentState::READY;
+                Ok(())
+            } else {
+                Err(JsValue::from_str("Trust level not verified"))
+            }
+        } else {
+            Err(JsValue::from_str("Invalid state transition to READY"))
+        }
+    }
+
+    pub fn start_running(&mut self) -> Result<(), JsValue> {
+        crate::metrics::track_event("start_running");
+        if self.state == AgentState::READY {
+            self.state = AgentState::RUNNING;
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Cannot run: not READY"))
+        }
+    }
+
+    pub fn report_failure(&mut self) {
+        crate::metrics::track_event("report_failure");
+        if self.state != AgentState::QUARANTINED && self.state != AgentState::TERMINATED {
+            self.state = AgentState::FAILED;
+        }
+    }
+
+    pub fn degrade(&mut self) {
+         if self.state == AgentState::RUNNING {
+             self.state = AgentState::DEGRADED;
+         }
+    }
+
+    pub fn resurrect(&mut self) -> Result<(), JsValue> {
+         crate::metrics::track_event("resurrect");
+         if self.state == AgentState::FAILED || self.state == AgentState::DEGRADED {
+             self.state = AgentState::RESURRECTING;
+             self.trust_level_verified = false; // requires re-verification
+             Ok(())
+         } else {
+             Err(JsValue::from_str("Can only resurrect from FAILED or DEGRADED state"))
+         }
+    }
+
+    pub fn terminate(&mut self) {
+        self.state = AgentState::TERMINATED;
+    }
+}
+
 #[derive(Serialize)]
 pub struct MicroTask {
     pub id: String,

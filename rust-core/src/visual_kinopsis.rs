@@ -37,16 +37,24 @@ impl VisualKinopsis {
 
     /// L5 - Kinopsis Intelligence: Analyze collective context from multiple nodes in same location
     #[wasm_bindgen]
-    pub fn collective_threat_analysis(threat_logs_json: &str) -> String {
-        let logs: Vec<String> = serde_json::from_str(threat_logs_json).unwrap_or_default();
-        let sos_count = logs.iter().filter(|&l| l == "FLASH_DETECTED_SOS").count();
+    pub fn collective_threat_analysis(threat_logs_json: &str) -> Result<String, JsValue> {
+        let logs_result: Result<Vec<String>, _> = serde_json::from_str(threat_logs_json);
+        match logs_result {
+            Ok(logs) => {
+                let sos_count = logs.iter().filter(|&l| l == "FLASH_DETECTED_SOS").count();
 
-        if sos_count >= 3 {
-            "CRITICAL_LOCKDOWN_ZERO_TRUST".to_string()
-        } else if sos_count > 0 {
-            "ELEVATED_RISK".to_string()
-        } else {
-            "ALL_CLEAR".to_string()
+                if sos_count >= 3 {
+                    Ok("CRITICAL_LOCKDOWN_ZERO_TRUST".to_string())
+                } else if sos_count > 0 {
+                    Ok("ELEVATED_RISK".to_string())
+                } else {
+                    Ok("ALL_CLEAR".to_string())
+                }
+            },
+            Err(e) => {
+                 crate::metrics::track_event(&format!("kinopsis_fault: {}", e));
+                 Err(JsValue::from_str(&format!("Fault isolated in Visual Kinopsis: {}", e)))
+            }
         }
     }
 }

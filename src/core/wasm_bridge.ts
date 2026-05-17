@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkStorage as _ArkStorage, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkStorage as _ArkStorage, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer, AgentStateMachine as _AgentStateMachine, MetricsEngine as _MetricsEngine } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -282,5 +282,24 @@ export const WasmCasteAutonomy = {
   determineRole: (metrics: any) => {
      return CasteAutonomy.determine_role(JSON.stringify(metrics));
   }
+};
+
+export class WasmAgentStateMachine {
+  inner: any;
+  constructor() { this.inner = new _AgentStateMachine(); }
+  get_state(): string { return this.inner.get_state(); }
+  verify_trust() { this.inner.verify_trust(); }
+  detect_usb() { this.inner.detect_usb(); }
+  start_running() { this.inner.start_running(); }
+  report_failure() { this.inner.report_failure(); }
+  degrade() { this.inner.degrade(); }
+  resurrect() { this.inner.resurrect(); }
+  terminate() { this.inner.terminate(); }
+}
+
+export const WasmMetricsEngine = {
+  get_metrics: () => JSON.parse(_MetricsEngine.get_metrics()),
+  mock_heartbeat: (success: boolean) => _MetricsEngine.mock_heartbeat(success),
+  mock_crdt_sync: (latency: number) => _MetricsEngine.mock_crdt_sync(latency)
 };
 
