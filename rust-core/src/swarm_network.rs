@@ -46,7 +46,7 @@ impl SwarmNetwork {
     /// L3: Native Gossip Protocol (mDNS + Acoustic Nabat)
     /// Emulates direct neighbor metadata discovery without signaling server
     #[wasm_bindgen]
-    pub fn trigger_gossip_discovery(local_id: &str) -> String {
+    pub fn trigger_gossip_discovery(_local_id: &str) -> String {
         // Concept: Broadcasts via UDP mDNS and Acoustic FSK 
         // Returning JSON of discovered peers
         let peers = vec![
@@ -70,14 +70,14 @@ impl SwarmNetwork {
 
     /// Store pending WebRTC signaling payloads via P2P Gossip
     #[wasm_bindgen]
-    pub fn gossip_transmit_signal(target: &str, payload_json: &str) {
+    pub fn gossip_transmit_signal(_target: &str, _payload_json: &str) {
         // Rust routes the signal through Intranet (mDNS) or Acoustic Nabat (if Intranet down)
         // No central server involved.
     }
     
     /// Retrieve intercepted gossips destined for us
     #[wasm_bindgen]
-    pub fn gossip_receive_signals(local_id: &str) -> String {
+    pub fn gossip_receive_signals(_local_id: &str) -> String {
         "[]".to_string() // Array of intercept signals
     }
 }

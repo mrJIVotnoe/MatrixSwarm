@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use std::rc::Rc;
 use std::cell::RefCell;
 use web_sys::{RtcPeerConnection, RtcDataChannel, RtcDataChannelInit, MessageEvent};
 
@@ -34,7 +33,7 @@ impl NativeNetworkLayer {
         let pc = RtcPeerConnection::new()?;
         
         let mut dci = RtcDataChannelInit::new();
-        dci.ordered(true);
+        dci.set_ordered(true);
         let channel = pc.create_data_channel_with_data_channel_dict("matrix_swarm", &dci);
         
         // Setup channel onmessage

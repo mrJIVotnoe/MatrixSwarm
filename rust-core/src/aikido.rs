@@ -201,7 +201,7 @@ impl AikidoCore {
 
 
     #[wasm_bindgen]
-    pub fn apply_aikido_penalty(node_id: &str, current_trust: f32, status: &str) -> Result<JsValue, JsValue> {
+    pub fn apply_aikido_penalty(_node_id: &str, current_trust: f32, status: &str) -> Result<JsValue, JsValue> {
         #[derive(Serialize)]
         struct PenaltyResult {
             pub effective_karma: f32,
@@ -286,7 +286,7 @@ impl AikidoCore {
 
     /// L2 - Local bot farm 51% attack detector
     #[wasm_bindgen]
-    pub fn detect_bot_farm(static_nodes: u32, mobile_nodes: u32, total_nodes: u32) -> bool {
+    pub fn detect_bot_farm(static_nodes: u32, _mobile_nodes: u32, total_nodes: u32) -> bool {
         if total_nodes < 10 { return false; }
         // If 80%+ of nodes are acting like static smartphones
         let static_ratio = static_nodes as f32 / total_nodes as f32;

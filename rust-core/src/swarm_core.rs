@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[wasm_bindgen]
 pub struct SwarmCore {
@@ -40,7 +40,7 @@ impl SwarmCore {
 
     /// Heavy Compute Allocation (Prime / PoW)
     #[wasm_bindgen]
-    pub fn execute_compute_task(seed: &str, start: u32, end: u32) -> u32 {
+    pub fn execute_compute_task(_seed: &str, start: u32, end: u32) -> u32 {
         let mut prime_count = 0;
         for n in start..end {
             if Self::is_prime(n) {

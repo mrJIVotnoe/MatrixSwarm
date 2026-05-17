@@ -17,8 +17,8 @@ pub fn get_next_trace_id() -> String {
     format!("TRACE_{:08X}", id)
 }
 
-pub fn track_event(event: &str) {
-    let trace_id = get_next_trace_id();
+pub fn track_event(_event: &str) {
+    let _trace_id = get_next_trace_id();
     // Use web_sys::console::log_1 in a real app, here we might just printf or mock.
     // Assuming console logging is acceptable but will avoid importing web_sys to prevent build issues if not enabled
     // Only compile-time string logic here

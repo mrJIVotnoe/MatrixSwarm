@@ -10,7 +10,7 @@ impl HolographicCore {
     /// Simulates Reed-Solomon or XOR secret sharing. Splits data into M shards,
     /// where any K shards can reconstruct the original data.
     #[wasm_bindgen]
-    pub fn fragment_honey(data: &str, total_shards: u32, min_shards: u32) -> Result<JsValue, JsValue> {
+    pub fn fragment_honey(data: &str, total_shards: u32, _min_shards: u32) -> Result<JsValue, JsValue> {
         #[derive(Serialize)]
         struct Shard {
             id: u32,
@@ -32,7 +32,7 @@ impl HolographicCore {
 
     /// Reconstructs the original Honey from a minimum number of fragments
     #[wasm_bindgen]
-    pub fn reconstruct_honey(shards_json: &str) -> String {
+    pub fn reconstruct_honey(_shards_json: &str) -> String {
         // Simplified reconstruction
         "RECONSTRUCTED_HOLOGRAPHIC_DATA".to_string()
     }
