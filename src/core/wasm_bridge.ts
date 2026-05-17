@@ -50,7 +50,15 @@ export const WasmIdentity = {
   importLegacyContainer: async (encryptedHex: string, newPhrase: string) => {
     try { return IdentityCore.import_legacy_container(encryptedHex, newPhrase); }
     catch (e) { handleRustError(e, 'WasmIdentity.importLegacyContainer'); throw e; }
-  }
+  },
+  signMessage: async (phrase: string, message: string) => {
+    try { return IdentityCore.sign_message(phrase, message); }
+    catch(e) { handleRustError(e, 'WasmIdentity.signMessage'); throw e; }
+  },
+  verifySignature: (publicKeyHex: string, message: string, signatureHex: string) => {
+    try { return IdentityCore.verify_signature(publicKeyHex, message, signatureHex); }
+    catch(e) { handleRustError(e, 'WasmIdentity.verifySignature'); throw e; }
+  },
 };
 
 export const WasmAikidoCore = {
@@ -276,7 +284,12 @@ export class WasmNativeP2PMesh {
     this.inner.register_data_channel(peer_id, channel, cb);
   }
   transmit_pheromone_direct(peer_id: string, payload: string) {
-    return this.inner.transmit_pheromone_direct(peer_id, payload);
+    try {
+       return this.inner.transmit_pheromone_direct(peer_id, payload);
+    } catch(e) {
+       handleRustError(e, 'WasmNativeP2PMesh.transmit_pheromone_direct');
+       return false;
+    }
   }
 }
 

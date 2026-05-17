@@ -105,13 +105,30 @@ export class SwarmConnection {
     });
   }
 
+  private heartbeatInterval?: NodeJS.Timeout;
+
   private startHeartbeat() {
-    setInterval(() => {
+    this.heartbeatInterval = setInterval(() => {
       if (this.dataChannel?.readyState === 'open') {
          // Sending directly via Rust Native layer
          this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify({ type: 'pheromone_heartbeat', payload: { ts: Date.now() } }));
       }
     }, 5000);
+  }
+
+  public close() {
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    if (this.dataChannel) {
+        this.dataChannel.onopen = null;
+        this.dataChannel.onmessage = null;
+        this.dataChannel.close();
+    }
+    if (this.rtcConnection) {
+        this.rtcConnection.onicecandidate = null;
+        this.rtcConnection.onconnectionstatechange = null;
+        this.rtcConnection.ondatachannel = null;
+        this.rtcConnection.close();
+    }
   }
 
   public send(message: MeshMessage) {
@@ -175,5 +192,10 @@ export class MeshNetwork {
     this.connections.forEach(conn => {
       conn.send({ type: 'data', payload: data });
     });
+  }
+
+  public stop() {
+    this.connections.forEach(conn => conn.close());
+    this.connections.clear();
   }
 }

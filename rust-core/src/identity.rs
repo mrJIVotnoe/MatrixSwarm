@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use ed25519_dalek::{SigningKey, VerifyingKey};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer, Signature, Verifier};
 use bip39::{Mnemonic, Language};
 use rand_core::OsRng;
 use serde::{Serialize, Deserialize};
@@ -46,7 +46,7 @@ impl IdentityCore {
         Ok(serde_wasm_bindgen::to_value(&passport)?)
     }
 
-    fn recover_internal(phrase: &str) -> Result<SoulPassport, JsValue> {
+    pub(crate) fn recover_internal(phrase: &str) -> Result<SoulPassport, JsValue> {
         let mnemonic = Mnemonic::parse(phrase)
             .map_err(|_| JsValue::from_str("Invalid seed phrase"))?;
         
@@ -163,6 +163,51 @@ impl IdentityCore {
         };
         
         Ok(serde_wasm_bindgen::to_value(&res)?)
+    }
+
+    /// Signs a message using the Passport's secret key
+    #[wasm_bindgen]
+    pub fn sign_message(phrase: &str, message: &str) -> Result<String, JsValue> {
+        let mnemonic = Mnemonic::parse(phrase)
+            .map_err(|_| JsValue::from_str("Invalid seed phrase"))?;
+        let seed = mnemonic.to_seed("");
+        let mut secret = [0u8; 32];
+        secret.copy_from_slice(&seed[..32]);
+        let signing_key = SigningKey::from_bytes(&secret);
+        
+        let signature = signing_key.sign(message.as_bytes());
+        Ok(hex::encode(signature.to_bytes()))
+    }
+
+    /// Verifies a signature using the public key
+    #[wasm_bindgen]
+    pub fn verify_signature(public_key_hex: &str, message: &str, signature_hex: &str) -> bool {
+        let pub_bytes = match hex::decode(public_key_hex) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+        let sig_bytes = match hex::decode(signature_hex) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+        
+        if pub_bytes.len() != 32 || sig_bytes.len() != 64 {
+            return false;
+        }
+
+        let mut pub_arr = [0u8; 32];
+        pub_arr.copy_from_slice(&pub_bytes);
+        
+        let mut sig_arr = [0u8; 64];
+        sig_arr.copy_from_slice(&sig_bytes);
+
+        let verifying_key = match VerifyingKey::from_bytes(&pub_arr) {
+            Ok(k) => k,
+            Err(_) => return false,
+        };
+        let signature = Signature::from_bytes(&sig_arr);
+
+        verifying_key.verify(message.as_bytes(), &signature).is_ok()
     }
 }
 

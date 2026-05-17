@@ -120,13 +120,15 @@ impl NativeP2PMesh {
 
     /// Send digital pheromones directly without server
     #[wasm_bindgen]
-    pub fn transmit_pheromone_direct(&self, peer_id: &str, payload: &str) -> bool {
+    pub fn transmit_pheromone_direct(&self, peer_id: &str, payload: &str) -> Result<bool, JsValue> {
         if let Some(channel) = self.channels.borrow().get(peer_id) {
             if channel.ready_state() == web_sys::RtcDataChannelState::Open {
-                let _ = channel.send_with_str(payload);
-                return true;
+                channel.send_with_str(payload).map_err(|_| JsValue::from_str("CONNECTION_BROKEN"))?;
+                return Ok(true);
+            } else {
+                 return Err(JsValue::from_str("CONNECTION_BROKEN"));
             }
         }
-        false
+        Err(JsValue::from_str("CONNECTION_BROKEN"))
     }
 }

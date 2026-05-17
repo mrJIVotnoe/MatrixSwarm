@@ -11,13 +11,12 @@ export class P2PMeshTransport {
 
   public registerCellConnection(peerId: string, conn: SwarmConnection) {
     this.cellConnections.set(peerId, conn);
-    
-    // WebRTC Data Channels for direct pheromone heartbeats within the cell
-    setInterval(() => {
-      conn.send({ type: 'pheromone_heartbeat', payload: { timestamp: Date.now() } });
-    }, 5000);
-    
     console.log(`[P2PMeshTransport] Registered local cell connection for ${peerId}`);
+  }
+
+  public stop() {
+    this.cellConnections.forEach(conn => conn.close());
+    this.cellConnections.clear();
   }
 
   public broadcastToCell(message: MeshMessage) {
