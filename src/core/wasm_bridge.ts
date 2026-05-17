@@ -18,15 +18,39 @@ export async function initRustCore() {
 import { TrustLevel } from './permissions';
 export { TrustLevel };
 
+export function handleRustError(err: any, contextStr: string) {
+  console.error(`[RUST CORE ERROR] At ${contextStr}:`, err);
+  console.warn(`[DEGRADATION] Node is falling back to DEGRADED state. Awaiting Acoustic Nabat (19-20kHz) for resurrection...`);
+  try {
+     const stateMachine = new _AgentStateMachine();
+     stateMachine.report_failure();
+     stateMachine.degrade();
+     // In a real scenario we might trigger microphone listening for Wake Word
+     WasmMetricsEngine.mock_heartbeat(false);
+  } catch(e) {}
+}
+
 export const WasmIdentity = {
-  forgePassport: async (humanEntropy: string) => IdentityCore.forge_passport(humanEntropy),
-  recoverFromSeed: async (phrase: string) => IdentityCore.recover_from_seed(phrase),
-  soulMigration: async (oldPhrase: string, newPhrase: string, legacyKarma: number) => 
-    IdentityCore.soul_migration(oldPhrase, newPhrase, legacyKarma),
-  exportLegacyContainer: async (phrase: string, karma: number, isGuard: boolean) => 
-    IdentityCore.export_legacy_container(phrase, karma, isGuard),
-  importLegacyContainer: async (encryptedHex: string, newPhrase: string) => 
-    IdentityCore.import_legacy_container(encryptedHex, newPhrase)
+  forgePassport: async (humanEntropy: string) => {
+    try { return IdentityCore.forge_passport(humanEntropy); }
+    catch (e) { handleRustError(e, 'WasmIdentity.forgePassport'); throw e; }
+  },
+  recoverFromSeed: async (phrase: string) => {
+    try { return IdentityCore.recover_from_seed(phrase); }
+    catch (e) { handleRustError(e, 'WasmIdentity.recoverFromSeed'); throw e; }
+  },
+  soulMigration: async (oldPhrase: string, newPhrase: string, legacyKarma: number) => {
+    try { return IdentityCore.soul_migration(oldPhrase, newPhrase, legacyKarma); }
+    catch (e) { handleRustError(e, 'WasmIdentity.soulMigration'); throw e; }
+  },
+  exportLegacyContainer: async (phrase: string, karma: number, isGuard: boolean) => {
+    try { return IdentityCore.export_legacy_container(phrase, karma, isGuard); }
+    catch (e) { handleRustError(e, 'WasmIdentity.exportLegacyContainer'); throw e; }
+  },
+  importLegacyContainer: async (encryptedHex: string, newPhrase: string) => {
+    try { return IdentityCore.import_legacy_container(encryptedHex, newPhrase); }
+    catch (e) { handleRustError(e, 'WasmIdentity.importLegacyContainer'); throw e; }
+  }
 };
 
 export const WasmAikidoCore = {
@@ -39,14 +63,22 @@ export const WasmAikidoCore = {
 // duplicate removed
 
 export const WasmSwarmNetwork = {
-  createPheromonePulse: (nodeId: string, status: string, karma: number, timestamp: number) => 
-    SwarmNetwork.create_pheromone_pulse(nodeId, status, karma, timestamp),
-  parsePheromonePulse: (json: string) => 
-    SwarmNetwork.parse_pheromone_pulse(json),
-  generateMdnsBroadcast: (nodeId: string) => 
-    SwarmNetwork.generate_mdns_broadcast(nodeId),
-  pollMdnsPeers: () => 
-    SwarmNetwork.poll_mdns_peers()
+  createPheromonePulse: (nodeId: string, status: string, karma: number, timestamp: number) => {
+    try { return SwarmNetwork.create_pheromone_pulse(nodeId, status, karma, timestamp); }
+    catch(e) { handleRustError(e, 'WasmSwarmNetwork.create_pheromone_pulse'); throw e; }
+  },
+  parsePheromonePulse: (json: string) => {
+    try { return SwarmNetwork.parse_pheromone_pulse(json); }
+    catch(e) { handleRustError(e, 'WasmSwarmNetwork.parse_pheromone_pulse'); throw e; }
+  },
+  generateMdnsBroadcast: (nodeId: string) => {
+    try { return SwarmNetwork.generate_mdns_broadcast(nodeId); }
+    catch(e) { handleRustError(e, 'WasmSwarmNetwork.generate_mdns_broadcast'); throw e; }
+  },
+  pollMdnsPeers: () => {
+    try { return SwarmNetwork.poll_mdns_peers(); }
+    catch(e) { handleRustError(e, 'WasmSwarmNetwork.poll_mdns_peers'); throw e; }
+  }
 };
 
 export const WasmEntropyBridge = {
