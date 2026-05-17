@@ -45,10 +45,13 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
         return;
       }
 
-      const keys = await getKeysFromSeed(phrase);
-      setSeedPhrase(phrase);
-      setPublicKeyStr(keys.publicKey);
-      setStep(2); // continue to role selection
+      const passport: any = await WasmIdentity.recoverFromSeed(phrase);
+      setSeedPhrase(passport.seed_phrase);
+      setPublicKeyStr(passport.public_key);
+      setErrorMsg("QUANTUM REINCARNATION: Soul Passport recovered via Rust Core. Karma linked.");
+      setTimeout(() => {
+          setStep(2); // continue to role selection
+      }, 1500);
     } catch (e) {
       console.error(e);
       setErrorMsg("Ошибка восстановления.");
@@ -131,7 +134,7 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
               </motion.div>
             )}
 
-            {errorMsg && <p className="text-red-500 text-xs font-bold">{errorMsg}</p>}
+            {errorMsg && <p className={`text-xs font-bold ${errorMsg.includes('QUANTUM') ? 'text-green-400' : 'text-red-500'}`}>{errorMsg}</p>}
 
             <button 
               onClick={handleNext}

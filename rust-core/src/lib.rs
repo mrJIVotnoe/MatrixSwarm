@@ -21,6 +21,12 @@ mod planetary_shield;
 mod global_knowledge;
 mod p2p_queue;
 mod network_layer;
+mod ark_storage;
+mod seismic_sensor;
+mod agent_logic;
+
+#[cfg(test)]
+mod tests;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {

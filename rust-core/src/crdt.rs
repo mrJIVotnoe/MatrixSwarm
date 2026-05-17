@@ -73,6 +73,85 @@ impl CrdtRegister {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct CRDTKarmaBlock {
+    pub id: String,
+    pub node_id: String,
+    pub action: String,
+    pub amount: f32,
+    pub timestamp: u64,
+    pub previous_hash: String,
+    pub hash: String,
+}
+
+#[wasm_bindgen]
+pub struct KarmaCRDT {
+    blocks: HashMap<String, CRDTKarmaBlock>,
+}
+
+#[wasm_bindgen]
+impl KarmaCRDT {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> KarmaCRDT {
+        KarmaCRDT {
+            blocks: HashMap::new(),
+        }
+    }
+
+    /// Add block locally
+    #[wasm_bindgen]
+    pub fn add_block(&mut self, json_block: &str) -> bool {
+        if let Ok(block) = serde_json::from_str::<CRDTKarmaBlock>(json_block) {
+            if !self.blocks.contains_key(&block.id) {
+                self.blocks.insert(block.id.clone(), block);
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Merge from P2P
+    #[wasm_bindgen]
+    pub fn merge_all(&mut self, sync_data: &str) -> usize {
+        let mut added = 0;
+        if let Ok(incoming) = serde_json::from_str::<Vec<CRDTKarmaBlock>>(sync_data) {
+            for block in incoming {
+                if !self.blocks.contains_key(&block.id) {
+                    self.blocks.insert(block.id.clone(), block);
+                    added += 1;
+                }
+            }
+        }
+        added
+    }
+
+    #[wasm_bindgen]
+    pub fn export_deltas_since(&self, since_ts: u64) -> String {
+        let mut deltas: Vec<&CRDTKarmaBlock> = self.blocks.values()
+            .filter(|b| b.timestamp > since_ts)
+            .collect();
+        deltas.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
+        serde_json::to_string(&deltas).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    #[wasm_bindgen]
+    pub fn merge_deltas(&mut self, delta_data: &str) -> usize {
+        self.merge_all(delta_data)
+    }
+
+    #[wasm_bindgen]
+    pub fn export_all(&self) -> String {
+        let mut all: Vec<&CRDTKarmaBlock> = self.blocks.values().collect();
+        all.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
+        serde_json::to_string(&all).unwrap_or_else(|_| "[]".to_string())
+    }
+    
+    #[wasm_bindgen]
+    pub fn size(&self) -> usize {
+        self.blocks.len()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CRDTMessage {
     pub id: String,
     pub sender: String,
@@ -134,6 +213,19 @@ impl MessageCRDT {
                 self.messages.entry(msg.id.clone()).or_insert(msg);
             }
         }
+    }
+
+    #[wasm_bindgen]
+    pub fn export_deltas_since(&self, since_ts: u64) -> String {
+        let all: Vec<&CRDTMessage> = self.messages.values()
+            .filter(|m| m.timestamp > since_ts)
+            .collect();
+        serde_json::to_string(&all).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    #[wasm_bindgen]
+    pub fn merge_deltas(&mut self, delta_data: &str) {
+        self.merge_all(delta_data)
     }
 
     #[wasm_bindgen]

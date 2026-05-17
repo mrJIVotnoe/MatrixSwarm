@@ -1,4 +1,5 @@
 import { Identity, signData, verifySignature } from '../core/identity';
+import { SwarmNetwork } from '../../rust-core/pkg/swarm_wasm';
 
 export interface PeerInfo {
   id: string;
@@ -9,9 +10,9 @@ export interface PeerInfo {
 }
 
 export class MatchmakingClient {
-  private ws: WebSocket | null = null;
   private identity: Identity;
   public cellId: string;
+  private gossipInterval: any;
   
   public onPeersDiscovered?: (peers: PeerInfo[]) => void;
   public onSignalReceived?: (type: string, senderId: string, payload: any) => void;
@@ -22,68 +23,65 @@ export class MatchmakingClient {
   }
 
   public connect(serverUrl: string) {
-    // Camouflage under WSS HTTPS
-    const wsUrl = serverUrl.replace('http', 'ws');
-    this.ws = new WebSocket(wsUrl);
+    console.log('[L3] Discarded central server. Initializing Native Gossip (mDNS + Acoustic).');
+    
+    // Simulate initial discovery
+    this.discoverPeers();
 
-    this.ws.onopen = async () => {
-      console.log('[L3 Signaling] Connected to Matchmaking Server');
-      // Auth with identity signature
-      const payload = { type: 'auth', nodeId: this.identity.address, cellId: this.cellId, timestamp: Date.now() };
-      this.send(payload);
-    };
-
-    this.ws.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type === 'auth_success') {
-        this.discoverPeers();
-      }
-
-      if (data.type === 'discovery_response') {
-        if (this.onPeersDiscovered) {
-          this.onPeersDiscovered(data.peers);
-        }
-      }
-
-      if (['webrtc_offer', 'webrtc_answer', 'webrtc_ice_candidate', 'webrtc_signal'].includes(data.type)) {
-        // Zero-Trust: Verify sender signature
-        const isValid = verifySignature(data.senderNodeId, JSON.stringify(data.sdp || data.candidate || data.signal), data.signature);
-        if (!isValid) {
-          console.warn(`[ZeroTrust] Rejected invalid signature from ${data.senderNodeId}. Hardware isolation triggered.`);
-          return; // Ignore compromised message
-        }
-        
-        if (this.onSignalReceived) {
-          this.onSignalReceived(data.type, data.senderNodeId, data);
-        }
-      }
-    };
-
-    this.ws.onclose = () => {
-      console.log('[L3 Signaling] Disconnected from Matchmaking Server');
-    };
+    // Start Gossip loop for receiving signals
+    this.gossipInterval = setInterval(() => {
+        const signalsJson = SwarmNetwork.gossip_receive_signals(this.identity.address);
+        try {
+            const signals = JSON.parse(signalsJson);
+            for (const data of signals) {
+                if (['webrtc_offer', 'webrtc_answer', 'webrtc_ice_candidate', 'webrtc_signal'].includes(data.type)) {
+                    // Zero-Trust: Verify sender signature
+                    const isValid = verifySignature(data.senderNodeId, JSON.stringify(data.sdp || data.candidate || data.signal), data.signature);
+                    if (!isValid) {
+                    console.warn(`[ZeroTrust] Rejected invalid signature from ${data.senderNodeId}.`);
+                    continue;
+                    }
+                    
+                    if (this.onSignalReceived) {
+                    this.onSignalReceived(data.type, data.senderNodeId, data);
+                    }
+                }
+            }
+        } catch(e) {}
+    }, 2000);
   }
 
   public discoverPeers() {
-    this.send({ type: 'discovery', cellId: this.cellId });
+      console.log("[mDNS] Sending out discovery pings...");
+      const peersStr = SwarmNetwork.trigger_gossip_discovery(this.identity.address);
+      try {
+          const peers: PeerInfo[] = JSON.parse(peersStr);
+          if (this.onPeersDiscovered) {
+              this.onPeersDiscovered(peers);
+          }
+      } catch(e) {}
   }
 
   public async sendSignal(targetNodeId: string, type: 'webrtc_offer' | 'webrtc_answer' | 'webrtc_ice_candidate' | 'webrtc_signal', payload: any) {
     // Sign the payload
     const signature = await signData(this.identity.privateKey, JSON.stringify(payload));
     
-    this.send({
+    const packet = {
       type,
+      senderNodeId: this.identity.address,
       targetNodeId,
       signature,
-      ...payload // inject sdp or candidate
-    });
+      ...payload
+    };
+
+    // Use Native Gossip to transmit
+    SwarmNetwork.gossip_transmit_signal(targetNodeId, JSON.stringify(packet));
   }
 
-  private send(data: any) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data));
-    }
+  public disconnect() {
+      if (this.gossipInterval) {
+          clearInterval(this.gossipInterval);
+      }
+      console.log('[L3 Signaling] Native Gossip Disconnected');
   }
 }

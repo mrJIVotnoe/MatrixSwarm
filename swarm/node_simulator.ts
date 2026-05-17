@@ -56,8 +56,8 @@ async function simulate() {
         activeNodes.push({ id: data.id, template, isp });
       }
       await new Promise(r => setTimeout(r, 500)); // Stagger registrations
-    } catch (err) {
-      console.error(`❌ Failed to register node`);
+    } catch (err: any) {
+      console.error(`❌ Failed to register node:`, err.message);
     }
   }
 
@@ -69,10 +69,16 @@ async function simulate() {
         const hbRes = await fetch(`${API_URL}/nodes/${node.id}/heartbeat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(3000),
           body: JSON.stringify({ isp: node.isp })
         });
 
-        const { task } = await hbRes.json();
+        if (!hbRes.ok) {
+           throw new Error(`Heartbeat failed: ${hbRes.status}`);
+        }
+
+        const data = await hbRes.json();
+        const task = data?.task;
 
         if (task) {
           console.log(`🚀 Node ${node.id} picked up task: ${task.id} (${task.strategy}) for ${task.target}`);
@@ -97,8 +103,13 @@ async function simulate() {
             console.log(`🏁 Node ${node.id} ${success ? "completed" : "failed"} task: ${task.id} in ${latency_ms}ms`);
           }, 1000 + Math.random() * 2000);
         }
-      } catch (err) {
-        // Silent fail for simulation
+      } catch (err: any) {
+        // Handle timeout and gracefully degrade
+        if (err.name === 'TimeoutError') {
+             console.warn(`[TIMEOUT] Node ${node.id} timed out. Reconnecting later.`);
+        } else {
+             console.error(`[ERROR] Node ${node.id} heartbeat threw:`, err.message);
+        }
       }
     }
   }, 4000);

@@ -8,7 +8,6 @@ import { createServer } from "http";
 import { getDb } from "./src/db.js";
 import { state } from "./src/server/state.js";
 import { MatrixService } from "./src/services/matrixService.js";
-import { initializeWebSockets } from "./src/server/sockets/index.js";
 import { startBackgroundSweep } from "./src/server/services/orchestratorService.js";
 import apiRouter from "./src/server/routes/api.js";
 
@@ -41,10 +40,13 @@ async function startServer() {
   app.use(express.json());
 
   // Init DB
-  await getDb();
+  try {
+    await getDb();
+  } catch (e: any) {
+    console.error("[WARNING] Database failed to initialize. Swarm operating in ephemeral memory Mode! Error:", e.message);
+  }
 
-  // WebSockets
-  initializeWebSockets(server);
+  // WebSockets Removed for Final L3 Native Gossip Only Protocol
 
   // Background Sweep
   startBackgroundSweep();

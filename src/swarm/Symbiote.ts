@@ -4,7 +4,7 @@ import { SwarmSandbox, ResourceQuotas } from '../core/isolation';
 import { PermissionEngine, PermissionScope } from '../core/permissions';
 import { IntegrityGuard } from '../core/integrity';
 import { MagistrateBridge } from './magistrate';
-import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore, WasmAikidoCore } from '../core/wasm_bridge';
+import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore, WasmAikidoCore, WasmSeismicSensor } from '../core/wasm_bridge';
 
 export type SymbioteStatus = 
   | "sleeping" 
@@ -29,6 +29,7 @@ export class SwarmSymbiote {
   public mobilityScore: number = 0;
   public cellId: string | null = null;
   public magistrateBridge: MagistrateBridge | null = null;
+  public seismicSensor: WasmSeismicSensor;
   private lastCoords: { lat: number, lng: number } | null = null;
   private lastCoordsTime: number = Date.now();
   public sensors = {
@@ -44,6 +45,7 @@ export class SwarmSymbiote {
 
   constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {
     this.trustEngine = new WasmTrustEngine();
+    this.seismicSensor = new WasmSeismicSensor();
     this.detectHardwareClass();
     
     // Simulate initial hardware signature verification (e.g. valid USB Quarantine device)
@@ -78,6 +80,25 @@ export class SwarmSymbiote {
       this.sensors.touch = true;
     }
 
+    // Proprioception (Seismic Planetary Shield)
+    if (window.DeviceMotionEvent) {
+      this.sensors.proprioception = true;
+      window.addEventListener('devicemotion', (event) => {
+        const accel = event.accelerationIncludingGravity;
+        if (accel && accel.x !== null && accel.y !== null && accel.z !== null) {
+          // Calculate approx G force
+          const gForce = Math.sqrt(accel.x*accel.x + accel.y*accel.y + accel.z*accel.z) / 9.81;
+          const isTriggered = this.seismicSensor.analyze_vibration(gForce);
+          if (isTriggered) {
+             console.warn("[NABAT] Planetary Shield Triggered! Local seismic anomaly detected.");
+             this.onUpdate(this.status, "[NABAT] PLANETARY SHIELD: Local seismic anomaly detected! Broadcasting acoustic alert via core...", this.trustScore);
+             // Would trigger acoustic broadcast in reality
+             this.seismicSensor.reset_nabat();
+          }
+        }
+      });
+    }
+
     // Require consent for invasive sensors
     if (await this.requestSensorAccess('microphone')) {
         navigator.mediaDevices?.enumerateDevices().then(devices => {
@@ -100,7 +121,7 @@ export class SwarmSymbiote {
                  const isMobileValid = WasmAikidoCore.validateMobility(this.hardwareClass, distMeters, elapsedMinutes);
                  if (!isMobileValid && this.hardwareClass === 'smartphone') {
                      // GPS Spoofing or BotFarm detected
-                     this.trustEngine.revoke_trust("GPS_SPOOFING");
+                     WasmAikidoCore.applyAikidoPenalty(this.nodeId || "unknown", this.trustScore, "GPS_SPOOFING");
                      this.status = "quarantined";
                      this.onUpdate(this.status, "[АЙКИДО] Узел помещен в карантин: Аномальная (нулевая) мобильность для профиля 'Смартфон'. Подозрение на бот-ферму.");
                      return;

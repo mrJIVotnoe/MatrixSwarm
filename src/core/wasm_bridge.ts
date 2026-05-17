@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkStorage as _ArkStorage, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -220,14 +220,63 @@ export class WasmMessageCRDT {
   get_messages_for(r: string): any[] { return JSON.parse(this.inner.get_messages_for(r)); }
   merge_all(s: string) { this.inner.merge_all(s); }
   export_all(): string { return this.inner.export_all(); }
+  export_deltas_since(since_ts: number): string { return this.inner.export_deltas_since ? this.inner.export_deltas_since(BigInt(since_ts) as any) : "[]"; }
+  merge_deltas(delta_data: string) { if (this.inner.merge_deltas) this.inner.merge_deltas(delta_data); }
 }
 
-export class WasmNativeNetworkLayer {
-  private inner: _NativeNetworkLayer;
-  constructor(node_id: string) { this.inner = new _NativeNetworkLayer(node_id); }
-  initiate_peer_connection(id: string, cb1: Function, cb2: Function) { this.inner.initiate_peer_connection(id, cb1, cb2); }
-  broadcast_pheromone(p: string) { this.inner.broadcast_pheromone(p); }
+export class WasmKarmaCRDT {
+  private inner: any;
+  constructor() { this.inner = new KarmaCRDT(); }
+  add_block(json: string): boolean { return this.inner.add_block(json); }
+  merge_all(sync: string): number { return this.inner.merge_all(sync); }
+  export_all(): any[] { return JSON.parse(this.inner.export_all()); }
+  size(): number { return this.inner.size(); }
+  export_deltas_since(since_ts: number): any[] { return JSON.parse(this.inner.export_deltas_since(since_ts)); }
+  merge_deltas(delta_data: string): number { return this.inner.merge_deltas(delta_data); }
 }
+
+export class WasmNativeP2PMesh {
+  private inner: _NativeP2PMesh;
+  constructor(node_id: string) { 
+    this.inner = new _NativeP2PMesh(node_id);
+  }
+  register_data_channel(peer_id: string, channel: RTCDataChannel, cb: Function) {
+    this.inner.register_data_channel(peer_id, channel, cb);
+  }
+  transmit_pheromone_direct(peer_id: string, payload: string) {
+    return this.inner.transmit_pheromone_direct(peer_id, payload);
+  }
+}
+
+
+export class WasmArkStorage {
+  private inner: _ArkStorage;
+  constructor() { this.inner = new _ArkStorage(); }
+  store_fragment(topic: string, content: string) { this.inner.store_fragment(topic, content); }
+  read_fragment(topic: string): string { return this.inner.read_fragment(topic); }
+  get_available_knowledge(): string { return this.inner.get_available_knowledge(); }
+  pollinate(peer_id: string): string { return this.inner.pollinate(peer_id); }
+  receive_pollination(payload: string): number { return this.inner.receive_pollination(payload); }
+}
+
+export class WasmSeismicSensor {
+  private inner: _SeismicSensor;
+  constructor() { this.inner = new _SeismicSensor(); }
+  set_threshold(val: number) { this.inner.set_threshold(val); }
+  analyze_vibration(accel_g: number): boolean { return this.inner.analyze_vibration(accel_g); }
+  receive_peer_anomaly(sig: string): boolean {
+     if (this.inner.receive_peer_anomaly) return this.inner.receive_peer_anomaly(sig);
+     return false;
+  }
+  is_nabat_active(): boolean { return this.inner.is_nabat_active(); }
+  reset_nabat() { this.inner.reset_nabat(); }
+}
+
+export const WasmGlobalIntentDecomposer = {
+  decompose_intent: (intent: string): any[] => {
+    return JSON.parse(GlobalIntentDecomposer.decompose_intent(intent));
+  }
+};
 
 export const WasmCasteAutonomy = {
   determineRole: (metrics: any) => {

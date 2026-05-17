@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -14,19 +14,26 @@ export const ObserverHUD: React.FC = () => {
 
   const schedulerRef = useRef(new WasmTaskScheduler());
 
-  const handleGlobalIntent = (e: React.FormEvent) => {
+    const handleGlobalIntent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!globalIntent.trim()) return;
-    setIntentStatus("Dispersing intent via Probability Waves... Magistrates analyzing task.");
+    setIntentStatus("Decomposing intent via Rust LLM Interface...");
     
     setTimeout(() => {
-        // "Собрать медицинский архив в моем районе" -> rust-core самостоятельно распределит нагрузку
-        const res = schedulerRef.current.distribute_global_intent(globalIntent, Math.floor(Math.random() * 20) + 5, Math.floor(Math.random() * 50) + 10);
-        setIntentStatus(res);
+        const tasks = WasmGlobalIntentDecomposer.decompose_intent(globalIntent);
+        const res = schedulerRef.current.distribute_global_intent(globalIntent, tasks.length, Math.floor(Math.random() * 50) + 10);
+        setIntentStatus(`Decomposed into ${tasks.length} micro-tasks... ${res}`);
         setGlobalIntent('');
         setIsAlert(true);
         setTimeout(() => setIsAlert(false), 800);
-    }, 2500);
+    }, 1500);
+  };
+
+  const handleVectorCollapse = (vector: string) => {
+      setIntentStatus(`QUANTUM COLLAPSE INITIATED: ${vector}. All 100% devices instantly shifting protocol via CRDT Finality.`);
+      setTimeout(() => {
+          setIntentStatus(`Wave collapsed. Vector locked: ${vector}`);
+      }, 3000);
   };
 
   // Simulating probability wave particles and planetary anchors
@@ -200,7 +207,7 @@ export const ObserverHUD: React.FC = () => {
         <div className="col-span-4 mb-2">
             <form onSubmit={handleGlobalIntent} className="flex flex-col gap-2 bg-black/60 border border-cyan-900/50 p-3 rounded">
                <div className="flex justify-between text-cyan-400 font-bold mb-1">
-                 <span>GLOBAL INTENT (EYE OF GOD)</span>
+                 <span>GLOBAL INTENT (EYE OF GOD) / PROBABILITY COLLAPSE</span>
                  <span className="text-yellow-400/80 uppercase text-[10px] tracking-widest">{intentStatus ? "ACTIVE" : "AWAITING"}</span>
                </div>
                <div className="flex gap-2">
@@ -209,11 +216,22 @@ export const ObserverHUD: React.FC = () => {
                    value={globalIntent}
                    onChange={e => setGlobalIntent(e.target.value)}
                    className="flex-1 bg-black/80 border border-blue-900/50 outline-none px-3 py-2 text-cyan-200 placeholder-blue-900/70"
-                   placeholder="e.g. Gather air quality telemetry in Sector 4..."
+                   placeholder="e.g. Synchronize medical archive in Sector X..."
                  />
                  <button type="submit" className="bg-cyan-900/50 hover:bg-cyan-800 text-cyan-300 px-4 py-2 border border-cyan-700/50 transition-colors">
                     TRANSMIT
                  </button>
+               </div>
+               <div className="flex gap-2 mt-2">
+                   <button type="button" onClick={() => handleVectorCollapse("MAXIMAL ANONYMITY")} className="text-xs bg-purple-900/40 hover:bg-purple-800 text-purple-200 px-3 py-1 border border-purple-700/50">
+                       V: MAXIMAL ANONYMITY
+                   </button>
+                   <button type="button" onClick={() => handleVectorCollapse("BATTERY SAVER (HIBERNATION)")} className="text-xs bg-amber-900/40 hover:bg-amber-800 text-amber-200 px-3 py-1 border border-amber-700/50">
+                       V: HIBERNATION
+                   </button>
+                   <button type="button" onClick={() => handleVectorCollapse("RED ALERT (CONNECTIVITY)")} className="text-xs bg-red-900/40 hover:bg-red-800 text-red-200 px-3 py-1 border border-red-700/50">
+                       V: RED ALERT
+                   </button>
                </div>
                {intentStatus && <div className="text-left text-green-400 mt-2 animate-pulse">{intentStatus}</div>}
             </form>

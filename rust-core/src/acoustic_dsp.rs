@@ -50,10 +50,19 @@ impl AcousticAnalyzer {
     #[wasm_bindgen]
     pub fn encode_acoustic_payload(payload: &str, sample_rate: f32) -> Vec<f32> {
         let mut buffer = Vec::new();
+        let freq_0 = 18500.0;
+        let freq_1 = 19500.0;
+        let baud_ms = 10.0; // 10ms per bit (100 baud)
+        
+        // Start bit (sync)
+        buffer.append(&mut Self::generate_ultrasonic_marker(sample_rate, 20.0, 20000.0));
+        
         for b in payload.as_bytes() {
-            let freq = 18000.0 + (*b as f32) * 50.0;
-            let mut chirp = Self::generate_ultrasonic_marker(sample_rate, 20.0, freq);
-            buffer.append(&mut chirp);
+            for i in 0..8 {
+                let bit = (b >> i) & 1;
+                let freq = if bit == 1 { freq_1 } else { freq_0 };
+                buffer.append(&mut Self::generate_ultrasonic_marker(sample_rate, baud_ms, freq));
+            }
         }
         buffer
     }
@@ -61,37 +70,53 @@ impl AcousticAnalyzer {
     /// L3 - Acoustic Resurrection: Decode FSK ultrasound payloads
     #[wasm_bindgen]
     pub fn decode_acoustic_payload(samples: &[f32], sample_rate: f32) -> String {
-        // A naive sliding window FSK decoder matching the encode logic
-        let duration_ms = 20.0;
-        let samples_per_window = ((sample_rate * duration_ms) / 1000.0) as usize;
-        if samples_per_window == 0 { return String::new(); }
+        let freq_0 = 18500.0;
+        let freq_1 = 19500.0;
+        let baud_ms = 10.0;
+        let samples_per_bit = ((sample_rate * baud_ms) / 1000.0) as usize;
+        let sync_samples = ((sample_rate * 20.0) / 1000.0) as usize;
+        
+        if samples_per_bit == 0 || samples.len() < sync_samples { return String::new(); }
         
         let mut text_bytes: Vec<u8> = Vec::new();
-        
         let mut i = 0;
-        while i + samples_per_window <= samples.len() {
-            let window = &samples[i..i+samples_per_window];
-            
-            // Find the frequency with highest energy between 18000 and 18000 + 255*50
-            let mut best_byte = 0;
-            let mut max_energy = 0.0;
-            
-            for b_guess in 0..=255 {
-                let test_freq = 18000.0 + (b_guess as f32) * 50.0;
-                let energy = Self::detect_ultrasonic_beacon(window, sample_rate, test_freq);
-                if energy > max_energy {
-                    max_energy = energy;
-                    best_byte = b_guess;
-                }
+        
+        // Find sync pulse (20kHz)
+        while i + sync_samples <= samples.len() {
+            let window = &samples[i..i+sync_samples];
+            let energy = Self::detect_ultrasonic_beacon(window, sample_rate, 20000.0);
+            if energy > 1.0 { // threshold
+                i += sync_samples;
+                break;
             }
-            
-            // basic threshold to ignore noise
-            if max_energy > 0.1 {
-                text_bytes.push(best_byte as u8);
-            }
-            i += samples_per_window;
+            i += samples_per_bit; // jump forward
         }
         
-        String::from_utf8_lossy(&text_bytes).to_string()
+        // Read bits
+        while i + samples_per_bit <= samples.len() {
+            let mut current_byte = 0u8;
+            let mut valid = true;
+            for bit_idx in 0..8 {
+                if i + samples_per_bit > samples.len() {
+                    valid = false;
+                    break;
+                }
+                let window = &samples[i..i+samples_per_bit];
+                let energy_0 = Self::detect_ultrasonic_beacon(window, sample_rate, freq_0);
+                let energy_1 = Self::detect_ultrasonic_beacon(window, sample_rate, freq_1);
+                
+                if energy_1 > energy_0 {
+                    current_byte |= 1 << bit_idx;
+                }
+                i += samples_per_bit;
+            }
+            if valid {
+                text_bytes.push(current_byte);
+            } else {
+                break;
+            }
+        }
+        
+        String::from_utf8_lossy(&text_bytes).into_owned()
     }
 }

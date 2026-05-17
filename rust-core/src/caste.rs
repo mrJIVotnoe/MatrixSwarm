@@ -26,10 +26,8 @@ impl CasteAutonomy {
             "Magistrate"
         } else if metrics.device_type == "mobile" && metrics.has_gps && metrics.battery_level > 20.0 {
             "Scout"
-        } else if metrics.device_type == "mobile" {
-            "Drone"
         } else if metrics.device_type == "smart_tv" && metrics.is_plugged_in {
-            "StableGuardian"
+            "Stable Guard"
         } else if metrics.cpu_cores >= 4 && metrics.is_plugged_in {
             "Relay"
         } else {

@@ -57,7 +57,27 @@ export const SwarmNetwork = {
   },
   poll_mdns_peers: () => {
     return ["LOCAL_PEER_A0F9", "LOCAL_PEER_B221"];
-  }
+  },
+  trigger_gossip_discovery: (local_id) => {
+      return JSON.stringify([
+            {
+                "id": "AUSTIN_ROUTER_19X",
+                "trust_score": 85.0,
+                "power_rating": "Magistrate",
+                "device_type": "router",
+                "capabilities": "[\"p2p_signaling\", \"bramble_relay\"]"
+            },
+            {
+                "id": "MOBILE_SCOUT_Z",
+                "trust_score": 45.0,
+                "power_rating": "Scout",
+                "device_type": "smartphone",
+                "capabilities": "[\"system_ping\"]"
+            }
+      ]);
+  },
+  gossip_transmit_signal: (target, payload_json) => {},
+  gossip_receive_signals: (local_id) => { return "[]"; }
 };
 
 export const EntropyBridge = {
@@ -267,6 +287,96 @@ export class NativeNetworkLayer {
   broadcast_pheromone(payload) {}
 }
 
+export class NativeP2PMesh {
+  constructor(local_id) {
+    this.local_id = local_id;
+  }
+  register_data_channel(peer_id, channel, cb) {}
+  transmit_pheromone_direct(peer_id, payload) { return true; }
+}
+
+export class KarmaCRDT {
+  constructor() {
+    this.blocks = {};
+  }
+  add_block(json) { return true; }
+  merge_all(sync) { return 0; }
+  export_all() { return "[]"; }
+  size() { return 0; }
+  export_deltas_since(since_ts) { return "[]"; }
+  merge_deltas(delta_data) { return 0; }
+}
+
+export const GlobalIntentDecomposer = {
+  decompose_intent: (intent) => {
+    return JSON.stringify([
+      { id: "TASK_1", assigned_role: "Magistrate", payload: `Analyze intent: ${intent}` },
+      { id: "TASK_2", assigned_role: "Scout", payload: "Observe environment for context." }
+    ]);
+  }
+};
+
+export class ArkStorage {
+  constructor() {
+    this.fragments = {};
+  }
+  store_fragment(topic, content) {
+    this.fragments[topic] = content;
+  }
+  read_fragment(topic) {
+    return this.fragments[topic] || "";
+  }
+  get_available_knowledge() {
+    return Object.keys(this.fragments).join(",");
+  }
+  pollinate(peer_id) {
+    return JSON.stringify(this.fragments);
+  }
+  receive_pollination(payload) {
+    let added = 0;
+    try {
+        const incoming = JSON.parse(payload);
+        for(const k of Object.keys(incoming)) {
+            if(!this.fragments[k]) {
+                this.fragments[k] = incoming[k];
+                added++;
+            }
+        }
+    } catch(e) {}
+    return added;
+  }
+}
+
+export class SeismicSensor {
+  constructor() {
+    this.nabat_triggered = false;
+    this.cell_anomaly_reports = 0;
+    this.latest_signature = "";
+  }
+  set_threshold(val) {}
+  analyze_vibration(accel_g) {
+    if(accel_g >= 2.5) {
+      this.nabat_triggered = true;
+      this.latest_signature = "SIG_100_250";
+      return true;
+    }
+    return false;
+  }
+  receive_peer_anomaly(sig) {
+      this.cell_anomaly_reports++;
+      if(this.cell_anomaly_reports >= 5) {
+          this.nabat_triggered = true;
+          return true;
+      }
+      return false;
+  }
+  is_nabat_active() { return this.nabat_triggered; }
+  reset_nabat() { 
+      this.nabat_triggered = false; 
+      this.cell_anomaly_reports = 0;
+  }
+}
+
 export class MessageCRDT {
   constructor() {
     this.messages = [];
@@ -275,4 +385,6 @@ export class MessageCRDT {
   get_messages_for(r) { return "[]"; }
   merge_all(s) {}
   export_all() { return "[]"; }
+  export_deltas_since(since_ts) { return "[]"; }
+  merge_deltas(delta_data) {}
 }

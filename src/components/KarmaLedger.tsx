@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, Box, ArrowRight, Activity, Zap } from 'lucide-react';
-import { QuantumMemoryMap } from '../core/crdt';
+import { WasmKarmaCRDT } from '../core/wasm_bridge';
 
 interface KarmaBlock {
   id: string;
@@ -14,32 +14,29 @@ interface KarmaBlock {
 
 export const KarmaLedger: React.FC = () => {
   const [blocks, setBlocks] = useState<KarmaBlock[]>([]);
-  const crdtRef = useRef(new QuantumMemoryMap<KarmaBlock>());
+  const crdtRef = useRef<WasmKarmaCRDT | null>(null);
   const [crdtStateCount, setCrdtStateCount] = useState(0);
 
   useEffect(() => {
+    crdtRef.current = new WasmKarmaCRDT();
+    
     // Quantum Synchronization: WebRTC/mDNS CRDT Logic (L4)
     // Synchronize Karma and Soul Passport across cell instantly
     const pullFromP2P = () => {
        // Simulate receiving WebRTC push from another peer with a new CRDT state
-       if (Math.random() > 0.7) {
-          const mockPeerData = new Map<string, { value: KarmaBlock; timestamp: number }>();
-          const fakeId = "peer_" + Math.floor(Math.random()*1000);
-          mockPeerData.set(fakeId, {
-              value: {
-                 id: "block_" + Date.now(),
-                 node_id: fakeId,
-                 action: "P2P_CRDT_SYNC_REWARD",
-                 amount: 5,
-                 timestamp: Date.now(),
-                 previous_hash: "00000000",
-                 hash: "crdt" + Date.now()
-              },
-              timestamp: Date.now()
-          });
+       if (Math.random() > 0.7 && crdtRef.current) {
+          const fakeBlock = {
+             id: "block_" + Date.now(),
+             node_id: "peer_" + Math.floor(Math.random()*1000),
+             action: "P2P_CRDT_SYNC_REWARD",
+             amount: 5,
+             timestamp: Date.now(),
+             previous_hash: "00000000",
+             hash: "crdt" + Date.now()
+          };
           
-          crdtRef.current.merge(mockPeerData);
-          setCrdtStateCount(crdtRef.current.export().size);
+          crdtRef.current.add_block(JSON.stringify(fakeBlock));
+          setCrdtStateCount(crdtRef.current.size());
        }
     };
 
@@ -48,18 +45,21 @@ export const KarmaLedger: React.FC = () => {
         const res = await fetch('/api/v1/karma/ledger');
         if (res.ok) {
           const apiBlocks = await res.json();
-          // Merge API blocks into CRDT
-          apiBlocks.forEach((b: KarmaBlock) => crdtRef.current.set(b.id, b, b.timestamp));
-          
-          // Collapse state back into view view
-          const exported = Array.from(crdtRef.current.export().values()).map(v => v.value).sort((a,b) => b.timestamp - a.timestamp);
-          setBlocks(exported);
-          setCrdtStateCount(exported.length);
+          // Merge API blocks into CRDT natively in Rust
+          if (crdtRef.current) {
+             apiBlocks.forEach((b: KarmaBlock) => crdtRef.current?.add_block(JSON.stringify(b)));
+             // Collapse state back into view view
+             const exported = crdtRef.current.export_all();
+             setBlocks(exported);
+             setCrdtStateCount(exported.length);
+          }
         }
       } catch (e) {
         // Offline? We still have CRDT state!
-        const exported = Array.from(crdtRef.current.export().values()).map(v => v.value).sort((a,b) => b.timestamp - a.timestamp);
-        setBlocks(exported);
+        if (crdtRef.current) {
+            const exported = crdtRef.current.export_all();
+            setBlocks(exported);
+        }
       }
     };
 

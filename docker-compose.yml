@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  magistrate:
+    build: .
+    environment:
+      - NODE_ROLE=Magistrate
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    command: ["npm", "run", "simulate"]
+  scout:
+    build: .
+    environment:
+      - NODE_ROLE=Scout
+      - PORT=3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      - magistrate
+    command: ["npm", "run", "simulate"]
+  relay:
+    build: .
+    environment:
+      - NODE_ROLE=Relay
+      - PORT=3003
+    ports:
+      - "3003:3003"
+    depends_on:
+      - magistrate
+    command: ["npm", "run", "simulate"]

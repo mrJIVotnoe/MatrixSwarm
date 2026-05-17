@@ -283,4 +283,21 @@ impl AikidoCore {
         }
         true
     }
+
+    /// L2 - Local bot farm 51% attack detector
+    #[wasm_bindgen]
+    pub fn detect_bot_farm(static_nodes: u32, mobile_nodes: u32, total_nodes: u32) -> bool {
+        if total_nodes < 10 { return false; }
+        // If 80%+ of nodes are acting like static smartphones
+        let static_ratio = static_nodes as f32 / total_nodes as f32;
+        static_ratio > 0.8
+    }
+
+    /// L2 - Digital Camouflage
+    #[wasm_bindgen]
+    pub fn generate_digital_camouflage(real_payload: &str, bot_noise_seed: &str) -> String {
+        // Encase the real payload in fake generic metadata mimicking bot farm noise
+        // This hides our P2P signal within the 51% attack.
+        format!("{{\"bot_signature\": \"{bot_noise_seed}\", \"dummy_metrics\": [0.0, 1.2], \"__hidden_payload\": \"{real_payload}\"}}")
+    }
 }
