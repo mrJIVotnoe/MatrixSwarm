@@ -29,6 +29,8 @@ async function bootstrap() {
 
   // We maintain discovered peers
   const peers = new Set();
+  const activePeers = new Map<string, number>();
+  const activeTasks = new Map<string, string>();
 
   socket.on('message', (msg, rinfo) => {
       try {
@@ -57,20 +59,54 @@ async function bootstrap() {
                        console.log(`[P2P WebRTC-DataChannel] Sent encrypted Honey to ${data.role}!`);
                    });
               }
+              // Task Failover (Reincarnation) tracking
+              activePeers.set(data.nodeId, Date.now());
           } else if (data.type === 'HONEY_TRANSFER') {
               // L3 P2P Messaging: Inbound Honey
               const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.alloc(32, 1), Buffer.alloc(16, 0));
               let decrypted = decipher.update(data.payload, 'hex', 'utf8');
               decrypted += decipher.final('utf8');
               console.log(`[P2P WebRTC-DataChannel] Decrypted Honey from ${data.role}: >> "${decrypted}" <<`);
+          } else if (data.type === 'TASK_CLAIM') {
+              activeTasks.set(data.taskId, data.nodeId);
           }
-      } catch (e) {}
+      } catch (e: unknown) {}
   });
+
+  // Failover detector - Reincarnating tasks
+  setInterval(() => {
+     const now = Date.now();
+     for (const [peerId, lastSeen] of activePeers.entries()) {
+        if (now - lastSeen > 15000) { // 15 seconds without heartbeat -> Node died
+           console.log(`[WARNING] Node ${peerId} declared DEAD. Reincarnating its tasks...`);
+           activePeers.delete(peerId);
+           for (const [taskId, ownerId] of activeTasks.entries()) {
+              if (ownerId === peerId) {
+                  console.log(`[CRDT_FAILOVER] Reclaiming Task ${taskId} from dead node ${peerId}`);
+                  const claimMsg = JSON.stringify({ type: 'TASK_CLAIM', taskId, nodeId });
+                  socket.send(claimMsg, MULTICAST_PORT, MULTICAST_ADDR);
+                  activeTasks.set(taskId, nodeId);
+              }
+           }
+        }
+     }
+  }, 5000);
 
   socket.bind(MULTICAST_PORT, () => {
       socket.addMembership(MULTICAST_ADDR);
       console.log(`[NETWORK] Joined L3 Gossip Swarm at ${MULTICAST_ADDR}:${MULTICAST_PORT}`);
       
+      // Simulate task acquisition for Magistrate
+      if (ROLE === 'Magistrate') {
+          setTimeout(() => {
+             const taskId = "TASK_DECODE_NEXUS";
+             console.log(`[TASKS] ${ROLE} claiming genesis task ${taskId}`);
+             activeTasks.set(taskId, nodeId);
+             const claimMsg = JSON.stringify({ type: 'TASK_CLAIM', taskId, nodeId });
+             socket.send(claimMsg, MULTICAST_PORT, MULTICAST_ADDR);
+          }, 3000);
+      }
+
       // 2. mDNS Discovery broadcast (Waggle Dance)
       setInterval(() => {
           const discMsg = JSON.stringify({ type: 'MDNS_DISC', role: ROLE, nodeId });

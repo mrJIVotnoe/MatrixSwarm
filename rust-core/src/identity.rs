@@ -34,7 +34,7 @@ impl IdentityCore {
         let mut entropy_16 = [0u8; 16];
         entropy_16.copy_from_slice(&final_entropy.as_bytes()[..16]);
 
-        let mnemonic = Mnemonic::from_entropy(&entropy_16, Language::English)
+        let mnemonic = Mnemonic::from_entropy(&entropy_16)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         
         let passport = SoulPassport {
