@@ -87,6 +87,7 @@ impl SwarmNetwork {
 pub struct NativeP2PMesh {
     // we manage data channels here for direct messaging
     channels: std::cell::RefCell<std::collections::HashMap<String, web_sys::RtcDataChannel>>,
+    offline_queue: std::cell::RefCell<std::collections::HashMap<String, Vec<String>>>,
     local_id: String,
 }
 
@@ -96,6 +97,7 @@ impl NativeP2PMesh {
     pub fn new(local_id: &str) -> NativeP2PMesh {
         NativeP2PMesh {
             channels: std::cell::RefCell::new(std::collections::HashMap::new()),
+            offline_queue: std::cell::RefCell::new(std::collections::HashMap::new()),
             local_id: local_id.to_string(),
         }
     }
@@ -113,9 +115,34 @@ impl NativeP2PMesh {
         }) as Box<dyn FnMut(web_sys::MessageEvent)>);
         
         channel.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
+        
+        let onopen_callback = Closure::wrap(Box::new(move || {
+            crate::metrics::track_event("datachannel_opened");
+        }) as Box<dyn FnMut()>);
+        channel.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
+        
         onmessage_callback.forget();
+        onopen_callback.forget();
         
         self.channels.borrow_mut().insert(peer_id.to_string(), channel);
+    }
+
+    /// Drain offline messages to a peer once they connect
+    #[wasm_bindgen]
+    pub fn flush_offline_queue(&self, peer_id: &str) -> Result<u32, JsValue> {
+        let mut count = 0;
+        if let Some(channel) = self.channels.borrow().get(peer_id) {
+            if channel.ready_state() == web_sys::RtcDataChannelState::Open {
+                if let Some(mut queue) = self.offline_queue.borrow_mut().remove(peer_id) {
+                    for msg in queue.drain(..) {
+                        if channel.send_with_str(&msg).is_ok() {
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(count)
     }
 
     /// Send digital pheromones directly without server
@@ -125,10 +152,16 @@ impl NativeP2PMesh {
             if channel.ready_state() == web_sys::RtcDataChannelState::Open {
                 channel.send_with_str(payload).map_err(|_| JsValue::from_str("CONNECTION_BROKEN"))?;
                 return Ok(true);
-            } else {
-                 return Err(JsValue::from_str("CONNECTION_BROKEN"));
             }
         }
-        Err(JsValue::from_str("CONNECTION_BROKEN"))
+        
+        // Queue it
+        self.offline_queue
+            .borrow_mut()
+            .entry(peer_id.to_string())
+            .or_insert_with(Vec::new)
+            .push(payload.to_string());
+            
+        Err(JsValue::from_str("QUEUED_OFFLINE"))
     }
 }

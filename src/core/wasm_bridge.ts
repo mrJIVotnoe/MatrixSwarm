@@ -287,9 +287,17 @@ export class WasmNativeP2PMesh {
     try {
        return this.inner.transmit_pheromone_direct(peer_id, payload);
     } catch(e) {
-       handleRustError(e, 'WasmNativeP2PMesh.transmit_pheromone_direct');
+       // Queued offline or connection broken
        return false;
     }
+  }
+  flush_offline_queue(peer_id: string): number {
+    try {
+       if (this.inner.flush_offline_queue) {
+           return this.inner.flush_offline_queue(peer_id);
+       }
+    } catch(e) {}
+    return 0;
   }
 }
 

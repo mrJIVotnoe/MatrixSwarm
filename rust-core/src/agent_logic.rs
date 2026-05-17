@@ -41,22 +41,31 @@ impl AgentStateMachine {
         self.try_transition_ready()
     }
 
+    fn transition_to(&mut self, new_state: AgentState) {
+        let trace_id = crate::metrics::get_next_trace_id();
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&JsValue::from_str(&format!("[{}] State Transition: {:?} -> {:?}", trace_id, self.state, new_state)));
+        #[cfg(not(target_arch = "wasm32"))]
+        println!("[{}] State Transition: {:?} -> {:?}", trace_id, self.state, new_state);
+        self.state = new_state;
+    }
+
     pub fn detect_usb(&mut self) -> Result<(), JsValue> {
         crate::metrics::track_isolation_breach();
         crate::metrics::track_event("usb_detected");
         self.usb_connection_detected = true;
-        self.state = AgentState::QUARANTINED;
+        self.transition_to(AgentState::QUARANTINED);
         Ok(())
     }
 
     pub fn try_transition_ready(&mut self) -> Result<(), JsValue> {
         if self.usb_connection_detected {
-            self.state = AgentState::QUARANTINED;
+            self.transition_to(AgentState::QUARANTINED);
             return Err(JsValue::from_str("Cannot become ready: UART/USB breach detected. Quarantined."));
         }
         if self.state == AgentState::INIT || self.state == AgentState::RESURRECTING {
             if self.trust_level_verified {
-                self.state = AgentState::READY;
+                self.transition_to(AgentState::READY);
                 Ok(())
             } else {
                 Err(JsValue::from_str("Trust level not verified"))
@@ -69,7 +78,7 @@ impl AgentStateMachine {
     pub fn start_running(&mut self) -> Result<(), JsValue> {
         crate::metrics::track_event("start_running");
         if self.state == AgentState::READY {
-            self.state = AgentState::RUNNING;
+            self.transition_to(AgentState::RUNNING);
             Ok(())
         } else {
             Err(JsValue::from_str("Cannot run: not READY"))
@@ -79,20 +88,20 @@ impl AgentStateMachine {
     pub fn report_failure(&mut self) {
         crate::metrics::track_event("report_failure");
         if self.state != AgentState::QUARANTINED && self.state != AgentState::TERMINATED {
-            self.state = AgentState::FAILED;
+            self.transition_to(AgentState::FAILED);
         }
     }
 
     pub fn degrade(&mut self) {
          if self.state == AgentState::RUNNING {
-             self.state = AgentState::DEGRADED;
+             self.transition_to(AgentState::DEGRADED);
          }
     }
 
     pub fn resurrect(&mut self) -> Result<(), JsValue> {
          crate::metrics::track_event("resurrect");
          if self.state == AgentState::FAILED || self.state == AgentState::DEGRADED {
-             self.state = AgentState::RESURRECTING;
+             self.transition_to(AgentState::RESURRECTING);
              self.trust_level_verified = false; // requires re-verification
              Ok(())
          } else {
@@ -101,7 +110,7 @@ impl AgentStateMachine {
     }
 
     pub fn terminate(&mut self) {
-        self.state = AgentState::TERMINATED;
+        self.transition_to(AgentState::TERMINATED);
     }
 }
 

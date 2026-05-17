@@ -80,6 +80,13 @@ export class SwarmConnection {
     this.dataChannel = channel;
     this.dataChannel.onopen = () => {
       console.log(`[Mesh L3] DataChannel OPEN with ${this.peerId}. Transferring control to Native WebAssembly Rust Core.`);
+      
+      // Flush any queued offline messages
+      const flushed = (this.nativeMesh as any).flush_offline_queue(this.peerId);
+      if (flushed && flushed > 0) {
+        console.log(`[Queue] Flushed ${flushed} offline messages to ${this.peerId}.`);
+      }
+
       this.startHeartbeat();
     };
 
@@ -132,10 +139,8 @@ export class SwarmConnection {
   }
 
   public send(message: MeshMessage) {
-      if (this.dataChannel?.readyState === 'open') {
-         // L3 Direct Rust transmitting
-         this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify(message));
-      }
+      // L3 Direct Rust transmitting handles internal queueing if channel isn't open yet
+      this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify(message));
   }
 
   private initiateRelayFallback() {
