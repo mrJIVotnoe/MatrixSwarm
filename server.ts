@@ -25,7 +25,17 @@ if (process.env.MATRIX_BASE_URL && process.env.MATRIX_ACCESS_TOKEN && process.en
     process.env.MATRIX_USER_ID,
     process.env.SWARM_ENCRYPTION_KEY
   );
-  state.matrixEcho.start().catch((err: any) => console.error("[ERROR] [HIVE] Matrix Echo failed to start:", err));
+  try {
+    state.matrixEcho.start().catch((err: unknown) => {
+      if (err instanceof Error) {
+        console.error("[ERROR] [HIVE] Matrix Echo failed to start:", err.message);
+      } else {
+        console.error("[ERROR] [HIVE] Matrix Echo failed to start:", err);
+      }
+    });
+  } catch (err: unknown) {
+    console.error("[ERROR] [HIVE] Matrix setup error:", err);
+  }
 } else {
   console.warn("[WARN] [HIVE] Matrix credentials missing. The Echo protocol will be simulated locally.");
 }
@@ -33,7 +43,7 @@ if (process.env.MATRIX_BASE_URL && process.env.MATRIX_ACCESS_TOKEN && process.en
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
 
   // Middlewares
   app.use(cors());
@@ -42,8 +52,12 @@ async function startServer() {
   // Init DB
   try {
     await getDb();
-  } catch (e: any) {
-    console.error("[WARNING] Database failed to initialize. Swarm operating in ephemeral memory Mode! Error:", e.message);
+  } catch (e: unknown) {
+    if (e instanceof Error) {
+      console.error("[WARNING] Database failed to initialize. Swarm operating in ephemeral memory Mode! Error:", e.message);
+    } else {
+      console.error("[WARNING] Database failed to initialize:", e);
+    }
   }
 
   // WebSockets Removed for Final L3 Native Gossip Only Protocol
@@ -53,6 +67,11 @@ async function startServer() {
 
   // API Routes
   app.use("/api/v1", apiRouter);
+
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", type: "matrix_swarm", timestamp: Date.now() });
+  });
 
   // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== "production") {
@@ -71,11 +90,15 @@ async function startServer() {
 
   server.listen(PORT, "0.0.0.0", () => {
     console.info(`[INFO] [SWARM CORE] Server running on port ${PORT}`);
-  }).on("error", (err: any) => {
-    console.error("[ERROR] [SWARM CORE] Server failed to start:", err);
+  }).on("error", (err: unknown) => {
+    if (err instanceof Error) {
+      console.error("[ERROR] [SWARM CORE] Server failed to start:", err.message);
+    } else {
+      console.error("[ERROR] [SWARM CORE] Server failed to start:", err);
+    }
   });
 }
 
-startServer().catch((err) => {
+startServer().catch((err: unknown) => {
   console.error("[ERROR] [SWARM CORE] Fatal error during startup:", err);
 });

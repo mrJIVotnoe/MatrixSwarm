@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, WasmAgentStateMachine } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');

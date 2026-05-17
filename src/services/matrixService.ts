@@ -31,28 +31,72 @@ export class MatrixService {
     }
   }
 
+  private timelineHandler = (event: unknown, room: unknown, toStartOfTimeline: boolean) => {
+    if (toStartOfTimeline) return;
+    
+    // Type-guard event and room
+    const ev = event as sdk.MatrixEvent;
+    const rm = room as sdk.Room;
+    
+    if (ev.getType && ev.getType() !== "m.room.message") return;
+    if (rm.roomId && rm.roomId !== this.roomId) return;
+
+    const content = ev.getContent ? ev.getContent() : null;
+    if (content && content.msgtype === "m.text" && content.body && typeof content.body === 'string' && content.body.startsWith("ECHO_V2:")) {
+      try {
+        const encryptedData = content.body.substring(8);
+        const decryptedData = this.decrypt(encryptedData);
+        if (!decryptedData) return;
+
+        const data = JSON.parse(decryptedData);
+        console.log("[MATRIX_ECHO] Received encrypted telemetry:", data);
+      } catch (e: unknown) {
+        console.error("[MATRIX_ECHO] Failed to parse decrypted echo message");
+      }
+    }
+  };
+
+  private getDerivedKey() {
+    // PBKDF2 Key Derivation Upgrade
+    return CryptoJS.PBKDF2(this.swarmKey || "", "swarm_salt_v1", { keySize: 256 / 32, iterations: 10000 });
+  }
+
   private encrypt(text: string): string {
     if (!this.swarmKey) return text;
-    const key = CryptoJS.SHA256(this.swarmKey);
+    const key = this.getDerivedKey();
     const iv = CryptoJS.lib.WordArray.random(16);
     const encrypted = CryptoJS.AES.encrypt(text, key, { iv: iv });
-    // Format: iv_hex:ciphertext_base64
-    return iv.toString() + ":" + encrypted.toString();
+    
+    // Add HMAC for Source Validation
+    const ciphertext = encrypted.toString();
+    const hmac = CryptoJS.HmacSHA256(iv.toString() + ":" + ciphertext, key).toString();
+    
+    // Format: iv_hex:ciphertext_base64:hmac_hex
+    return iv.toString() + ":" + ciphertext + ":" + hmac;
   }
 
   private decrypt(ciphertextWithIv: string): string {
     if (!this.swarmKey) return ciphertextWithIv;
     try {
       const parts = ciphertextWithIv.split(":");
-      if (parts.length !== 2) return "";
+      if (parts.length !== 3) return "";
       
-      const iv = CryptoJS.enc.Hex.parse(parts[0]);
+      const ivStr = parts[0];
       const ciphertext = parts[1];
-      const key = CryptoJS.SHA256(this.swarmKey);
+      const providedHmac = parts[2];
+      const key = this.getDerivedKey();
       
+      // Verify signature (Source Validation)
+      const expectedHmac = CryptoJS.HmacSHA256(ivStr + ":" + ciphertext, key).toString();
+      if (providedHmac !== expectedHmac) {
+        console.error("[MATRIX_ECHO] HMAC Signature Invalid! Dropping message from unauthorized source.");
+        return "";
+      }
+
+      const iv = CryptoJS.enc.Hex.parse(ivStr);
       const bytes = CryptoJS.AES.decrypt(ciphertext, key, { iv: iv });
       return bytes.toString(CryptoJS.enc.Utf8);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("[MATRIX_ECHO] Decryption failed. Invalid Swarm Key or format?");
       return "";
     }
@@ -66,30 +110,14 @@ export class MatrixService {
     
     await this.client.startClient({ initialSyncLimit: 10 });
     
-    this.client.on("Room.timeline" as any, (event: any, room: any, toStartOfTimeline: boolean) => {
-      if (toStartOfTimeline) return;
-      if (event.getType() !== "m.room.message") return;
-      if (room.roomId !== this.roomId) return;
-
-      const content = event.getContent();
-      if (content.msgtype === "m.text" && content.body.startsWith("ECHO_V2:")) {
-        try {
-          const encryptedData = content.body.substring(8);
-          const decryptedData = this.decrypt(encryptedData);
-          if (!decryptedData) return;
-
-          const data = JSON.parse(decryptedData);
-          console.log("[MATRIX_ECHO] Received encrypted telemetry:", data);
-        } catch (e) {
-          console.error("[MATRIX_ECHO] Failed to parse decrypted echo message");
-        }
-      }
-    });
+    // Explicitly bind to 'Room.timeline' string avoiding `any` assertion
+    // @ts-expect-error matrix-js-sdk event typing workaround
+    this.client.on("Room.timeline", this.timelineHandler);
 
     try {
       await this.client.joinRoom(this.roomId!);
       console.log(`[MATRIX_ECHO] Joined room ${this.roomId}`);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("[MATRIX_ECHO] Failed to join room:", e);
     }
   }
@@ -100,18 +128,25 @@ export class MatrixService {
   async broadcastEcho(telemetry: EchoMessage) {
     if (!this.client || !this.roomId) return;
 
-    const jsonString = JSON.stringify(telemetry);
-    const encryptedBody = this.encrypt(jsonString);
-    const body = `ECHO_V2:${encryptedBody}`;
+    try {
+      const jsonString = JSON.stringify(telemetry);
+      const encryptedBody = this.encrypt(jsonString);
+      const body = `ECHO_V2:${encryptedBody}`;
 
-    await (this.client as any).sendEvent(this.roomId, "m.room.message", {
-      msgtype: "m.text",
-      body: body,
-    }, "");
+      // @ts-expect-error matrix-js-sdk sendEvent typing workaround
+      await this.client.sendEvent(this.roomId, "m.room.message", {
+        msgtype: "m.text",
+        body: body,
+      });
+    } catch (e: unknown) {
+      console.error("[MATRIX_ECHO] Failed to broadcast echo:", e);
+    }
   }
 
   stop() {
     if (this.client) {
+      // @ts-expect-error matrix-js-sdk event typing workaround
+      this.client.removeListener("Room.timeline", this.timelineHandler);
       this.client.stopClient();
     }
   }

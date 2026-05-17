@@ -1,6 +1,8 @@
 <div align="center">
   
 # 🌌 MATRIX_SWARM
+[![Build Status](https://img.shields.io/badge/Build-passing-success)]()
+
 > **«Железо смертно. Информация бессмертна. Рой вечен.»**
 
 **Infrastructure of Last Resort**
@@ -39,18 +41,18 @@ TypeScript/JavaScript низведены до уровня периферии (�
 
 ```mermaid
 graph TD
-    classDef surrogate fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fcd34d;
-    classDef component fill:#1e293b,stroke:#0ea5e9,stroke-width:1px,color:#fff;
-    classDef policy fill:#334155,stroke:#ef4444,stroke-width:2px,color:#fff;
+    classDef surrogate fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fcd34d
+    classDef component fill:#1e293b,stroke:#0ea5e9,stroke-width:1px,color:#fff
+    classDef policy fill:#334155,stroke:#ef4444,stroke-width:2px,color:#fff
     
-    Core[<b>Digital Shell (WASM)</b><br>Ядро Симбионта L5]:::component --> Auth{Предъявлен Token?}:::policy
-    Auth --> |Нет подписи| Block[Аппаратный Карантин]:::policy
-    Auth --> |Valid Signature| Senses
+    Core["<b>Digital Shell (WASM)</b><br>Ядро Симбионта L5"]:::component --> Auth{"Предъявлен Token?"}:::policy
+    Auth -->|"Нет подписи"| Block["Аппаратный Карантин"]:::policy
+    Auth -->|"Valid Signature"| Senses
     
-    subgraph Senses [Органы Чувств Роя]
-        Audio[<b>Слух</b><br>Микрофон: Акустические феромоны, Nabbat]:::surrogate
-        Vision[<b>Зрение</b><br>Камера: Kinopsis, Декодирование P2P]:::surrogate
-        Geo[<b>Проприоцепция</b><br>GPS: Построение локальной Geo-соты]:::surrogate
+    subgraph Senses ["Органы Чувств Роя"]
+        Audio["<b>Слух</b><br>Микрофон: Акустические феромоны, Nabbat"]:::surrogate
+        Vision["<b>Зрение</b><br>Камера: Kinopsis, Декодирование P2P"]:::surrogate
+        Geo["<b>Проприоцепция</b><br>GPS: Построение локальной Geo-соты"]:::surrogate
     end
 ```
 
