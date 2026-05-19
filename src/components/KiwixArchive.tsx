@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity, Share2 } from 'lucide-react';
-import { WasmGlobalKnowledge, WasmArkStorage } from '../core/wasm_bridge';
+import { WasmGlobalKnowledge, WasmArkManager } from '../core/wasm_bridge';
 
 // ... other constants ...
 const ZIM_LIBRARIES = [
@@ -29,7 +29,7 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
 
   const workerRef = useRef<Worker | null>(null);
 
-  const arkRef = useRef(new WasmArkStorage());
+  const arkRef = useRef(new WasmArkManager());
 
   const handlePollinate = (knowledgeType: string) => {
      // Simulating node role 'Magistrate' for demo

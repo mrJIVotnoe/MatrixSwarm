@@ -16,6 +16,28 @@ pub struct SystemMetrics {
 
 #[wasm_bindgen]
 impl CasteAutonomy {
+    #[wasm_bindgen]
+    pub fn calculate_karma_multiplier(has_mini_jack: bool, is_throttling: bool, condor_synced: bool) -> f32 {
+        let mut multiplier = 1.0;
+        
+        // Postulate 1: Mini-Jack Bonus
+        // "Наличие разъема и подключенной «суррогатной антенны» (наушников) дает множитель х1.5"
+        if has_mini_jack {
+            multiplier *= 1.5;
+        }
+
+        // Postulate 2: Condor Stability
+        // "Стабильная работа процессора без «троттлинга» и успешная синхронизация с кластером Condor — базовый множитель Кармы."
+        if !is_throttling && condor_synced {
+            multiplier *= 1.2;
+        } else if is_throttling {
+            // Penalize throttling
+            multiplier *= 0.8;
+        }
+        
+        multiplier
+    }
+
     /// Merits of Iron: Determine Node Role based on system resources
     #[wasm_bindgen]
     pub fn determine_role(metrics_json: &str) -> Result<JsValue, JsValue> {

@@ -1,5 +1,5 @@
 import { TrustLevel } from '../core/permissions';
-import { WasmArkStorage } from '../core/wasm_bridge';
+import { WasmArkManager } from '../core/wasm_bridge';
 
 export interface TranslationRequest {
   taskId: string;
@@ -23,12 +23,12 @@ export interface TranslationResponse {
 export class MagistrateBridge {
   private hasLlmApiAccess: boolean = false;
   private trustLevel: TrustLevel;
-  public arkStorage: WasmArkStorage;
+  public arkStorage: WasmArkManager;
 
   constructor(trustLevel: TrustLevel) {
     this.trustLevel = trustLevel;
     this.hasLlmApiAccess = !!process.env.GEMINI_API_KEY; // Check if node has local/magistrate API capabilities
-    this.arkStorage = new WasmArkStorage();
+    this.arkStorage = new WasmArkManager();
     
     // Seed some critical medical knowledge
     this.arkStorage.store_fragment("medicine_basic", "Treatment for burns: Cool water, aloe, do not break blisters.");

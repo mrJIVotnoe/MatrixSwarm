@@ -151,6 +151,7 @@ export const HolographicCore = {
 };
 
 export const VisualKinopsis = {
+  request_camera_constraints: () => JSON.stringify({ video: { facingMode: { exact: "environment" }, width: { ideal: 1920 } } }),
   analyze_visual_pheromone: (frame_data) => "NORMAL_CONDITIONS",
   generate_visual_pheromone: (status) => new Uint8Array([100, 200, 100, 200]),
   collective_threat_analysis: (logs_json) => {
@@ -227,6 +228,8 @@ export class TrustEngine {
   constructor() {
     this.karmic_score = 0;
     this.is_hardware_verified = false;
+    this.is_powered = false;
+    this.has_mini_jack = false;
   }
   verify_hardware(signature) {
     if (signature.length > 10) {
@@ -235,8 +238,22 @@ export class TrustEngine {
     }
     return false;
   }
-  add_karma(amount) {
-    this.karmic_score += amount;
+  register_mini_jack(present) {
+    this.has_mini_jack = present;
+  }
+  is_anchor_magistrate_candidate() {
+    return this.is_powered && this.get_level() === 4;
+  }
+  add_karma(amount, role = "Drone") {
+    let amt = amount;
+    if (this.has_mini_jack && amount > 0) {
+      if (role === "Scout") {
+         amt += amount / 2;
+      } else {
+         amt += amount / 4;
+      }
+    }
+    this.karmic_score += Math.floor(amt);
   }
   get_level() {
     if (this.karmic_score < 0) return -1;
@@ -246,11 +263,17 @@ export class TrustEngine {
     if (this.karmic_score < 10000) return 3;
     return 4;
   }
-  check_physical_link(isUsbConnected) {
+  check_physical_link(isUsbConnected, authorizedPower = false) {
     if (isUsbConnected) {
+      if (authorizedPower) {
+        this.is_powered = true;
+        return false;
+      }
       this.is_hardware_verified = false;
+      this.is_powered = false;
       return true;
     }
+    this.is_powered = false;
     return false;
   }
 }
@@ -316,9 +339,35 @@ export const GlobalIntentDecomposer = {
   }
 };
 
-export class ArkStorage {
+export const VisionCore = {
+  get_camera_constraints: () => JSON.stringify({ video: { facingMode: { exact: "environment" }, width: { ideal: 1920 } } }),
+  process_metadata: (light_level, motion_score) => "NORMAL_LIGHT,STATIC_MOTION",
+};
+
+export const MeshSurrogate = {
+  enable_lora_surrogate: () => "LORA_DRIVER_STUB_LOADED: Listening on pseudo-serial...",
+  enable_meshtastic_surrogate: () => "MESHTASTIC_BLE_BRIDGE_MOCK_READY",
+};
+
+export class ArkManager {
   constructor() {
     this.fragments = {};
+    this.zim_registry = {};
+    this.cultural_layer = {};
+  }
+  load_zim_archive(archive_name, file_size) {
+    this.zim_registry[archive_name] = "ZIM/Kiwix-Compatible";
+    return true;
+  }
+  read_zim_fragment(topic) {
+    if (topic === "ZIM_WIKIPEDIA_SURVIVAL") return "Kiwix ZIM Fragment: [Water Purification Techniques & Basic First Aid]";
+    return "Fragment not found in ZIM registry";
+  }
+  install_retro_app(app_id, package_data) {
+    this.cultural_layer[app_id] = "INSTALLED";
+  }
+  get_installed_apps() {
+    return Object.keys(this.cultural_layer).join(",");
   }
   store_fragment(topic, content) {
     this.fragments[topic] = content;
@@ -327,19 +376,28 @@ export class ArkStorage {
     return this.fragments[topic] || "";
   }
   get_available_knowledge() {
-    return Object.keys(this.fragments).join(",");
+    return [...Object.keys(this.fragments), ...Object.keys(this.zim_registry), ...Object.keys(this.cultural_layer)].join(",");
   }
   pollinate(peer_id) {
-    return JSON.stringify(this.fragments);
+    return JSON.stringify({ fragments: this.fragments, culture: this.cultural_layer });
   }
   receive_pollination(payload) {
     let added = 0;
     try {
         const incoming = JSON.parse(payload);
-        for(const k of Object.keys(incoming)) {
-            if(!this.fragments[k]) {
-                this.fragments[k] = incoming[k];
-                added++;
+        if (incoming.fragments) {
+            for(const k of Object.keys(incoming.fragments)) {
+                if(!this.fragments[k]) {
+                    this.fragments[k] = incoming.fragments[k];
+                    added++;
+                }
+            }
+        }
+        if (incoming.culture) {
+            for(const k of Object.keys(incoming.culture)) {
+                if(!this.cultural_layer[k]) {
+                    this.cultural_layer[k] = incoming.culture[k];
+                }
             }
         }
     } catch(e) {}
@@ -385,7 +443,13 @@ export class AgentStateMachine {
   }
   get_state() { return this.state; }
   verify_trust() { this.trust_level_verified = true; return this.try_transition_ready(); }
-  detect_usb() { this.usb_connection_detected = true; this.state = "QUARANTINED"; }
+  detect_usb(authorized = false) { 
+    if (authorized) {
+      return; // Do nothing, it's energy communion
+    }
+    this.usb_connection_detected = true; 
+    this.state = "QUARANTINED"; 
+  }
   try_transition_ready() {
       if (this.usb_connection_detected) { this.state = "QUARANTINED"; throw new Error("USB breach"); }
       if (this.state === "INIT" || this.state === "RESURRECTING") {
@@ -413,6 +477,39 @@ export class AgentStateMachine {
   terminate() { this.state = "TERMINATED"; }
 }
 
+export class CondorCluster {
+  constructor() {
+    this.tasks = {};
+    this.active_nodes = 0;
+  }
+  register_node(is_powered, karmic_score) {
+    if (is_powered || karmic_score > 100) this.active_nodes += 1;
+  }
+  submit_heavy_task(task_id, payload, chunks) {
+    this.tasks[task_id] = { id: task_id, payload, total: chunks, completed: 0 };
+    return true;
+  }
+  process_chunk(task_id) {
+    let t = this.tasks[task_id];
+    if (t && t.completed < t.total) t.completed += 1;
+    return t ? t.completed : 0;
+  }
+  is_task_complete(task_id) {
+    let t = this.tasks[task_id];
+    return t ? t.completed >= t.total : false;
+  }
+  get_active_nodes() { return this.active_nodes; }
+}
+
+export class ProprioceptionCore {
+  constructor() {}
+  update_gps(lat, lng) { return `CELL_MOCK_${lat.toFixed(2)}_${lng.toFixed(2)}`; }
+  get_current_cell() { return "CELL_MOCK"; }
+  triangulate_via_acoustic_and_ble(peer_id, acoustic_strength, ble_strength) {
+     return 100.0 - (acoustic_strength * 0.5 + ble_strength * 0.5);
+  }
+}
+
 export const MetricsEngine = {
   get_metrics: () => JSON.stringify({ heartbeat_success_rate: 99.5, crdt_sync_latency: 12.3, isolation_breach_attempts: 0 }),
   mock_heartbeat: (success) => {},
@@ -423,10 +520,36 @@ export class MessageCRDT {
   constructor() {
     this.messages = [];
   }
-  add_message(id, s, r, p, ts) { this.messages.push({id, s, r, p, ts}); }
+  add_message(id, s, r, p, ts) { 
+      this.messages.push({id, s, r, p, ts}); 
+      this.messages.sort((a,b) => a.ts - b.ts);
+  }
   get_messages_for(r) { return "[]"; }
-  merge_all(s) {}
-  export_all() { return "[]"; }
-  export_deltas_since(since_ts) { return "[]"; }
-  merge_deltas(delta_data) {}
+  merge_all(s) {
+      try {
+          const incoming = JSON.parse(s);
+          for (let msg of incoming) {
+              if (!this.messages.find(m => m.id === msg.id)) {
+                  this.messages.push(msg);
+              }
+          }
+          this.messages.sort((a,b) => a.ts - b.ts);
+      } catch(e) {}
+  }
+  export_all() { return JSON.stringify(this.messages); }
+  export_deltas_since(since_ts) { return JSON.stringify(this.messages.filter(m => m.ts > since_ts)); }
+  merge_deltas(delta_data) {
+      try {
+          const incoming = JSON.parse(delta_data);
+          let added = 0;
+          for (let msg of incoming) {
+              if (!this.messages.find(m => m.id === msg.id)) {
+                  this.messages.push(msg);
+                  added++;
+              }
+          }
+          this.messages.sort((a,b) => a.ts - b.ts);
+          return added;
+      } catch(e) {}
+  }
 }

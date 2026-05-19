@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Network, Activity, Eye, Combine, Globe, RefreshCcw } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, WasmAgentStateMachine } from '../core/wasm_bridge';
+import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones } from 'lucide-react';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -12,19 +12,53 @@ export const ObserverHUD: React.FC = () => {
   const [globalIntent, setGlobalIntent] = useState('');
   const [intentStatus, setIntentStatus] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({ heartbeat_success_rate: 0, crdt_sync_latency: 0, isolation_breach_attempts: 0 });
+  const [cellId, setCellId] = useState<string>("UNKNOWN");
+  const [arkContent, setArkContent] = useState<string | null>(null);
 
   const schedulerRef = useRef(new WasmTaskScheduler());
+  const proprioceptionRef = useRef(new WasmProprioceptionCore());
+  const arkStorageRef = useRef(new WasmArkManager());
+  const condorRef = useRef(new WasmCondorCluster());
+
+  const [agentState, setAgentState] = useState<string>('INIT');
+  const [isPowered, setIsPowered] = useState(false);
+  const [condorStatus, setCondorStatus] = useState<string>("INACTIVE");
+  const [visionStatus, setVisionStatus] = useState<string>("OFFLINE");
+  const [antennaMultiplier, setAntennaMultiplier] = useState<string>("x1.0");
+
+  const activateKinopsis = () => {
+     setVisionStatus("REQUESTING WIDE-LENS...");
+     setTimeout(() => {
+         const constraints = WasmVisionCore.get_camera_constraints();
+         setIntentStatus(`KINOPSIS: Applied strict constraints: ${JSON.stringify(constraints)}`);
+         
+         const meta = WasmVisionCore.process_metadata(45.0, 80.0);
+         setVisionStatus(meta);
+     }, 1000);
+  };
+
+  const activateSurrogateAntenna = () => {
+      setAntennaMultiplier("x1.5");
+      setIntentStatus("SURROGATE ANTENNA DETECTED (Mini-jack). Karma accumulation boosted.");
+  };
 
   useEffect(() => {
+     // Proprioception Mock Location (Triangulated by WebAPI or Reverse StarLink)
+     const cell_id = proprioceptionRef.current.update_gps(55.75, 37.61);
+     setCellId(cell_id);
+
      const interval = setInterval(() => {
         try {
             setMetrics(WasmMetricsEngine.get_metrics());
+            if (GlobalAgentState) {
+               setAgentState(GlobalAgentState.get_state());
+            }
         } catch(e) {}
      }, 1000);
      return () => clearInterval(interval);
   }, []);
 
-    const handleGlobalIntent = (e: React.FormEvent) => {
+  const handleGlobalIntent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!globalIntent.trim()) return;
     setIntentStatus("Decomposing intent via Rust LLM Interface...");
@@ -44,6 +78,33 @@ export const ObserverHUD: React.FC = () => {
       setTimeout(() => {
           setIntentStatus(`Wave collapsed. Vector locked: ${vector}`);
       }, 3000);
+  };
+
+  const handleEnergyCommunion = () => {
+      // User allows authorized power via USB
+      GlobalAgentState.detect_usb(true);
+      setIsPowered(true);
+      setIntentStatus("ENERGY COMMUNION: Authorized USB power. Node anchoring as Magistrate.");
+  };
+
+  const testCondorDistributedTask = () => {
+      condorRef.current.submit_heavy_task("HASH_BLOCK_4", "0xDEADBEEF", 100);
+      setCondorStatus("CONDOR ACTIVE");
+      let chunks = 0;
+      const t = setInterval(() => {
+          chunks++;
+          condorRef.current.process_chunk("HASH_BLOCK_4");
+          if(chunks >= 100) {
+             clearInterval(t);
+             setCondorStatus("TASK COMPLETE");
+          }
+      }, 20);
+  };
+
+  const handleArkStorageTest = () => {
+      arkStorageRef.current.load_zim_archive("wikipedia_survival.zim", 1024 * 1024 * 500);
+      const frag = arkStorageRef.current.read_zim_fragment("ZIM_WIKIPEDIA_SURVIVAL");
+      setArkContent(frag);
   };
 
   // Simulating probability wave particles and planetary anchors
@@ -213,8 +274,8 @@ export const ObserverHUD: React.FC = () => {
         )}
       </div>
       
-      <div className="mt-4 grid grid-cols-4 gap-4 text-xs font-mono text-center">
-        <div className="col-span-4 mb-2">
+      <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-4 text-xs font-mono text-center">
+        <div className="col-span-full mb-2">
             <form onSubmit={handleGlobalIntent} className="flex flex-col gap-2 bg-black/60 border border-cyan-900/50 p-3 rounded">
                <div className="flex justify-between text-cyan-400 font-bold mb-1">
                  <span>GLOBAL INTENT (EYE OF GOD) / PROBABILITY COLLAPSE</span>
@@ -247,20 +308,54 @@ export const ObserverHUD: React.FC = () => {
             </form>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">HEARTBEAT SUCCESS</span>
-           <span className="text-green-400">{metrics.heartbeat_success_rate.toFixed(1)}%</span>
+           <span className="text-gray-500 block">CURRENT STATE</span>
+           <span className={`font-bold ${agentState === 'RUNNING' ? 'text-green-400' : agentState === 'QUARANTINED' ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>{agentState}</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
            <span className="text-gray-500 block">CRDT LATENCY</span>
            <span className="text-cyan-400">{metrics.crdt_sync_latency.toFixed(1)}ms</span>
         </div>
-        <div className="border border-blue-900/50 bg-black/40 p-2 rounded" onClick={() => { WasmAgentStateMachine && new WasmAgentStateMachine().detect_usb(); }}>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded" onClick={() => { GlobalAgentState.detect_usb(); }}>
            <span className="text-gray-500 block">ISOLATION BREACHES</span>
            <span className={metrics.isolation_breach_attempts > 0 ? "text-red-400" : "text-yellow-400"}>{metrics.isolation_breach_attempts}</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">LEGACY</span>
-           <span className="text-purple-400">SOUL MIGRATION READY</span>
+           <span className="text-gray-500 block">TRUST / P2P STATUS</span>
+           <span className="text-purple-400">{agentState === 'RUNNING' ? 'VERIFIED' : 'AWAITING AUTH'}</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
+           <span className="text-gray-500 block">DIGITAL PROPRIOCEPTION</span>
+           <span className="text-emerald-400 truncate block" title={cellId}>{cellId}</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={handleEnergyCommunion}>
+           <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
+             <BatteryCharging className="w-3 h-3 mr-1" /> ENERGY COMMUNION
+           </span>
+           <span className={isPowered ? "text-amber-400" : "text-gray-600"}>{isPowered ? "ANCHOR MODE" : "UNPLUGGED"}</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={testCondorDistributedTask}>
+           <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
+             <Cpu className="w-3 h-3 mr-1" /> DISTRIBUTED COMPUTE
+           </span>
+           <span className={condorStatus.includes("ACTIVE") ? "text-yellow-400 animate-pulse font-bold" : "text-gray-600"}>{condorStatus}</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={activateKinopsis}>
+           <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
+             <Camera className="w-3 h-3 mr-1" /> KINOPSIS SENSOR
+           </span>
+           <span className={visionStatus === "OFFLINE" ? "text-gray-600" : "text-emerald-400 font-bold text-[10px]"}>{visionStatus}</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={activateSurrogateAntenna}>
+           <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
+             <Headphones className="w-3 h-3 mr-1" /> MESH SURROGATE
+           </span>
+           <span className={antennaMultiplier === "x1.5" ? "text-yellow-400 font-bold" : "text-gray-600"}>KARMA {antennaMultiplier}</span>
+        </div>
+        <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={handleArkStorageTest}>
+           <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
+             <Archive className="w-3 h-3 mr-1" /> LOUVRE ZIM ACCESS
+           </span>
+           <span className="text-white text-[10px] break-words truncate">{arkContent ? arkContent : "AWAITING FRAGMENT..."}</span>
         </div>
       </div>
     </div>

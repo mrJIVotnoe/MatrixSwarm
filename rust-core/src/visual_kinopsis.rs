@@ -5,7 +5,15 @@ pub struct VisualKinopsis {}
 
 #[wasm_bindgen]
 impl VisualKinopsis {
+    #[wasm_bindgen]
+    pub fn request_camera_constraints() -> String {
+        // "Жесткое ограничение — доступ только к основной (задней) камере и только в ультра-широком диапазоне. Никакой фронтальной камеры."
+        // These are passed to JS `navigator.mediaDevices.getUserMedia(...)`
+        r#"{ "video": { "facingMode": { "exact": "environment" }, "width": { "ideal": 1920 } } }"#.to_string()
+    }
+
     /// L5 - Kinopsis: Analyze Context via Camera frames (simplified)
+
     /// Processes a generic array of brightness values.
     #[wasm_bindgen]
     pub fn analyze_visual_pheromone(frame_data: &[u8]) -> String {

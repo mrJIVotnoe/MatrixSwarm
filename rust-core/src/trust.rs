@@ -16,6 +16,8 @@ pub enum TrustLevel {
 pub struct TrustEngine {
     karmic_score: i32,
     is_hardware_verified: bool,
+    is_powered: bool,
+    has_mini_jack: bool,
 }
 
 #[wasm_bindgen]
@@ -25,6 +27,8 @@ impl TrustEngine {
         Self {
             karmic_score: 0,
             is_hardware_verified: false,
+            is_powered: false,
+            has_mini_jack: false,
         }
     }
 
@@ -49,8 +53,17 @@ impl TrustEngine {
     }
 
     #[wasm_bindgen]
-    pub fn add_karma(&mut self, amount: i32) {
-        self.karmic_score += amount;
+    pub fn add_karma(&mut self, amount: i32, role: &str) {
+        let mut final_amount = amount;
+        if self.has_mini_jack && amount > 0 {
+            if role == "Scout" {
+                // Кармическая Антенна multiplier x1.5
+                final_amount += amount / 2;
+            } else {
+                final_amount += amount / 4; // lesser bonus for non-Scout
+            }
+        }
+        self.karmic_score += final_amount;
     }
 
     #[wasm_bindgen]
@@ -64,18 +77,35 @@ impl TrustEngine {
         }
     }
 
-    /// L2 - Immunity: Zero-Trust USB
     #[wasm_bindgen]
-    pub fn check_physical_link(&mut self, is_usb_connected: bool) -> bool {
+    pub fn register_mini_jack(&mut self, present: bool) {
+        self.has_mini_jack = present;
+    }
+
+    /// L2 - Immunity: Zero-Trust USB & Power Authorization
+    #[wasm_bindgen]
+    pub fn check_physical_link(&mut self, is_usb_connected: bool, authorized_power: bool) -> bool {
         if is_usb_connected {
+            if authorized_power {
+                self.is_powered = true;
+                // If authorized, trust level doesn't fall, and we mark as powered
+                return false;
+            }
             // "Если система обнаруживает подключение через USB-кабель, trustLevel узла
             // в памяти Rust должен быть принудительно установлен в 0 (Карантин)"
             self.is_hardware_verified = false;
+            self.is_powered = false;
             // "Блокируй любые попытки автоматической синхронизации данных через USB-порты 
             // до тех пор, пока Пользователь (Наблюдатель) не подтвердит доверие через подпись ключом"
             return true; // Return true indicating a quarantine block occurred
         }
+        self.is_powered = false;
         false
+    }
+
+    #[wasm_bindgen]
+    pub fn is_anchor_magistrate_candidate(&self) -> bool {
+        self.is_powered && self.get_level() == TrustLevel::Magistrate
     }
 }
 
@@ -91,8 +121,8 @@ mod tests {
         
         assert_eq!(engine.get_level(), TrustLevel::Adept);
         
-        // Connect USB
-        let blocked = engine.check_physical_link(true);
+        // Connect USB without authorization
+        let blocked = engine.check_physical_link(true, false);
         assert!(blocked);
         
         // Level falls to Quarantine (0)

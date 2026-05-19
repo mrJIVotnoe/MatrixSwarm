@@ -118,7 +118,11 @@ export class SwarmConnection {
     this.heartbeatInterval = setInterval(() => {
       if (this.dataChannel?.readyState === 'open') {
          // Sending directly via Rust Native layer
-         this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify({ type: 'pheromone_heartbeat', payload: { ts: Date.now() } }));
+         try {
+             this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify({ type: 'pheromone_heartbeat', payload: { ts: Date.now() } }));
+         } catch(e) {
+             console.error("[P2P] Heartbeat transmit failed:", e);
+         }
       }
     }, 5000);
   }
@@ -140,7 +144,11 @@ export class SwarmConnection {
 
   public send(message: MeshMessage) {
       // L3 Direct Rust transmitting handles internal queueing if channel isn't open yet
-      this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify(message));
+      try {
+          this.nativeMesh.transmit_pheromone_direct(this.peerId, JSON.stringify(message));
+      } catch(e) {
+          console.error(`[P2P] Failed to send message to ${this.peerId}:`, e);
+      }
   }
 
   private initiateRelayFallback() {

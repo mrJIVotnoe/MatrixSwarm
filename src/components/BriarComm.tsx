@@ -108,6 +108,14 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
     
     peer.on('data', async data => {
       const text = data.toString();
+      let extractedText = text;
+      try {
+          const parsed = JSON.parse(text);
+          if (parsed.type === 'matrix_honey') {
+              console.log(`[MATRIX_BRIDGE] Received Matrix Honey over WebRTC`);
+              extractedText = parsed.payload;
+          }
+      } catch (e) {}
       
       // L4/L5 Sandboxing: Parse and validate incoming payload in isolated worker
       try {
@@ -119,7 +127,7 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
           return { safeText: input };
         `;
         // Execute in an isolated Web Worker (Zero-Trust context)
-        const result = await SwarmSandbox.executeTask(validationCode, text, { maxCpuPercentage: 10, maxRamMb: 10, maxExecutionTimeMs: 1000 });
+        const result = await SwarmSandbox.executeTask(validationCode, extractedText, { maxCpuPercentage: 10, maxRamMb: 10, maxExecutionTimeMs: 1000 });
         
         setMessages(prev => ({
           ...prev,
@@ -148,10 +156,12 @@ export function BriarComm({ symbiote, observerData, cellData }: { symbiote: any,
 
     const peer = peers[activeContact];
     if (peer && peer.connected) {
-      peer.send(messageText);
+      // Matrix Bridge: Сообщения («Мёд») течь через WebRTC DataChannels напрямую.
+      console.log(`[MATRIX_BRIDGE] Direct WebRTC DataChannel send of Honey (Мёд).`);
+      peer.send(JSON.stringify({ type: 'matrix_honey', payload: messageText }));
     } else {
       // Offline fallback
-      console.log(`[BrambleComm] Peer offline. Queueing securely via Rust Core.`);
+      console.log(`[MATRIX_BRIDGE] Peer offline. Queueing manually via Rust Core CRDT.`);
       if (messageQueueRef.current) {
           messageQueueRef.current.enqueue_message(
              msgId,

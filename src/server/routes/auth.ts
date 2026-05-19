@@ -12,7 +12,8 @@ const router = Router();
 router.post("/register", async (req, res) => {
   try {
     const { alias, public_key, user_mode } = req.body;
-    let id = crypto.createHash('sha256').update(public_key).digest('hex').substring(0, 16);
+    // PBKDF2 Key Derivation instead of SHA-256
+    let id = crypto.pbkdf2Sync(public_key, 'swarm_salt', 10000, 32, 'sha256').toString('hex').substring(0, 16);
     
     const db = await getDb();
     const existing = await db.get('SELECT * FROM observers WHERE id = ?', [id]);

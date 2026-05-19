@@ -6,3 +6,8 @@ export const EntropyBridge: any;
 export const AikidoMath: any;
 export const AcousticAnalyzer: any;
 export const SwarmCore: any;
+export const ProprioceptionCore: any;
+export const CondorCluster: any;
+export const VisionCore: any;
+export const ArkManager: any;
+export const MeshSurrogate: any;

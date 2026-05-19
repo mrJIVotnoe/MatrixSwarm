@@ -148,6 +148,9 @@ export class MatrixService {
       // @ts-expect-error matrix-js-sdk event typing workaround
       this.client.removeListener("Room.timeline", this.timelineHandler);
       this.client.stopClient();
+      this.client = null;
     }
+    this.swarmKey = null;
+    this.roomId = null;
   }
 }

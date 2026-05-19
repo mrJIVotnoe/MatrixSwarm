@@ -64,6 +64,18 @@ export const PlanetaryGrid: React.FC = () => {
             </div>
          </div>
       )}
+
+      {/* Offline Maps Slot: Децентрализованная навигация 2ГИС-style на базе ячеек */}
+      <div className="mb-4 bg-black/40 border border-emerald-900/50 p-3 flex flex-col gap-2">
+         <h3 className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
+           <Radio className="w-3 h-3" />
+           OFFLINE MAPS (2ГИС-STYLE)
+         </h3>
+         <div className="flex justify-between text-xs font-mono text-slate-400 text-[10px]">
+           <span>Geo-Cell Cache: <span className="text-emerald-400">LOADED</span></span>
+           <span>Routing Protocol: <span className="text-cyan-400">P2P MESH</span></span>
+         </div>
+      </div>
       
       <div className="grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
         {cells.length === 0 ? (

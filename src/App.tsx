@@ -22,6 +22,7 @@ import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
 import { ObserverHUD } from './components/ObserverHUD';
 import { getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
+import { GlobalAgentState } from './core/wasm_bridge';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from './core/i18n';
@@ -206,6 +207,13 @@ function MainDashboard() {
                const id = keys.nodeId;
                localStorage.setItem('observerId', id);
                setObserverId(id);
+               // Advance Agent Contract State
+               try {
+                  GlobalAgentState.verify_trust();
+                  GlobalAgentState.start_running();
+               } catch (e) {
+                  console.error("Agent Contract violation:", e);
+               }
             } else {
                localStorage.removeItem('soul_passport');
             }

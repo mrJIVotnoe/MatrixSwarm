@@ -4,7 +4,15 @@ import { SwarmSandbox, ResourceQuotas } from '../core/isolation';
 import { PermissionEngine, PermissionScope } from '../core/permissions';
 import { IntegrityGuard } from '../core/integrity';
 import { MagistrateBridge } from './magistrate';
-import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore, WasmAikidoCore, WasmSeismicSensor } from '../core/wasm_bridge';
+import { WasmTrustEngine, WasmAikidoMath, TrustLevel, WasmSwarmCore, WasmAikidoCore, WasmSeismicSensor, WasmProprioceptionCore } from '../core/wasm_bridge';
+
+export interface SwarmTask {
+  id: string;
+  type: string;
+  signature?: string;
+  payload?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 export type SymbioteStatus = 
   | "sleeping" 
@@ -22,6 +30,7 @@ export class SwarmSymbiote {
   public nodeId: string | null = null;
   public hardwareStats = { cores: 1, ram: 2 };
   public trustEngine: WasmTrustEngine;
+  public proprioceptionCore: WasmProprioceptionCore;
   public get trustScore() { return (this.trustEngine as any).karmic_score; }
   public get trustLevel() { return this.trustEngine.get_level(); }
   public isp: string = "BrowserISP"; 
@@ -46,10 +55,15 @@ export class SwarmSymbiote {
   constructor(private onUpdate: (status: SymbioteStatus, message?: string, trustScore?: number) => void) {
     this.trustEngine = new WasmTrustEngine();
     this.seismicSensor = new WasmSeismicSensor();
+    this.proprioceptionCore = new WasmProprioceptionCore();
     this.detectHardwareClass();
     
     // Simulate initial hardware signature verification (e.g. valid USB Quarantine device)
     this.trustEngine.verify_hardware("simulated_signature_from_usb_" + Date.now());
+
+    // Кармический mini-jack
+    const hasMiniJack = ('getAudioTracks' in navigator && (navigator as any).getAudioTracks) || true; // Mock true for demo
+    this.trustEngine.register_mini_jack(true);
   }
 
   private async requestSensorAccess(scope: PermissionScope): Promise<boolean> {
@@ -134,9 +148,7 @@ export class SwarmSymbiote {
           }
           this.lastCoordsTime = Date.now();
           this.lastCoords = { lat: latitude, lng: longitude };
-          const cellLat = latitude.toFixed(3);
-          const cellLng = longitude.toFixed(3);
-          this.cellId = `CELL-${cellLat}-${cellLng}`;
+          this.cellId = this.proprioceptionCore.update_gps(latitude, longitude);
         }, () => {}, { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 });
       }
     }
@@ -306,7 +318,7 @@ export class SwarmSymbiote {
     }, 5000);
   }
 
-  private async handleTask(task: any) {
+  private async handleTask(task: SwarmTask) {
     if (task.signature) {
       const isValid = IntegrityGuard.verifyTaskSignature(JSON.stringify(task.payload || {}), task.signature, this.magistratePublicKey);
       if (!isValid) {

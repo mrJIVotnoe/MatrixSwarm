@@ -13,8 +13,17 @@ const ROLE = process.env.NODE_ROLE || 'Scout_Local';
 const MULTICAST_ADDR = '224.0.0.114';
 const MULTICAST_PORT = 41234;
 
+let globalTraceCounter = Math.floor(Math.random() * 1000000);
+
+function logStateTransition(oldState: string, newState: string) {
+   const traceId = "TRACE_" + (globalTraceCounter++).toString(16).toUpperCase().padStart(8, '0');
+   console.log(`[${traceId}] State Transition: ${oldState} -> ${newState}`);
+}
+
 async function bootstrap() {
   console.log(`🐝 [BOOTSTRAP] Starting MatrixSwarm Node Simulator: ${ROLE}...`);
+  
+  logStateTransition("INIT", "READY");
 
   const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
   
@@ -26,6 +35,7 @@ async function bootstrap() {
   };
   
   console.log(`[IDENTITY] Soul Passport Forged: ${nodeId}`);
+  logStateTransition("READY", "RUNNING");
 
   // We maintain discovered peers
   const peers = new Set();
@@ -104,6 +114,14 @@ async function bootstrap() {
              activeTasks.set(taskId, nodeId);
              const claimMsg = JSON.stringify({ type: 'TASK_CLAIM', taskId, nodeId });
              socket.send(claimMsg, MULTICAST_PORT, MULTICAST_ADDR);
+             
+             if (process.env.DEMO_MODE) {
+                  setTimeout(() => {
+                      logStateTransition("RUNNING", "FAILED");
+                      console.log(`[FATAL] Injecting artificial crash to demonstrate task failover... Container will die.`);
+                      process.exit(1);
+                  }, 6000);
+             }
           }, 3000);
       }
 

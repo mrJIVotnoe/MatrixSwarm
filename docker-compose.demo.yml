@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  node_magistrate:
+  node1:
     image: node:20-alpine
     command: sh -c "npm install -g tsx typescript && npm install && npm run demo:node1"
     working_dir: /app
@@ -11,7 +11,7 @@ services:
       - NODE_ROLE=Magistrate
       - DEMO_MODE=true
 
-  node_scout:
+  node2:
     image: node:20-alpine
     command: sh -c "npm install -g tsx typescript && npm install && npm run demo:node2"
     working_dir: /app
@@ -21,16 +21,4 @@ services:
       - NODE_ROLE=Scout
       - DEMO_MODE=true
     depends_on:
-      - node_magistrate
-
-  node_relay:
-    image: node:20-alpine
-    command: sh -c "npm install -g tsx typescript && npm install && tsx swarm/node_simulator.ts"
-    working_dir: /app
-    volumes:
-      - .:/app
-    environment:
-      - NODE_ROLE=Relay
-      - DEMO_MODE=true
-    depends_on:
-      - node_magistrate
+      - node1

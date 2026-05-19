@@ -14,7 +14,10 @@
     "start": "tsx server.ts",
     "prepare": "husky install",
     "os": "tsx src/os/Orchestrator.ts",
-    "simulate": "tsx swarm/node_simulator.ts"
+    "simulate": "tsx swarm/node_simulator.ts",
+    "demo": "docker-compose -f docker-compose.demo.yml up --build",
+    "demo:node1": "tsx swarm/node_simulator.ts",
+    "demo:node2": "tsx swarm/node_simulator.ts"
   },
   "husky": {
     "hooks": {
