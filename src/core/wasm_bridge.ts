@@ -165,6 +165,15 @@ export class WasmTrustEngine {
     if (this.inner.register_mini_jack) this.inner.register_mini_jack(present);
   }
 
+  register_acoustic_sync(active: boolean) {
+    if (this.inner.register_acoustic_sync) this.inner.register_acoustic_sync(active);
+  }
+
+  is_scout_vanguard(): boolean {
+    if (this.inner.is_scout_vanguard) return this.inner.is_scout_vanguard();
+    return false;
+  }
+
   check_physical_link(isUsbConnected: boolean, authorizedPower: boolean = false): boolean {
     if (this.inner.check_physical_link) return this.inner.check_physical_link(isUsbConnected, authorizedPower);
     return false;
@@ -503,6 +512,12 @@ export class WasmCondorEngine {
   }
   is_node_ready_for_condor(trust_level: number, is_plugged_in: boolean): boolean {
     return this.inner.is_node_ready_for_condor(trust_level, is_plugged_in);
+  }
+  reincarnate_task_from_dying_node(task_id: string, failing_node: string, candidate_node: string): boolean {
+    if (this.inner.reincarnate_task_from_dying_node) {
+      return this.inner.reincarnate_task_from_dying_node(task_id, failing_node, candidate_node);
+    }
+    return false;
   }
 }
 

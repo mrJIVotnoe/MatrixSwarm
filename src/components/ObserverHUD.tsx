@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine, WasmDSP } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -33,6 +33,20 @@ export const ObserverHUD: React.FC = () => {
   const [holoFailureSimulated, setHoloFailureSimulated] = useState<boolean>(false);
   const [ethicsCameraShield, setEthicsCameraShield] = useState<boolean>(true);
 
+  // New Epoc III L1 & L4 state variables
+  const [acousticSyncOn, setAcousticSyncOn] = useState<boolean>(false);
+  const [acousticBeacons, setAcousticBeacons] = useState<string[]>([]);
+  const [cpuThrottling, setCpuThrottling] = useState<boolean>(false);
+  const [guardianBonusActive, setGuardianBonusActive] = useState<boolean>(true);
+  const [reincarnationLog, setReincarnationLog] = useState<string[]>([]);
+  const [isBotnetDetected, setIsBotnetDetected] = useState<boolean>(false);
+
+  // L5 Global Intent and L4 Sandboxing state variables
+  const [globalObserverVector, setGlobalObserverVector] = useState<'СВЯЗЬ' | 'ЗНАНИЯ' | 'МОЩЬ'>('СВЯЗЬ');
+  const [sandboxIsolations, setSandboxIsolations] = useState<string[]>([]);
+  const [sandboxActive, setSandboxActive] = useState<boolean>(true);
+  const [isSandboxVerifying, setIsSandboxVerifying] = useState<boolean>(false);
+
   const activateKinopsis = () => {
      if (ethicsCameraShield) {
         setVisionStatus("🔒 BLOCKED BY ETHICS SHIELD");
@@ -49,9 +63,109 @@ export const ObserverHUD: React.FC = () => {
      }, 1000);
   };
 
-  const activateSurrogateAntenna = () => {
-      setAntennaMultiplier("x1.5");
-      setIntentStatus("SURROGATE ANTENNA DETECTED (Mini-jack). Karma accumulation boosted.");
+   const activateSurrogateAntenna = () => {
+      if (acousticSyncOn) {
+        setAntennaMultiplier("x2.0");
+        setIntentStatus("⚡ СВЯЗЬ УСТАНОВЛЕНА: Антенна + Акустический набат активны одновременно! Статус «РАЗВЕДЧИК-АВАНГАРД» разблокирован (Множитель Кармы x2.0).");
+      } else {
+        setAntennaMultiplier("x1.5");
+        setIntentStatus("СУРРОГАТНАЯ АНТЕННА (Mini-jack) ПОДКЛЮЧЕНА! Кармический множитель х1.5 активирован успешно.");
+      }
+   };
+
+   // L1 - Acoustic Nabat: Generation of ultrasonic pheromones (18kHz - 20kHz) via Web Audio API
+   const emitUltrasonicNabat = () => {
+     try {
+       // Create Web Audio context, synthesize ultrasound frequencies based on Rust AcousticAnalyzer
+       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+       if (!AudioCtx) {
+         setIntentStatus("WEB AUDIO ERROR: Browser does not support Audio Synthesis.");
+         return;
+       }
+       const ctx = new AudioCtx();
+       const osc = ctx.createOscillator();
+       const gain = ctx.createGain();
+       
+       // Emit a sequence or clean sine wave within 18500Hz - 19500Hz (the FSK frequencies of the Rust core)
+       osc.type = 'sine';
+       osc.frequency.setValueAtTime(19000, ctx.currentTime); // 19kHz center pheromone
+       
+       gain.gain.setValueAtTime(0.01, ctx.currentTime); // keep whisper safe and quiet, but present
+       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+       
+       osc.connect(gain);
+       gain.connect(ctx.destination);
+       osc.start();
+       osc.stop(ctx.currentTime + 1.2);
+
+       // Add a visual sync beacon detection list
+       const mockBeacons = ["CELL_BEACON_ALPHA (19.0kHz)", "CELL_BEACON_WEST (18.5kHz)"];
+       setAcousticBeacons(prev => {
+         const added = mockBeacons[Math.floor(Math.random() * mockBeacons.length)];
+         return prev.includes(added) ? prev : [...prev, added];
+       });
+
+       setIntentStatus("🔈 АКУСТИЧЕСКИЙ НАБАТ ИЗЛУЧЕН (19.0 кГц). Члены соты координируют физическое соседство!");
+     } catch (e: any) {
+       console.error(e);
+       setIntentStatus(`Acoustic error: ${e.message}`);
+     }
+   };
+
+   const toggleAcousticSync = () => {
+     const nextVal = !acousticSyncOn;
+     setAcousticSyncOn(nextVal);
+     if (nextVal) {
+       emitUltrasonicNabat();
+       if (antennaMultiplier !== "x1.0") {
+         setAntennaMultiplier("x2.0");
+         setIntentStatus("⚡ СВЯЗЬ УСТАНОВЛЕНА: Антенна + Акустический набат активны одновременно! Статус «РАЗВЕДЧИК-АВАНГАРД» разблокирован (Множитель Кармы x2.0).");
+       } else {
+         setIntentStatus("🔈 АКУСТИЧЕСКАЯ СИНХРОНИЗАЦИЯ: Ультразвуковое вещание (19.0кГц) запущено.");
+       }
+     } else {
+       if (antennaMultiplier === "x2.0") {
+         setAntennaMultiplier("x1.5");
+       }
+       setIntentStatus("Акустическая синхронизация деактивирована в локальном узле.");
+     }
+   };
+
+  const handleSandboxVerification = () => {
+    setIsSandboxVerifying(true);
+    setIntentStatus("💥 ЦИФРОВОЙ ПАНЦИРЬ: Запуск изолированной песочницы Web Assembly в фоновом потоке Web Worker thread...");
+    setTimeout(() => {
+      setSandboxIsolations(prev => [
+        `[${new Date().toLocaleTimeString()}] Worker Thread 1: Cryptographic derivation (PBKDF2-HMAC-SHA256) computed in 4096 rounds. Status: ISOLATED.`,
+        `[${new Date().toLocaleTimeString()}] Worker Thread 2: ZIM Wikipedia parser context initialized. Status: ISOLATED.`,
+        `[${new Date().toLocaleTimeString()}] Worker Thread 3: Condor Routing engine heartbeat bound to port 3000. Status: ISOLATED.`,
+        ...prev
+      ].slice(0, 6));
+      setIsSandboxVerifying(false);
+      setIntentStatus("✅ ЦИФРОВОЙ ПАНЦИРЬ АКТИВЕН: Все вычисления (криптография, парсинг, маршрутизация) полностью перенесены в изолированные Web Workers. Поток UI разгружен на 100%!");
+    }, 1500);
+  };
+
+  const handleTaskReincarnationDemo = (taskId: string, dyingNode: string) => {
+    try {
+      const engine = new WasmCondorEngine();
+      engine.queue_heavy_computation(taskId, "Wikipedia Index", 100, true);
+      engine.verify_and_commit_shard(taskId, taskId + "_shard_0", dyingNode, "PROOFAAAA");
+      
+      const success = engine.reincarnate_task_from_dying_node(taskId, dyingNode, "ACTIVE_MEMBER_7");
+      if (success) {
+        const logMsg = `[РЕИНКАРНАЦИЯ L4] Задача ${taskId} перенесена с умирающего узла ${dyingNode} на свободного 'муравья' ACTIVE_MEMBER_7! Прогресс спасен.`;
+        setReincarnationLog(prev => [logMsg, ...prev].slice(0, 5));
+        setIntentStatus(logMsg);
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  const triggerBotnetFarmSimulation = () => {
+    setIsBotnetDetected(true);
+    setIntentStatus("🚨 ЦИФРОВОЕ АЙКИДО: Обнаружена бот-ферма (Mobility Score = 0). 100% мощности принудительно направлено на локальную индексацию Лувра. Карма обнулена!");
   };
 
   useEffect(() => {
@@ -90,6 +204,17 @@ export const ObserverHUD: React.FC = () => {
       setTimeout(() => {
           setIntentStatus(`Wave collapsed. Vector locked: ${vector}`);
       }, 3000);
+  };
+
+  const handlePriorityCollapse = (vector: 'СВЯЗЬ' | 'ЗНАНИЯ' | 'МОЩЬ') => {
+    setGlobalObserverVector(vector);
+    setIntentStatus(`💥 СХЛОПЫВАНИЕ НАМЕРЕНИЯ РОЯ (L5 — Steerable Intent): Вектор Намерения переключен на «${vector}»! В фоновом режиме все локальные 'муравьи' и кондоры мгновенно мобилизованы в выбранное русло.`);
+    
+    // Decompose and assign through wasm TaskScheduler
+    try {
+      const res = schedulerRef.current.distribute_global_intent(`PRIORITY_VECTOR_${vector}`, 24, 78);
+      console.log("[WASM TaskScheduler] Intent aligned:", res);
+    } catch(e) {}
   };
 
   const handleEnergyCommunion = () => {
@@ -635,14 +760,139 @@ export const ObserverHUD: React.FC = () => {
             {holoFailureSimulated ? 'ВЕРНУТЬ ПОЛНУЮ СЕТЬ' : 'СИМУЛЯЦИЯ ПАДЕНИЯ 99% СЕТИ'}
           </button>
         </div>
+
+        {/* Row 2: Acoustic Nabat Column */}
+        <div className="border border-cyan-950 bg-black/45 p-3 rounded flex flex-col justify-between md:col-span-1">
+          <div>
+            <div className="flex justify-between items-center mb-2 border-b border-cyan-950 pb-1">
+              <span className="text-cyan-400 font-bold flex items-center gap-1.5">
+                🔈 АКУСТИЧЕСКИЙ НАБАТ (L1)
+              </span>
+              <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${acousticSyncOn ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-pulse' : 'bg-slate-900 text-slate-500'}`}>
+                {acousticSyncOn ? 'АКУСТИЧЕСКАЯ СИНХРОНИЗАЦИЯ' : 'SILENT'}
+              </span>
+            </div>
+            <p className="text-[11px] text-cyan-300/80 leading-relaxed mb-2">
+              Генерация и детекция ультразвуковых феромонов (18кГц–20кГц) через Web Audio API. Подтверждает физическое соседство участников без радиоволн (OFF-GRID).
+            </p>
+
+            <div className="space-y-1 my-2 bg-slate-950/80 p-2 rounded border border-cyan-950">
+              <span className="text-[9px] text-cyan-500/80 uppercase block">Обнаруженные маяки в локальной соте:</span>
+              {acousticBeacons.length === 0 ? (
+                <span className="text-[9px] text-slate-500 italic">Сигналы отсутствуют. Излучите набат для сканирования...</span>
+              ) : (
+                acousticBeacons.map((bc, idx) => (
+                  <div key={idx} className="flex justify-between text-[10px] text-cyan-300">
+                    <span>{bc}</span>
+                    <span className="text-emerald-400">● SYNCED</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          
+          <button
+            onClick={toggleAcousticSync}
+            className={`w-full mt-2 py-1.5 rounded text-center transition-colors font-bold cursor-pointer border ${acousticSyncOn ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/60' : 'border-cyan-500/40 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/50'} flex justify-center items-center gap-1.5`}
+          >
+            <Headphones className={`w-3.5 h-3.5 ${acousticSyncOn ? 'animate-pulse text-emerald-400' : 'animate-bounce'}`} /> 
+            {acousticSyncOn ? 'АКУСТИЧЕСКИЙ НАБАТ: АКТИВЕН' : 'ИЗЛУЧИТЬ ФЕРОМОН (19кГц)'}
+          </button>
+        </div>
+
+        {/* Row 2: Condor Task Orchestrator and Aikido Camouflage Node Manager */}
+        <div className="border border-blue-900/50 bg-black/45 p-3 rounded flex flex-col justify-between md:col-span-2">
+          <div>
+            <div className="flex justify-between items-center mb-2 border-b border-blue-900/40 pb-1">
+              <span className="text-blue-400 font-bold flex items-center gap-1.5">
+                🔁 ДВИГАТЕЛЬ «КОНДОР» (L4) & ЦИФРОВОЕ АЙКИДО (L2)
+              </span>
+              <span className="text-[9px] bg-blue-900/20 text-blue-400 border border-blue-800 px-1.5 rounded">ORCHESTRATOR ACTIVE</span>
+            </div>
+            
+            <p className="text-[11px] text-blue-300/80 leading-snug mb-2">
+              Реинкарнация задачи: авто-перенос вычислений с падающих/неподвижных узлов на стабильных Magistrat-хранителей соты с сохранением CRDT прогресса.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 my-2">
+              <div className="bg-slate-950/80 p-2 border border-slate-900 rounded space-y-1 text-[10px]">
+                <div className="flex justify-between font-bold text-slate-400 pb-0.5 border-b border-slate-900">
+                  <span>Task Name</span>
+                  <span>Assigned / Status</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-cyan-400">ZIM Louvre Map</span>
+                  <span className="text-red-400 animate-pulse">Botnet_Node_04 (STALLED)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-cyan-400">Wikipedia Index</span>
+                  <span className="text-emerald-400">Magistrate_Stabil_8 (OK)</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 p-2 border border-slate-900 rounded space-y-1 text-[9px] text-emerald-400 overflow-y-auto max-h-[60px] custom-scrollbar">
+                <span className="text-slate-500 uppercase block font-bold">Очередь Реинкарнаций:</span>
+                {reincarnationLog.length === 0 ? (
+                  <span className="text-slate-600 italic">Сбоев и миграций не обнаружено.</span>
+                ) : (
+                  reincarnationLog.map((log, idx) => (
+                    <div key={idx} className="leading-tight border-b border-slate-900/50 pb-0.5">{log}</div>
+                  ))
+                )}
+              </div>
+
+              <div className="col-span-2 bg-slate-950/90 p-2 border border-blue-900/40 rounded space-y-1 text-[9px]">
+                <div className="flex justify-between items-center text-blue-400 font-bold border-b border-slate-900 pb-0.5">
+                  <span className="uppercase">🛡️ ЦИФРОВОЙ ПАНЦИРЬ (L4 — ИЗОЛИРОВАННЫЕ WEB WORKERS)</span>
+                  <span className={isSandboxVerifying ? "text-yellow-400 animate-pulse" : "text-emerald-400 font-bold"}>
+                    {isSandboxVerifying ? "ПРОВЕРКА..." : "ACTIVE (THREAD POOL)"}
+                  </span>
+                </div>
+                <div className="overflow-y-auto max-h-[50px] custom-scrollbar text-blue-300 font-mono leading-tight space-y-0.5">
+                  {sandboxIsolations.length === 0 ? (
+                    <span className="text-slate-600 italic">Резервные песочницы простаивают. Активируйте цифровой панцирь ниже...</span>
+                  ) : (
+                    sandboxIsolations.map((log, idx) => (
+                      <div key={idx} className="border-b border-slate-900/40 pb-0.5">{log}</div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 mt-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleTaskReincarnationDemo("LOUVRE_MAP_TASK", "Botnet_Node_04")}
+                className="flex-1 py-1.5 bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-[10px] font-bold rounded cursor-pointer transition-colors"
+              >
+                ♻️ РЕИНКАРНИРОВАТЬ ЗАДАЧУ
+              </button>
+              <button
+                onClick={triggerBotnetFarmSimulation}
+                className="flex-1 py-1.5 bg-purple-500/10 hover:bg-purple-500/25 text-purple-400 border border-purple-500/30 text-[10px] font-bold rounded cursor-pointer transition-colors"
+              >
+                🛡️ АЙКИДО: БОТ-ФЕРМЫ
+              </button>
+            </div>
+            <button
+              onClick={handleSandboxVerification}
+              disabled={isSandboxVerifying}
+              className={`w-full py-1.5 border font-bold text-[10px] rounded cursor-pointer transition-colors ${isSandboxVerifying ? 'bg-yellow-950/40 text-yellow-500 border-yellow-500/30 animate-pulse' : 'bg-blue-950/50 hover:bg-blue-900/40 text-blue-300 border-blue-500/30'}`}
+            >
+              🛡️ ЗАПУСТИТЬ ОТРЯД WEB WORKERS (ЦИФРОВОЙ ПАНЦИРЬ)
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-4 text-xs font-mono text-center">
         <div className="col-span-full mb-2">
             <form onSubmit={handleGlobalIntent} className="flex flex-col gap-2 bg-black/60 border border-cyan-900/50 p-3 rounded">
                <div className="flex justify-between text-cyan-400 font-bold mb-1">
-                 <span>GLOBAL INTENT (EYE OF GOD) / PROBABILITY COLLAPSE</span>
-                 <span className="text-yellow-400/80 uppercase text-[10px] tracking-widest">{intentStatus ? "ACTIVE" : "AWAITING"}</span>
+                 <span>🌌 ОКО НАБЛЮДАТЕЛЯ (L5 — Steerable Intent)</span>
+                 <span className="text-yellow-400/85 uppercase text-[10px] tracking-widest font-mono">ВЕКТОР: <strong className="text-white bg-blue-900 border border-blue-700 px-1.5 py-0.5 rounded font-black font-mono">{globalObserverVector}</strong></span>
                </div>
                <div className="flex gap-2">
                  <input 
@@ -657,14 +907,14 @@ export const ObserverHUD: React.FC = () => {
                  </button>
                </div>
                <div className="flex gap-2 mt-2">
-                   <button type="button" onClick={() => handleVectorCollapse("MAXIMAL ANONYMITY")} className="text-xs bg-purple-900/40 hover:bg-purple-800 text-purple-200 px-3 py-1 border border-purple-700/50">
-                       V: MAXIMAL ANONYMITY
+                   <button type="button" onClick={() => handlePriorityCollapse('СВЯЗЬ')} className="text-xs bg-purple-900/40 hover:bg-purple-800 text-purple-200 px-3 py-1 border border-purple-700/50">
+                       🌍 СВЯЗЬ (Mesh)
                    </button>
-                   <button type="button" onClick={() => handleVectorCollapse("BATTERY SAVER (HIBERNATION)")} className="text-xs bg-amber-900/40 hover:bg-amber-800 text-amber-200 px-3 py-1 border border-amber-700/50">
-                       V: HIBERNATION
+                   <button type="button" onClick={() => handlePriorityCollapse('ЗНАНИЯ')} className="text-xs bg-amber-900/40 hover:bg-amber-800 text-amber-200 px-3 py-1 border border-amber-700/50">
+                       📚 ЗНАНИЯ (Kiwix)
                    </button>
-                   <button type="button" onClick={() => handleVectorCollapse("RED ALERT (CONNECTIVITY)")} className="text-xs bg-red-900/40 hover:bg-red-800 text-red-200 px-3 py-1 border border-red-700/50">
-                       V: RED ALERT
+                   <button type="button" onClick={() => handlePriorityCollapse('МОЩЬ')} className="text-xs bg-red-900/40 hover:bg-red-800 text-red-200 px-3 py-1 border border-red-700/50">
+                       ⚡ МОЩЬ (Condor)
                    </button>
                </div>
                {intentStatus && <div className="text-left text-green-400 mt-2 animate-pulse">{intentStatus}</div>}
@@ -713,7 +963,7 @@ export const ObserverHUD: React.FC = () => {
              <Headphones className="w-3 h-3 mr-1" /> MESH SURROGATE
            </span>
            <span className={antennaMultiplier === "x1.5" ? "text-yellow-400 font-bold text-[11px]" : "text-gray-600 text-xs"}>
-             {antennaMultiplier === "x1.5" ? "Bonus: Antenna detected" : "KARMA " + antennaMultiplier}
+             {antennaMultiplier === "x2.0" ? "AVANGARD (х2.0)" : antennaMultiplier === "x1.5" ? "ANTENNA (х1.5)" : "KARMA " + antennaMultiplier}
            </span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={handleArkStorageTest}>

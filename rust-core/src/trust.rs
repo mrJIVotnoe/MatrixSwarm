@@ -18,6 +18,9 @@ pub struct TrustEngine {
     is_hardware_verified: bool,
     is_powered: bool,
     has_mini_jack: bool,
+    is_cpu_stable: bool,
+    is_botnet_farmer: bool,
+    is_acoustic_sync_active: bool,
 }
 
 #[wasm_bindgen]
@@ -29,6 +32,9 @@ impl TrustEngine {
             is_hardware_verified: false,
             is_powered: false,
             has_mini_jack: false,
+            is_cpu_stable: true,
+            is_botnet_farmer: false,
+            is_acoustic_sync_active: false,
         }
     }
 
@@ -54,16 +60,61 @@ impl TrustEngine {
 
     #[wasm_bindgen]
     pub fn add_karma(&mut self, amount: i32, role: &str) {
-        let mut final_amount = amount;
-        if self.has_mini_jack && amount > 0 {
-            if role == "Scout" {
-                // Кармическая Антенна multiplier x1.5
-                final_amount += amount / 2;
-            } else {
-                final_amount += amount / 4; // lesser bonus for non-Scout
-            }
+        if self.is_botnet_farmer {
+            // Aikido Camouflage Rule: 100% computational load redirected, NO karma awarded.
+            return;
         }
+
+        let mut final_amount = amount;
+        
+        // L0 - Hardware Sync (Scout Vanguard Postulate): 
+        // If both mini-jack antenna and Acoustic Sync (ultrasound) are active, 
+        // node receives Scout Vanguard level with direct x2.0 Karma multiplier!
+        if self.has_mini_jack && self.is_acoustic_sync_active && amount > 0 {
+            final_amount = (final_amount as f32 * 2.0) as i32;
+        } else if self.has_mini_jack && amount > 0 {
+            // Mini-Jack Audio Ear / Surrogate Antenna physical ethic: automatic 1.5x Karma bonus
+            final_amount = (final_amount as f32 * 1.5) as i32;
+        }
+
+        // Condor (Heart / Stable Guardian) ethic: Stable CPU, no thermal throttling. +20% karma bonus.
+        if self.is_cpu_stable && amount > 0 {
+            final_amount += (final_amount as f32 * 0.20) as i32;
+        }
+
         self.karmic_score += final_amount;
+    }
+
+    #[wasm_bindgen]
+    pub fn register_acoustic_sync(&mut self, active: bool) {
+        self.is_acoustic_sync_active = active;
+    }
+
+    #[wasm_bindgen]
+    pub fn is_scout_vanguard(&self) -> bool {
+        self.has_mini_jack && self.is_acoustic_sync_active
+    }
+
+    #[wasm_bindgen]
+    pub fn set_cpu_stability(&mut self, stable: bool) {
+        self.is_cpu_stable = stable;
+    }
+
+    #[wasm_bindgen]
+    pub fn detect_botnet_farm(&mut self, mobility_score: f64, is_smartphone: bool) -> bool {
+        if is_smartphone && mobility_score == 0.0 {
+            self.is_botnet_farmer = true;
+            self.karmic_score = 0; // Seize all karma
+            true
+        } else {
+            self.is_botnet_farmer = false;
+            false
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn is_botnet_farmer(&self) -> bool {
+        self.is_botnet_farmer
     }
 
     #[wasm_bindgen]

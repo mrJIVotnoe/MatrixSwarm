@@ -141,4 +141,21 @@ impl CondorEngine {
         }
         false
     }
+
+    #[wasm_bindgen]
+    pub fn reincarnate_task_from_dying_node(&mut self, task_id: &str, failing_node: &str, candidate_node: &str) -> bool {
+        let mut reincarnated = false;
+        if let Some(list) = self.completed_shards.get_mut(task_id) {
+            for shard in list.iter_mut() {
+                if shard.completed_by == failing_node {
+                    shard.completed_by = candidate_node.to_string();
+                    // Instant re-salting for cryptographic verification of reincarnation
+                    let raw_sig = format!("{}:{}:REINCARNATED_PROOF", shard.shard_id, candidate_node);
+                    shard.double_salted_proof = blake3::hash(raw_sig.as_bytes()).to_string();
+                    reincarnated = true;
+                }
+            }
+        }
+        reincarnated
+    }
 }

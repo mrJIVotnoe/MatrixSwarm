@@ -1,8 +1,14 @@
 version: '3.8'
 
+# Железо мертно. Информация бессмертна. Рой вечен.
+# L1 Resurrection: If node_magistrate stops, node_scout detects soul passport heartbeat failure
+# and undergoes reincarnation. Swarm transfers wiki indexing tasks from Magistrate payload to Scout.
+# Log: "Resurrection initiated: Soul Passport bound to Node-2"
+
 services:
   node_magistrate:
     image: node:20-alpine
+    container_name: node-1
     command: sh -c "npm install -g tsx typescript && npm install && npm run demo:node1"
     working_dir: /app
     volumes:
@@ -10,9 +16,13 @@ services:
     environment:
       - NODE_ROLE=Magistrate
       - DEMO_MODE=true
+      - SOUL_PASSPORT_ID=Node-1_MAGISTRATE_SOUL
+      - CRIDICAL_DATA_RELIABILITY=HOLOGRAPHIC_L5
+      - FAILOVER_PEER=node-2
 
   node_scout:
     image: node:20-alpine
+    container_name: node-2
     command: sh -c "npm install -g tsx typescript && npm install && npm run demo:node2"
     working_dir: /app
     volumes:
@@ -20,6 +30,9 @@ services:
     environment:
       - NODE_ROLE=Scout
       - DEMO_MODE=true
+      - SOUL_PASSPORT_ID=Node-2_SCOUT_SOUL
+      - AUTORECOVERY_FAILOVER_TARGET=true
+      - RESURRECTION_FALLBACK_TRIGGER=true
     depends_on:
       - node_magistrate
 

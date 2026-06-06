@@ -23,3 +23,6 @@ web-sys = { version = "0.3.61", features = ["RtcPeerConnection", "RtcDataChannel
 blake3 = "1.4"
 hex = "0.4.3"
 console_error_panic_hook = "0.1.7"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+

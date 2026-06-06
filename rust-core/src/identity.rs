@@ -18,7 +18,7 @@ pub struct IdentityCore;
 
 #[wasm_bindgen]
 impl IdentityCore {
-    /// Generates a new "Passport of the soul" (BIP39 Seed + Ed25519)
+    /// Generates a new "Passport of the soul" (BIP39 Seed + Ed25519) with PBKDF2 KDF Hardening
     #[wasm_bindgen]
     pub fn forge_passport(human_entropy: &str) -> Result<JsValue, JsValue> {
         let mut rng = OsRng;
@@ -26,15 +26,18 @@ impl IdentityCore {
         let signing_key = SigningKey::generate(&mut rng);
         let verifying_key: VerifyingKey = (&signing_key).into();
         
-        // We aren't building a showcase. We forge the Infrastructure of Last Resort.
-        // Convert the secret bytes mixed with Human Entropy into a 12-word mnemonic
-        let raw_entropy = format!("{}{}", hex::encode(signing_key.to_bytes()), human_entropy);
-        let final_entropy = blake3::hash(raw_entropy.as_bytes());
+        // PBKDF2-HMAC-SHA256 KDF Hardening for extreme resilience against brute-force
+        let password_bytes = format!("{}{}", hex::encode(signing_key.to_bytes()), human_entropy);
+        let salt = b"MATRIX_SWARM_EPOC_III_SOUL_SALT";
+        let mut derived_entropy = [0u8; 16];
+        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
+            password_bytes.as_bytes(),
+            salt,
+            4096, // 4096 iterations of SHA-256 for KDF defense standards
+            &mut derived_entropy
+        );
         
-        let mut entropy_16 = [0u8; 16];
-        entropy_16.copy_from_slice(&final_entropy.as_bytes()[..16]);
-
-        let mnemonic = Mnemonic::from_entropy(&entropy_16)
+        let mnemonic = Mnemonic::from_entropy(&derived_entropy)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         
         let passport = SoulPassport {
