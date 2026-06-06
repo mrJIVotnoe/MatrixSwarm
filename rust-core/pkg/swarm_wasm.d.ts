@@ -11,3 +11,5 @@ export const CondorCluster: any;
 export const VisionCore: any;
 export const ArkManager: any;
 export const MeshSurrogate: any;
+export const ArkStorage: any;
+export const CondorEngine: any;

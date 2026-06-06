@@ -22,6 +22,8 @@ mod global_knowledge;
 mod p2p_queue;
 mod network_layer;
 mod ark_manager;
+mod ark_storage;
+mod condor_engine;
 mod mesh_surrogate;
 mod vision;
 mod seismic_sensor;

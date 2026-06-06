@@ -53,6 +53,11 @@ impl AgentStateMachine {
     pub fn detect_usb(&mut self, authorized_power: bool) -> Result<(), JsValue> {
         if authorized_power {
             crate::metrics::track_event("usb_detected_authorized_power");
+            self.usb_connection_detected = false;
+            self.trust_level_verified = true;
+            // Transition back to RUNNING
+            self.transition_to(AgentState::READY);
+            self.transition_to(AgentState::RUNNING);
             return Ok(());
         }
         crate::metrics::track_isolation_breach();

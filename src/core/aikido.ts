@@ -2,7 +2,7 @@ import { TrustLevel } from './permissions';
 import { Device, DeviceType } from './models';
 import { WasmAikidoMath, WasmAikidoCore, WasmCovertOps } from './wasm_bridge';
 
-export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE' | 'Hardware Quarantine';
+export type AikidoStatus = 'Nomad' | 'Hardware Anchor' | 'STABLE_GUARDIAN' | 'HOME_ANCHOR' | 'Static Suspect' | 'BOT_FARM_NODE' | 'Hardware Quarantine' | 'FORCED_FORAGER';
 
 export interface NodeMetrics {
   nodeId: string;

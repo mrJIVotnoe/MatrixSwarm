@@ -16,7 +16,7 @@ describe('WASM Bridge Initialization and Linking', () => {
   });
 
   it('should determine roles logically', () => {
-    const role = WasmCasteAutonomy.determineRole({ cpu_cores: 8, ram_mb: 8000 });
+    const role = WasmCasteAutonomy.determineRole({ cpu_cores: 8, ram_gb: 8, is_plugged_in: true, device_type: "pc", has_gps: true, battery_level: 100 });
     expect(typeof role).toBe('string');
   });
 });

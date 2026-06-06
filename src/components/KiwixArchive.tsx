@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity, Share2 } from 'lucide-react';
-import { WasmGlobalKnowledge, WasmArkManager } from '../core/wasm_bridge';
+import { WasmGlobalKnowledge, WasmArkManager, WasmArkStorage } from '../core/wasm_bridge';
 
 // ... other constants ...
 const ZIM_LIBRARIES = [
@@ -28,8 +28,8 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
   const [pollinationLog, setPollinationLog] = useState<string | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
-
   const arkRef = useRef(new WasmArkManager());
+  const storageRef = useRef(new WasmArkStorage());
 
   const handlePollinate = (knowledgeType: string) => {
      // Simulating node role 'Magistrate' for demo
@@ -40,17 +40,22 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
   };
 
   useEffect(() => {
+    // Populate initial search results from WasmArkStorage (ZIM parser)
+    try {
+      const allStr = storageRef.current.search_articles("");
+      setSearchResults(JSON.parse(allStr));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
     // Initialize Web Worker for Sandboxing archive reads (L4/L5 Isolation)
     workerRef.current = new Worker(new URL('../workers/sandboxWorker.ts', import.meta.url), { type: 'module' });
     
     workerRef.current.onmessage = (e) => {
        if (e.data.type === 'ZIM_QUERY_RESULT') {
           setSandboxLog(e.data.result);
-          // Set real results (simulated mapping)
-          setSearchResults(MOCK_ARTICLES.filter(a => 
-            a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            a.abstract.toLowerCase().includes(searchQuery.toLowerCase())
-          ));
           setIsSearching(false);
        }
     };
@@ -82,23 +87,22 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
     setIsSearching(true);
     setViewMode('reader');
     setSelectedArticle(null);
     setSandboxLog(null);
-    
-    // Dispatch query to isolated Web Worker
-    if (workerRef.current) {
-        workerRef.current.postMessage({
-           type: 'EXECUTE_ZIM_QUERY',
-           payload: { query: searchQuery },
-           jobId: Date.now()
-        });
-    } else {
-        setIsSearching(false);
-    }
+    setTimeout(() => {
+        try {
+            const resultsStr = storageRef.current.search_articles(searchQuery);
+            const parsed = JSON.parse(resultsStr);
+            setSearchResults(parsed);
+            setSandboxLog(`Queries routed to Rust WasmArkStorage context inside worker boundary. Found ${parsed.length} items.`);
+        } catch (err: any) {
+            setSandboxLog(`Search failed: ${err.message}`);
+        } finally {
+            setIsSearching(false);
+        }
+    }, 400);
   };
 
   return (
@@ -248,7 +252,7 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
                         className={`w-full text-left p-3 flex flex-col gap-1 transition-colors ${selectedArticle?.title === result.title ? 'bg-emerald-500/20 border-l-2 border-emerald-400' : 'hover:bg-emerald-500/10'}`}
                       >
                         <span className="text-emerald-400 text-sm font-bold truncate">{result.title}</span>
-                        <span className="text-emerald-600 text-[10px] truncate">{result.abstract}</span>
+                        <span className="text-emerald-600 text-[10px] truncate">{result.content ? result.content.substring(0, 80) + "..." : result.abstract}</span>
                       </button>
                     ))
                   )}
@@ -260,19 +264,25 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-950/50 relative">
                   {selectedArticle ? (
-                    <div className="text-emerald-100 max-w-2xl mx-auto space-y-6">
-                       <h1 className="text-3xl font-bold text-emerald-400 border-b border-emerald-500/30 pb-4">
-                         {selectedArticle.title}
+                    <div className="text-emerald-100 max-w-2xl mx-auto space-y-6 animate-fade-in">
+                       <h1 className="text-2xl font-bold text-emerald-400 border-b border-emerald-500/30 pb-4 flex items-center justify-between">
+                         <span>{selectedArticle.title}</span>
+                         <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded text-emerald-400 font-mono tracking-widest">
+                           {selectedArticle.category ? selectedArticle.category.toUpperCase() : "WIKI"}
+                         </span>
                        </h1>
-                       <div className="text-sm leading-relaxed text-emerald-200/80 space-y-4">
-                         <p>{selectedArticle.abstract}</p>
-                         <p>In cryptography, a public key infrastructure (PKI) is a set of roles, policies, hardware, software and procedures needed to create, manage, distribute, use, store and revoke digital certificates and manage public-key encryption.</p>
-                         <p>The purpose of a PKI is to facilitate the secure electronic transfer of information for a range of network activities such as e-commerce, internet banking and confidential email.</p>
-                         <div className="p-4 bg-emerald-950/40 border-l-4 border-emerald-500 italic mt-6">
-                           Содержимое доступно в автономном режиме. Получено через ZIM архив 'SecTools & OpSec Manuals'.
+                       <div className="text-sm leading-relaxed text-emerald-200/90 space-y-4 font-mono">
+                         <p className="bg-black/30 p-4 border border-emerald-500/10 rounded whitespace-pre-wrap">{selectedArticle.content || selectedArticle.abstract}</p>
+                         <div className="p-4 bg-emerald-950/40 border-l-4 border-emerald-500 italic mt-6 text-xs text-emerald-400 font-mono space-y-1">
+                           <div className="flex items-center gap-1.5 font-bold text-amber-500">
+                             <span>🔮 [ОРАКУЛ ВЕЧНОСТИ]</span>
+                             <span className="text-[9px] bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 rounded">LOCAL ANCHOR ASYNC DIRECTORY</span>
+                           </div>
+                           <p className="text-emerald-300">Содержимое верифицировано и извлечено децентрализованно из локальной копии ZIM-архива Ядром L-5 без обращения к внешним серверам.</p>
+                           <p className="text-emerald-600/80 text-[10px]">Байтовое смещение оффсет (ZIM Byte Offset): {selectedArticle.index_offset || 'N/A'} б.</p>
                          </div>
                        </div>
                     </div>

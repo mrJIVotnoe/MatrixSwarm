@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkManager as _ArkManager, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer, AgentStateMachine as _AgentStateMachine, MetricsEngine as _MetricsEngine, ProprioceptionCore as _ProprioceptionCore, CondorCluster as _CondorCluster, VisionCore as _VisionCore, MeshSurrogate as _MeshSurrogate } from '../../rust-core/pkg/swarm_wasm';
+import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkManager as _ArkManager, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer, AgentStateMachine as _AgentStateMachine, MetricsEngine as _MetricsEngine, ProprioceptionCore as _ProprioceptionCore, CondorCluster as _CondorCluster, VisionCore as _VisionCore, MeshSurrogate as _MeshSurrogate, ArkStorage as _ArkStorage, CondorEngine as _CondorEngine } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -313,9 +313,35 @@ export class WasmNativeP2PMesh {
 }
 
 
+interface ArkManagerInterface {
+  store_fragment(topic: string, content: string): void;
+  read_fragment(topic: string): string;
+  get_available_knowledge(): string;
+  pollinate(peer_id: string): string;
+  receive_pollination(payload: string): number;
+  load_zim_archive?(archive_name: string, file_size: number): boolean;
+  read_zim_fragment?(topic: string): string;
+  install_retro_app?(app_id: string, package_data: string): void;
+  get_installed_apps?(): string;
+}
+
+interface CondorClusterInterface {
+  register_node(is_powered: boolean, karmic_score: number): boolean;
+  submit_heavy_task(task_id: string, payload: string, chunks: number): boolean;
+  process_chunk(task_id: string): number;
+  is_task_complete(task_id: string): boolean;
+  get_active_nodes(): number;
+}
+
+interface ProprioceptionCoreInterface {
+  update_gps(lat: number, lng: number): string;
+  get_current_cell(): string | undefined;
+  triangulate_via_acoustic_and_ble?(peer_id: string, acoustic_strength: number, ble_strength: number): number;
+}
+
 export class WasmArkManager {
-  private inner: _ArkManager;
-  constructor() { this.inner = new _ArkManager(); }
+  private inner: ArkManagerInterface;
+  constructor() { this.inner = new _ArkManager() as unknown as ArkManagerInterface; }
   store_fragment(topic: string, content: string) { this.inner.store_fragment(topic, content); }
   read_fragment(topic: string): string { return this.inner.read_fragment(topic); }
   get_available_knowledge(): string { return this.inner.get_available_knowledge(); }
@@ -339,8 +365,8 @@ export class WasmArkManager {
 }
 
 export class WasmCondorCluster {
-  private inner: _CondorCluster;
-  constructor() { this.inner = new _CondorCluster(); }
+  private inner: CondorClusterInterface;
+  constructor() { this.inner = new _CondorCluster() as unknown as CondorClusterInterface; }
   register_node(is_powered: boolean, karmic_score: number) { return this.inner.register_node(is_powered, Math.floor(karmic_score)); }
   submit_heavy_task(task_id: string, payload: string, chunks: number): boolean {
     return this.inner.submit_heavy_task(task_id, payload, chunks);
@@ -351,8 +377,8 @@ export class WasmCondorCluster {
 }
 
 export class WasmProprioceptionCore {
-  private inner: _ProprioceptionCore;
-  constructor() { this.inner = new _ProprioceptionCore(); }
+  private inner: ProprioceptionCoreInterface;
+  constructor() { this.inner = new _ProprioceptionCore() as unknown as ProprioceptionCoreInterface; }
   update_gps(lat: number, lng: number): string {
     return this.inner.update_gps(lat, lng);
   }
@@ -435,4 +461,49 @@ export const WasmMeshSurrogate = {
   enable_lora: () => _MeshSurrogate.enable_lora_surrogate(),
   enable_meshtastic: () => _MeshSurrogate.enable_meshtastic_surrogate()
 };
+
+export class WasmArkStorage {
+  private inner: any;
+  constructor() {
+    this.inner = new _ArkStorage();
+  }
+  parse_raw_zim_header(buffer: Uint8Array): string {
+    return this.inner.parse_raw_zim_header(buffer);
+  }
+  get_article_by_topic(id: string): string {
+    return this.inner.get_article_by_topic(id);
+  }
+  search_articles(query: string): string {
+    return this.inner.search_articles(query);
+  }
+  get_metadata(): string {
+    return this.inner.get_metadata();
+  }
+}
+
+export class WasmCondorEngine {
+  private inner: any;
+  constructor() {
+    this.inner = new _CondorEngine();
+  }
+  queue_heavy_computation(task_id: string, theme: string, difficulty: number, is_louvre: boolean): boolean {
+    return this.inner.queue_heavy_computation(task_id, theme, difficulty, is_louvre);
+  }
+  split_into_micro_chunks(task_id: string, total_nodes: number): string {
+    return this.inner.split_into_micro_chunks(task_id, total_nodes);
+  }
+  verify_and_commit_shard(task_id: string, shard_id: string, node_id: string, proof_hash: string): boolean {
+    return this.inner.verify_and_commit_shard(task_id, shard_id, node_id, proof_hash);
+  }
+  observer_collapse_finalize(task_id: string): boolean {
+    return this.inner.observer_collapse_finalize ? this.inner.observer_collapse_finalize(task_id) : true;
+  }
+  check_compilation_status(task_id: string): number {
+    return this.inner.check_compilation_status(task_id);
+  }
+  is_node_ready_for_condor(trust_level: number, is_plugged_in: boolean): boolean {
+    return this.inner.is_node_ready_for_condor(trust_level, is_plugged_in);
+  }
+}
+
 

@@ -167,7 +167,10 @@ impl AikidoCore {
                 let is_powerful = input.logical_cores >= 8 && input.memory_mb >= 4096;
                 
                 if out.mobility_score == 0.0 {
-                    if input.is_charging {
+                    if input.hours_in_same_cell > 24.0 {
+                        out.aikido_status = "FORCED_FORAGER".to_string();
+                        out.karma = 0.0;
+                    } else if input.is_charging {
                         // "Смартфон в режиме зарядки: Rust начисляет Карму за аптайм, игнорируя отсутствие перемещения"
                         if input.hours_in_same_cell > 72.0 {
                             out.aikido_status = "HOME_ANCHOR".to_string();
@@ -216,6 +219,11 @@ impl AikidoCore {
         };
 
         match status {
+            "FORCED_FORAGER" => {
+                res.effective_karma = 0.0;
+                res.voting_weight = 0.0;
+                res.forced_heavy_compute = true;
+            },
             "BOT_FARM_NODE" => {
                 res.effective_karma = res.effective_karma.min(50.0);
                 res.voting_weight = 0.0;

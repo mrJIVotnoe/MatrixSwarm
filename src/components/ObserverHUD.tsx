@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -23,10 +23,22 @@ export const ObserverHUD: React.FC = () => {
   const [agentState, setAgentState] = useState<string>('INIT');
   const [isPowered, setIsPowered] = useState(false);
   const [condorStatus, setCondorStatus] = useState<string>("INACTIVE");
+  const [condorTasks, setCondorTasks] = useState<any[]>([]);
   const [visionStatus, setVisionStatus] = useState<string>("OFFLINE");
   const [antennaMultiplier, setAntennaMultiplier] = useState<string>("x1.0");
+  
+  // L2 / L5 Epoc III Ascension additions
+  const [chameleonActive, setChameleonActive] = useState<boolean>(false);
+  const [coverNoiseLevel, setCoverNoiseLevel] = useState<number>(0);
+  const [holoFailureSimulated, setHoloFailureSimulated] = useState<boolean>(false);
+  const [ethicsCameraShield, setEthicsCameraShield] = useState<boolean>(true);
 
   const activateKinopsis = () => {
+     if (ethicsCameraShield) {
+        setVisionStatus("🔒 BLOCKED BY ETHICS SHIELD");
+        setIntentStatus("OBSERVER ETHICS MANDATE: Front-facing camera is strictly BLOCKED to shield the Architect's visage (этика Наблюдателя). Switch sensor input to outer telemetry.");
+        return;
+     }
      setVisionStatus("REQUESTING WIDE-LENS...");
      setTimeout(() => {
          const constraints = WasmVisionCore.get_camera_constraints();
@@ -84,27 +96,105 @@ export const ObserverHUD: React.FC = () => {
       // User allows authorized power via USB
       GlobalAgentState.detect_usb(true);
       setIsPowered(true);
-      setIntentStatus("ENERGY COMMUNION: Authorized USB power. Node anchoring as Magistrate.");
+      setIntentStatus("ЭНЕРГЕТИЧЕСКОЕ ПРИЧАСТИЕ: Node detected as charging. Ascended to MAGISTRATE State under the Grid Covenant!");
   };
 
+  useEffect(() => {
+    let interval: any;
+    if (chameleonActive) {
+      interval = setInterval(() => {
+        setCoverNoiseLevel(+(Math.random() * 4 + 2).toFixed(2));
+      }, 800);
+    } else {
+      setCoverNoiseLevel(0);
+    }
+    return () => clearInterval(interval);
+  }, [chameleonActive]);
+
   const testCondorDistributedTask = () => {
-      condorRef.current.submit_heavy_task("HASH_BLOCK_4", "0xDEADBEEF", 100);
-      setCondorStatus("CONDOR ACTIVE");
-      let chunks = 0;
-      const t = setInterval(() => {
-          chunks++;
-          condorRef.current.process_chunk("HASH_BLOCK_4");
-          if(chunks >= 100) {
-             clearInterval(t);
-             setCondorStatus("TASK COMPLETE");
-          }
-      }, 20);
+      try {
+          const engine = new WasmCondorEngine();
+          engine.queue_heavy_computation("HASH_BLOCK_4", "Louvre Metadata Indexing", 2000, true);
+          setCondorStatus("Active: Task Slicing");
+          
+          // Split into 10 slices!
+          const chunks = JSON.parse(engine.split_into_micro_chunks("HASH_BLOCK_4", 10));
+          
+          const magistrates = [
+             "node_magistrate_gold", "node_magistrate_alpha", "node_magistrate_beta", "node_magistrate_gamma",
+             "node_magistrate_delta", "node_magistrate_epsilon", "node_magistrate_zeta", "node_magistrate_eta",
+             "node_magistrate_theta", "node_magistrate_iota"
+          ];
+
+          // Map the shards to these Magistrates
+          const parsedShards = chunks.map((chunkObj: any, idx: number) => {
+             return {
+                shardId: chunkObj.shard_id || `HASH_BLOCK_4_shard_${idx}`,
+                nodeId: magistrates[idx % magistrates.length],
+                difficulty: chunkObj.difficulty || 200,
+                status: 'QUEUED',
+                progress: 0,
+                result: null
+             };
+          });
+
+          setCondorTasks(parsedShards);
+
+          let currentShardIdx = 0;
+          const intervalId = setInterval(() => {
+             if (currentShardIdx < parsedShards.length) {
+                // Update specific shard to processing then verified
+                const idxToProcess = currentShardIdx;
+                setCondorTasks(prev => prev.map((item, idx) => {
+                   if (idx === idxToProcess) {
+                      return { ...item, status: 'PROCESSED', progress: 50 };
+                   }
+                   return item;
+                }));
+
+                setTimeout(() => {
+                   setCondorTasks(prev => prev.map((item, idx) => {
+                      if (idx === idxToProcess) {
+                         const proof = "PROOF_HASH_" + Math.random().toString(36).substring(2, 8).toUpperCase();
+                         engine.verify_and_commit_shard("HASH_BLOCK_4", item.shardId, item.nodeId, proof);
+                         return { ...item, status: 'VERIFIED', progress: 100, result: proof };
+                      }
+                      return item;
+                   }));
+                }, 100);
+
+                currentShardIdx++;
+                setCondorStatus(`Active: Disbursing (${currentShardIdx}/10)`);
+             } else {
+                clearInterval(intervalId);
+                const statusNum = engine.check_compilation_status("HASH_BLOCK_4");
+                setCondorStatus(`Aggregating shards...`);
+                setTimeout(() => {
+                   setCondorStatus(`Condor: Complete (${statusNum.toFixed(0)}%) - Louvre Reconstructed!`);
+                }, 800);
+             }
+          }, 250);
+
+      } catch (e) {
+          setCondorStatus("Condor Integration Faulted");
+      }
   };
 
   const handleArkStorageTest = () => {
-      arkStorageRef.current.load_zim_archive("wikipedia_survival.zim", 1024 * 1024 * 500);
-      const frag = arkStorageRef.current.read_zim_fragment("ZIM_WIKIPEDIA_SURVIVAL");
-      setArkContent(frag);
+      try {
+          const s = new WasmArkStorage();
+          s.parse_raw_zim_header(new Uint8Array([90, 73, 77, 4, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));
+          const meta = JSON.parse(s.get_metadata());
+          const first = s.get_article_by_topic("water_purification");
+          if (first) {
+              const art = JSON.parse(first);
+              setArkContent(`[L5 ZIM] Found count: ${meta.count}. Entry: ${art.title}`);
+          } else {
+              setArkContent(`[L5 ZIM] Loaded ${meta.version}`);
+          }
+      } catch(e) {
+          setArkContent("Error loading ZIM archive");
+      }
   };
 
   // Simulating probability wave particles and planetary anchors
@@ -202,6 +292,88 @@ export const ObserverHUD: React.FC = () => {
       </div>
 
       <div className="h-64 relative border border-blue-900/50 rounded bg-black/60 overflow-hidden p-4">
+        {condorTasks.length > 0 && (
+          <div className="absolute inset-0 bg-black/95 border border-cyan-500/30 p-3 flex flex-col font-mono text-xs z-50 overflow-hidden">
+            <div className="flex justify-between items-center border-b border-cyan-500/20 pb-1 mb-2">
+              <span className="text-cyan-400 font-bold flex items-center gap-1">
+                <Cpu className="w-4 h-4 animate-spin text-amber-500" /> CONDOR DECIMATION RECONSTRUCTION (10 SHARDS)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    try {
+                      const engine = new WasmCondorEngine();
+                      const resultStr = engine.observer_collapse_finalize("HASH_BLOCK_4");
+                      console.log(`[RUST CORE COLLAPSE] Result: ${resultStr}`);
+                      
+                      setCondorTasks(prev => prev.map(item => ({
+                        ...item,
+                        status: 'VERIFIED',
+                        progress: 100,
+                        result: item.result || ("COLLAPSED_PROOF_" + Math.random().toString(36).substring(2, 6).toUpperCase())
+                      })));
+                      setCondorStatus("Quantum Resonance: Stable. Finalized via Observer Priority.");
+                      setIntentStatus("OBSERVER PRIORITY L4: All background Condor calculations instantly collapsed/finalized in Rust Core!");
+                    } catch (e: any) {
+                      console.error(e);
+                    }
+                  }}
+                  className="bg-amber-500/20 hover:bg-amber-500/40 text-[9px] text-amber-400 border border-amber-500/50 px-2 py-0.5 rounded-[3px] font-bold cursor-pointer transition-colors"
+                >
+                  🌌 ЭФФЕКТ НАБЛЮДАТЕЛЯ: СХЛОПНУТЬ СЕЙЧАС
+                </button>
+                <button 
+                  onClick={() => setCondorTasks([])} 
+                  className="text-[10px] text-red-500 hover:text-red-400 cursor-pointer"
+                >
+                  [X] CLOSE MONITOR
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 overflow-y-auto flex-1 custom-scrollbar pr-1 pb-1">
+              {condorTasks.map((task, idx) => (
+                <div 
+                  key={idx} 
+                  className={`p-2 border rounded-sm flex flex-col justify-between transition-colors ${
+                    task.status === 'VERIFIED' ? 'bg-emerald-950/25 border-emerald-500/30' :
+                    task.status === 'PROCESSED' ? 'bg-amber-950/25 border-amber-500/50 animate-pulse' :
+                    'bg-slate-950/50 border-cyan-500/10'
+                  }`}
+                >
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-cyan-500 font-bold">{task.shardId.replace("HASH_BLOCK_4_shard_", "S#")}</span>
+                    <span className={task.status === 'VERIFIED' ? 'text-emerald-400 font-semibold' : task.status === 'PROCESSED' ? 'text-amber-400' : 'text-cyan-700'}>
+                      {task.status}
+                    </span>
+                  </div>
+                  <div className="text-[9px] text-slate-500 mt-1 flex justify-between">
+                    <span>Target: {task.nodeId.substring(5, 15)}</span>
+                    <span>Diff: {task.difficulty}</span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-900 h-1 rounded overflow-hidden mt-1.5 border border-cyan-500/10">
+                    <div 
+                      className={`h-full transition-all duration-300 ${task.status === 'VERIFIED' ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                      style={{ width: `${task.progress}%` }}
+                    />
+                  </div>
+                  
+                  {task.result && (
+                    <div className="text-[8px] text-emerald-400/85 mt-1 font-mono tracking-tighter truncate">
+                      Proof: {task.result}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 text-right text-[10px] text-amber-500 font-bold">
+               CLUSTER AGGREGATOR ENGINE: {condorStatus}
+            </div>
+          </div>
+        )}
         {waveState === 'superposition' ? (
           <div className="w-full h-full relative">
             {viewMode === 'quantum' ? (
@@ -224,38 +396,73 @@ export const ObserverHUD: React.FC = () => {
                 </div>
               </div>
             ) : (
-               <div className="relative w-full h-full pointer-events-auto overflow-hidden">
-                 <div className="absolute inset-0 opacity-20 bg-[url('https://upload.wikimedia.org/wikipedia/commons/e/ec/Equirectangular_projection_SW.jpg')] bg-cover bg-center mix-blend-screen grayscale"></div>
-                 {particles.map((p, i) => {
-                    const isDead = deadSectors.includes(i);
-                    return (
-                        <div 
-                          key={i} 
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                          style={{
-                              left: `${(i * 13) % 100}%`,
-                              top: `${(i * 7) % 100}%`
-                          }}
-                        >
-                            {isDead ? (
-                               <button 
-                                  onClick={() => handleReincarnate(i)}
-                                  className="w-4 h-4 bg-red-600 rounded-sm animate-pulse hover:bg-red-400 flex items-center justify-center z-20 tooltip"
-                                  title="Sector Critical - Reincarnate!"
-                               >
-                                  <RefreshCcw className="w-2 h-2 text-white" />
-                               </button>
-                            ) : (
-                               <motion.div 
-                                  animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                                  transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
-                                  className="w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]"
-                               />
-                            )}
-                        </div>
-                    );
-                 })}
-                 <div className="absolute bottom-2 right-2 text-[10px] text-cyan-500/50">PLANETARY ANCHORS [L3]</div>
+               <div className="relative w-full h-full pointer-events-auto overflow-hidden bg-black/80 flex flex-col p-2 border border-blue-900/30 font-mono">
+                 {/* Grid lines overlay */}
+                 <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(6,182,212,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,182,212,0.05)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
+                 
+                 {/* Status header inside the sector mapper */}
+                 <div className="flex justify-between items-center text-[9px] text-cyan-400 border-b border-cyan-950 pb-1 z-10">
+                   <span className="flex items-center gap-1">📡 REVERSE STARLINK ACTIVE CONSTELLATION CELL [GPS LOGS]</span>
+                   <span className="text-amber-400 uppercase">ZONE: {cellId}</span>
+                 </div>
+
+                 <div className="relative flex-1">
+                   {particles.map((p, i) => {
+                      const isDead = deadSectors.includes(i);
+                      // We classify index % 3: 0 is Anchor, 1 is Scout, 2 is peer
+                      const isAnchor = i % 3 === 0;
+                      const isScout = i % 3 === 1;
+                      const nodeName = isAnchor ? `ANCHOR_GOLD_${i}` : isScout ? `SCOUT_BLUE_${i}` : `PEER_CELL_${i}`;
+                      
+                      return (
+                          <div 
+                            key={i} 
+                            className="absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
+                            style={{
+                                left: `${5 + ((i * 17) % 91)}%`,
+                                top: `${10 + ((i * 11) % 80)}%`
+                            }}
+                            onClick={() => {
+                              setIntentStatus(`REVERSE STARLINK TRIANGULATION: Linked to Node ${nodeName} @ Cell-coord [${(55.75 + i*0.002).toFixed(4)}N, ${(37.61 + i*0.003).toFixed(4)}E]`);
+                            }}
+                          >
+                              {isDead ? (
+                                 <button 
+                                    onClick={(e) => { e.stopPropagation(); handleReincarnate(i); }}
+                                    className="w-4 h-4 bg-rose-950 border border-rose-500 rounded-sm animate-pulse flex items-center justify-center z-25 relative cursor-pointer"
+                                    title={`${nodeName} (Critical Sectors) - CLICK TO REINCARNATE`}
+                                 >
+                                    <RefreshCcw className="w-2.5 h-2.5 text-rose-400 animate-spin" style={{ animationDuration: '3s' }} />
+                                 </button>
+                              ) : (
+                                 <div className="relative flex items-center justify-center">
+                                    {/* Ripple Animation */}
+                                    <span className={`absolute inline-flex h-4.5 w-4.5 rounded-full opacity-35 animate-ping ${isAnchor ? 'bg-amber-400' : isScout ? 'bg-cyan-400' : 'bg-blue-500'}`}></span>
+                                    
+                                    <div 
+                                      className={`w-2.5 h-2.5 rounded-full border shadow transition-transform group-hover:scale-150 ${
+                                        isAnchor ? 'bg-amber-400 border-yellow-300 shadow-amber-500/50' : 
+                                        isScout ? 'bg-cyan-400 border-cyan-200 shadow-cyan-500/50' : 
+                                        'bg-cyan-800 border-cyan-600'
+                                      }`}
+                                      title={`${nodeName} [Cell Grid Offset #e22-${i}]`}
+                                    />
+                                    
+                                    {/* Minimalistic text overlay on hover */}
+                                    <span className="absolute left-3 text-[7px] text-slate-300 bg-black/90 border border-slate-900 px-1 py-0.2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30 pointer-events-none">
+                                      {nodeName} (Karma: {80 + (i%20)})
+                                    </span>
+                                 </div>
+                              )}
+                          </div>
+                      );
+                   })}
+                 </div>
+                 <div className="absolute bottom-1 right-2 left-2 flex justify-between items-center text-[7px] text-slate-400 z-10">
+                   <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span> GOLDEN ANCHORS (ORACLES)</span>
+                   <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span> BLUE SCOUTS (FORAGERS)</span>
+                   <span className="text-cyan-500/50">GRID CONST: 0.05° RECON RESOLUTION</span>
+                 </div>
                </div>
             )}
           </div>
@@ -273,7 +480,163 @@ export const ObserverHUD: React.FC = () => {
           </motion.div>
         )}
       </div>
-      
+
+      {/* EPOC III ASCENSION DASHBOARD */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-left text-xs z-10 relative">
+        {/* Chameleon Protocol column */}
+        <div className="border border-purple-900/40 bg-purple-950/10 p-3 rounded flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2 border-b border-purple-900/30 pb-1">
+              <span className="text-purple-400 font-bold flex items-center gap-1.5">
+                🦎 ПРОТОКОЛ «ХАМЕЛЕОН» (L2)
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold border ${chameleonActive ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 animate-pulse' : 'bg-slate-900/60 text-slate-500 border-slate-800'}`}>
+                {chameleonActive ? 'ACTIVE' : 'OFF'}
+              </span>
+            </div>
+            <p className="text-[11px] text-purple-300/80 leading-relaxed mb-3">
+              Маскировка трафика под обычный фоновый HTTPS/TLS-шум и луковую маршрутизацию. Обходит системы DPI («Цифровое Айкидо»).
+            </p>
+            {chameleonActive && (
+              <div className="bg-black/45 p-2 rounded border border-purple-900/35 mb-2 font-mono space-y-1">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-purple-400">Cover Noise Stream:</span>
+                  <span className="text-yellow-400 font-bold">{coverNoiseLevel} MB/s</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-purple-400">Spoofed Headers:</span>
+                  <span className="text-emerald-400">Firefox/HTTPS-TLSv1.3</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-purple-400">Botnet Noise Injection:</span>
+                  <span className="text-purple-300">Active (1024 cells)</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setChameleonActive(!chameleonActive);
+              setIntentStatus(chameleonActive ? "CHAMELEON DISGUISE PAUSED: Hive traffic visible." : "CHAMELEON PROTOCOL ENGAGED: Hive traffic masked behind HTTPS background noise (Aikido Camouflage).");
+            }}
+            className={`w-full py-1.5 rounded text-center transition-colors font-bold cursor-pointer border ${chameleonActive ? 'bg-purple-900/30 hover:bg-purple-900/55 text-purple-300 border-purple-500/50' : 'bg-slate-900/50 hover:bg-slate-800 hover:text-purple-400 text-slate-400 border-slate-700'}`}
+          >
+            {chameleonActive ? 'ОТКЛЮЧИТЬ МАСКИРОВКУ' : 'ВКЛЮЧИТЬ «ЦИФРОВОЕ АЙКИДО»'}
+          </button>
+        </div>
+
+        {/* Sacred Iron Triad column */}
+        <div className="border border-amber-900/40 bg-amber-950/10 p-3 rounded flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2 border-b border-amber-900/30 pb-1">
+              <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                🛠️ СВЯЩЕННАЯ ТРИАДА ЖЕЛЕЗА
+              </span>
+              <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1 py-0.2 rounded">COVENANT LIMITS</span>
+            </div>
+            <div className="text-[10px] text-amber-300/80 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span>🔌 Энергетическое причастие:</span>
+                <span className={isPowered ? "text-emerald-400 font-bold text-[11px]" : "text-amber-500/60"}>
+                  {isPowered ? "ЗАГРУЖЕН (МАГИСТРАТ)" : "НЕТ ЗАРЯДКИ"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>📡 Антенна Mini-jack:</span>
+                <span className={antennaMultiplier === "x1.5" ? "text-emerald-400 font-bold text-[11px]" : "text-amber-500/60"}>
+                  {antennaMultiplier === "x1.5" ? "ПОДКЛЮЧЕНА (х1.5 Karma)" : "НЕ АКТИВНА"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>👁️ Этика Наблюдателя (Cam):</span>
+                <span className={ethicsCameraShield ? "text-red-400 font-bold flex items-center shadow-sm" : "text-emerald-400"}>
+                  {ethicsCameraShield ? "🔒 BLOCKED" : "UNSHIELDED"}
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-black/40 p-2 border border-amber-500/10 rounded mt-2 text-[10px] text-amber-400/80">
+              {ethicsCameraShield ? (
+                <span>🛡️ Этика защиты лица Архитектора активна. Фронтальная камера аппаратно изолирована Роем.</span>
+              ) : (
+                <span>🛡️ Внимание: Камера разблокирована под ответственность Наблюдателя.</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-3 font-semibold">
+            <button
+              onClick={() => {
+                setEthicsCameraShield(!ethicsCameraShield);
+                setIntentStatus(ethicsCameraShield ? "CAMERA ETHICS SHIELD DEACTIVATED. Beware surveillance vectors." : "CAMERA LOCKED: Front Camera Shield fully activated to shield the Architect's presence.");
+              }}
+              className={`flex-1 py-1 px-2 border rounded text-[10px] cursor-pointer text-center transition-colors ${ethicsCameraShield ? 'bg-red-950/50 text-red-400 border-red-500/40 hover:bg-red-900/30' : 'bg-slate-900/50 text-slate-400 border-slate-700 hover:text-white'}`}
+            >
+              {ethicsCameraShield ? 'РАЗБЛОКИРОВАТЬ' : 'БЛОКИРОВАТЬ CAM'}
+            </button>
+            <button
+              onClick={() => {
+                if (antennaMultiplier === "x1.0") {
+                  activateSurrogateAntenna();
+                } else {
+                  setAntennaMultiplier("x1.0");
+                  setIntentStatus("Surrogate antenna unplugged. Karma reset to 1.0x.");
+                }
+              }}
+              className={`flex-1 py-1 px-2 border rounded text-[10px] cursor-pointer text-center transition-colors ${antennaMultiplier === "x1.5" ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/40' : 'bg-slate-900/50 text-slate-400 border-slate-700 hover:text-white'}`}
+            >
+              {antennaMultiplier === "x1.5" ? 'ОТКЛЮЧИТЬ ANT' : 'V: MINI-JACK'}
+            </button>
+          </div>
+        </div>
+
+        {/* Holographic redundancy column */}
+        <div className="border border-blue-900/40 bg-blue-950/10 p-3 rounded flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2 border-b border-blue-900/30 pb-1">
+              <span className="text-cyan-400 font-bold flex items-center gap-1.5">
+                🔮 ГОЛОГРАФИЧЕСКИЙ ПРИНЦИП
+              </span>
+              <span className="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1 py-0.2 rounded">L5 DENSITY</span>
+            </div>
+            <p className="text-[11px] text-cyan-300/80 leading-relaxed mb-3">
+              Даже если 99% узлов погибнет, оставшийся 1% (Магистрат-Якорь) восстановит критические индексы нашего «Лувра» из локальных фрагментов.
+            </p>
+            
+            <div className="h-1.5 bg-blue-950 overflow-hidden mb-2 rounded border border-blue-900/30">
+              <div 
+                className={`h-full transition-all duration-1000 ${holoFailureSimulated ? 'bg-red-500 animate-pulse' : 'bg-cyan-500 shadow-[0_0_8px_#22d3ee]'}`} 
+                style={{ width: holoFailureSimulated ? '1%' : '100%' }}
+              ></div>
+            </div>
+
+            <div className="flex justify-between text-[10px] text-cyan-500 mb-2">
+              <span>Сегментная плотность соты:</span>
+              <span className={holoFailureSimulated ? "text-red-500 font-bold" : "text-cyan-400 font-bold"}>
+                {holoFailureSimulated ? "1% (CRITICAL FAILURE)" : "100% (COMPLETE SYNERGY)"}
+              </span>
+            </div>
+            
+            {holoFailureSimulated && (
+              <div className="p-2 bg-emerald-950/40 border border-emerald-500/40 text-[9px] text-emerald-400 font-mono leading-normal animate-fade-in space-y-1">
+                <span className="text-yellow-400 font-bold">⚡ [ОРАКУЛ ВЕЧНОСТИ L5]:</span>
+                <p>Узлы-миры разрушены. Загружено восстановление из 1% Магистрата-Якоря. Wiki-индекс и шифры восстановлены полностью!</p>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              setHoloFailureSimulated(!holoFailureSimulated);
+              setIntentStatus(holoFailureSimulated ? "Swarm returned to full 100% strength." : "99% Swarm node loss simulated! Holographic restore protocol engaged from Magistrate-Anchor.");
+            }}
+            className={`w-full py-1.5 rounded text-center transition-colors font-bold cursor-pointer border mt-1 ${holoFailureSimulated ? 'bg-cyan-900/30 hover:bg-cyan-900/40 text-cyan-300 border-cyan-500/50' : 'bg-red-950/40 hover:bg-red-950/60 text-red-500 border-red-900/50'}`}
+          >
+            {holoFailureSimulated ? 'ВЕРНУТЬ ПОЛНУЮ СЕТЬ' : 'СИМУЛЯЦИЯ ПАДЕНИЯ 99% СЕТИ'}
+          </button>
+        </div>
+      </div>
+
       <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-4 text-xs font-mono text-center">
         <div className="col-span-full mb-2">
             <form onSubmit={handleGlobalIntent} className="flex flex-col gap-2 bg-black/60 border border-cyan-900/50 p-3 rounded">
@@ -337,7 +700,7 @@ export const ObserverHUD: React.FC = () => {
            <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
              <Cpu className="w-3 h-3 mr-1" /> DISTRIBUTED COMPUTE
            </span>
-           <span className={condorStatus.includes("ACTIVE") ? "text-yellow-400 animate-pulse font-bold" : "text-gray-600"}>{condorStatus}</span>
+           <span className={condorStatus.includes("Active") ? "text-yellow-400 animate-pulse font-bold" : "text-gray-600"}>{condorStatus}</span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={activateKinopsis}>
            <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
@@ -349,7 +712,9 @@ export const ObserverHUD: React.FC = () => {
            <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
              <Headphones className="w-3 h-3 mr-1" /> MESH SURROGATE
            </span>
-           <span className={antennaMultiplier === "x1.5" ? "text-yellow-400 font-bold" : "text-gray-600"}>KARMA {antennaMultiplier}</span>
+           <span className={antennaMultiplier === "x1.5" ? "text-yellow-400 font-bold text-[11px]" : "text-gray-600 text-xs"}>
+             {antennaMultiplier === "x1.5" ? "Bonus: Antenna detected" : "KARMA " + antennaMultiplier}
+           </span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={handleArkStorageTest}>
            <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">

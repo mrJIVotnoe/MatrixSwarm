@@ -11,6 +11,15 @@ export interface SwarmTask {
   type: string;
   signature?: string;
   payload?: Record<string, unknown>;
+  data?: string;
+  difficulty?: number;
+  seed?: string;
+  start?: number;
+  end?: number;
+  shard_id?: string;
+  shard_index?: number;
+  cell_id?: string;
+  job_type?: string;
   [key: string]: unknown;
 }
 
