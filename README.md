@@ -39,19 +39,9 @@ TypeScript/JavaScript низведены до уровня периферии (�
 
 ```mermaid
 graph TD
-    classDef surrogate fill:#0f172a,stroke:#f59e0b,stroke-width:2px,color:#fcd34d
-    classDef component fill:#1e293b,stroke:#0ea5e9,stroke-width:1px,color:#fff
-    classDef policy fill:#334155,stroke:#ef4444,stroke-width:2px,color:#fff
-    
-    Core["<b>Digital Shell (WASM)</b><br>Ядро Симбионта L5"]:::component --> Auth{"Предъявлен Token?"}:::policy
-    Auth -->|"Нет подписи"| Block["Аппаратный Карантин"]:::policy
-    Auth -->|"Valid Signature"| Senses
-    
-    subgraph Senses ["Органы Чувств Роя"]
-        Audio["<b>Слух</b><br>Микрофон: Акустические феромоны, Nabbat"]:::surrogate
-        Vision["<b>Зрение</b><br>Камера: Kinopsis, Декодирование P2P"]:::surrogate
-        Geo["<b>Проприоцепция</b><br>GPS: Построение локальной Geo-соты"]:::surrogate
-    end
+    Core[Digital Shell WASM - L5 Symbiote] --> Auth{Token Presented?}
+    Auth -->|No Signature| Block[Hardware Quarantine - L0]
+    Auth -->|Valid Signature| Senses[Sense Organs of the Swarm - Audio, Vision, Geolocation]
 ```
 
 ## 🌍 Глобальный Охват и Башня Вавилона (Babel Swarm)

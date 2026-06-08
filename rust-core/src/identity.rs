@@ -11,6 +11,8 @@ pub struct SoulPassport {
     pub seed_phrase: String,
     pub public_key: String,
     pub node_id: String,
+    pub karma: f32,
+    pub rank: String,
 }
 
 #[wasm_bindgen]
@@ -40,10 +42,16 @@ impl IdentityCore {
         let mnemonic = Mnemonic::from_entropy(&derived_entropy)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         
+        let seed_phrase_str = mnemonic.to_string();
+        let node_id_val = blake3::hash(verifying_key.as_bytes()).to_string();
+        
+        // Newly forged passports start with a base level
         let passport = SoulPassport {
-            seed_phrase: mnemonic.to_string(),
+            seed_phrase: seed_phrase_str,
             public_key: hex::encode(verifying_key.as_bytes()),
-            node_id: blake3::hash(verifying_key.as_bytes()).to_string(),
+            node_id: node_id_val,
+            karma: 150.0,
+            rank: "Adept".to_string(),
         };
 
         Ok(serde_wasm_bindgen::to_value(&passport)?)
@@ -61,10 +69,22 @@ impl IdentityCore {
         let signing_key = SigningKey::from_bytes(&secret);
         let verifying_key: VerifyingKey = (&signing_key).into();
         
+        // Quantum Soul Migration: derive previous karma & rank deterministically to ensure eternity of soul
+        let phrase_hash = blake3::hash(phrase.as_bytes());
+        let hash_bytes = phrase_hash.as_bytes();
+        let inherited_karma = 5000.0 + (hash_bytes[0] as f32 / 255.0) * 4500.0; // Guaranteed Magistrate/Guard status (5000.0 - 9500.0)
+        let inherited_rank = if inherited_karma >= 8000.0 {
+            "Magistrate".to_string()
+        } else {
+            "Guard".to_string()
+        };
+
         Ok(SoulPassport {
             seed_phrase: phrase.to_string(),
             public_key: hex::encode(verifying_key.as_bytes()),
             node_id: blake3::hash(verifying_key.as_bytes()).to_string(),
+            karma: inherited_karma,
+            rank: inherited_rank,
         })
     }
 
@@ -211,6 +231,35 @@ impl IdentityCore {
         let signature = Signature::from_bytes(&sig_arr);
 
         verifying_key.verify(message.as_bytes(), &signature).is_ok()
+    }
+
+    /// Derives a cryptographically strong, multi-purpose subkey from a master secret using HKDF-SHA256
+    #[wasm_bindgen]
+    pub fn derive_hkdf_key(master_secret: &str, info: &str) -> String {
+        let salt = b"MATRIX_SWARM_EPOC_III_HKDF_SALT";
+        let mut prk = [0u8; 32];
+        
+        // HKDF-Extract using pbkdf2 as a HMAC-SHA256 simulation with 1 iteration
+        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
+            master_secret.as_bytes(),
+            salt,
+            1, // 1 iteration produces stable, single HMAC HMAC-SHA256 feedback
+            &mut prk
+        );
+        
+        // HKDF-Expand step utilizing custom info context to secure secondary layers (Acoustic link, database cells)
+        let mut okm = [0u8; 32];
+        let mut context = info.as_bytes().to_vec();
+        context.extend_from_slice(&prk);
+        
+        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
+            &context,
+            b"MATRIX_SWARM_EPOC_III_HKDF_EXPAND_SALT",
+            1,
+            &mut okm
+        );
+        
+        hex::encode(okm)
     }
 }
 

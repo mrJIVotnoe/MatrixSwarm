@@ -21,13 +21,14 @@ import { UserOnboarding } from './components/UserOnboarding';
 import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
 import { ObserverHUD } from './components/ObserverHUD';
+import { SpacedeskPanel } from './components/SpacedeskPanel';
 import { getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
 import { GlobalAgentState } from './core/wasm_bridge';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from './core/i18n';
 
-type Tab = 'nexus' | 'briar' | 'entropy';
+type Tab = 'nexus' | 'briar' | 'spacedesk' | 'entropy';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -268,12 +269,12 @@ function MainDashboard() {
     }
   }, [(symbiote as any)?.cellId]);
 
-  const handleOnboardingComplete = async (alias: string, user_mode: string, privateKeyBase64: string, publicKeyBase64: string) => {
+  const handleOnboardingComplete = async (alias: string, user_mode: string, privateKeyBase64: string, publicKeyBase64: string, karma: number, rank: string) => {
     try {
       const res = await fetch('/api/v1/observers/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alias, public_key: publicKeyBase64, user_mode })
+        body: JSON.stringify({ alias, public_key: publicKeyBase64, user_mode, karma, rank })
       });
       if (res.ok) {
         const data = await res.json();
@@ -378,6 +379,7 @@ function MainDashboard() {
           {[
             { id: 'nexus', label: 'NEXUS (СЕНСОРНАЯ ПАНЕЛЬ)', icon: Activity },
             { id: 'briar', label: 'P2P MESH (СВЯЗЬ)', icon: Wifi },
+            { id: 'spacedesk', label: 'SPACEDESK (KVM СВЯЗЬ)', icon: Monitor },
             { id: 'entropy', label: 'ИГРОВАЯ ЭНТРОПИЯ L3', icon: Hash },
           ].map(tab => (
             <button
@@ -556,6 +558,15 @@ function MainDashboard() {
                 <div className="flex-1 flex min-h-0">
                   <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SPACEDESK */}
+          {activeTab === 'spacedesk' && (
+            <div className="flex-1 w-full flex flex-col pt-4 min-h-[70vh]">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1">
+                <SpacedeskPanel symbiote={symbiote} />
               </div>
             </div>
           )}

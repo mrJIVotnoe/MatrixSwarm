@@ -59,6 +59,10 @@ export const WasmIdentity = {
     try { return IdentityCore.verify_signature(publicKeyHex, message, signatureHex); }
     catch(e) { handleRustError(e, 'WasmIdentity.verifySignature'); throw e; }
   },
+  deriveHkdfKey: (masterSecret: string, info: string): string => {
+    try { return (IdentityCore as any).derive_hkdf_key(masterSecret, info); }
+    catch(e) { handleRustError(e, 'WasmIdentity.deriveHkdfKey'); throw e; }
+  }
 };
 
 export const WasmAikidoCore = {
@@ -346,6 +350,8 @@ interface ProprioceptionCoreInterface {
   update_gps(lat: number, lng: number): string;
   get_current_cell(): string | undefined;
   triangulate_via_acoustic_and_ble?(peer_id: string, acoustic_strength: number, ble_strength: number): number;
+  register_shared_cell?(peer_id: string, cell_id: string, via_channel: string): boolean;
+  get_known_mesh_cells_json?(): string;
 }
 
 export class WasmArkManager {
@@ -397,6 +403,14 @@ export class WasmProprioceptionCore {
   triangulate_via_acoustic_and_ble(peer_id: string, acoustic_strength: number, ble_strength: number): number {
     if (this.inner.triangulate_via_acoustic_and_ble) return this.inner.triangulate_via_acoustic_and_ble(peer_id, acoustic_strength, ble_strength);
     return 100.0;
+  }
+  register_shared_cell(peer_id: string, cell_id: string, via_channel: string): boolean {
+    if (this.inner.register_shared_cell) return this.inner.register_shared_cell(peer_id, cell_id, via_channel);
+    return false;
+  }
+  get_known_mesh_cells_json(): string {
+    if (this.inner.get_known_mesh_cells_json) return this.inner.get_known_mesh_cells_json();
+    return "[]";
   }
 }
 

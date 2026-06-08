@@ -145,9 +145,20 @@ export class MatrixService {
 
   stop() {
     if (this.client) {
-      // @ts-expect-error matrix-js-sdk event typing workaround
-      this.client.removeListener("Room.timeline", this.timelineHandler);
-      this.client.stopClient();
+      try {
+        // @ts-expect-error matrix-js-sdk event typing workaround
+        this.client.removeListener("Room.timeline", this.timelineHandler);
+      } catch (e) {}
+      try {
+        // @ts-expect-error matrix-js-sdk event typing workaround
+        this.client.off("Room.timeline", this.timelineHandler);
+      } catch (e) {}
+      try {
+        this.client.stopClient();
+      } catch (e) {}
+      try {
+        this.client.removeAllListeners();
+      } catch (e) {}
       this.client = null;
     }
     this.swarmKey = null;

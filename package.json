@@ -17,7 +17,8 @@
     "simulate": "tsx swarm/node_simulator.ts",
     "demo": "docker-compose -f docker-compose.demo.yml up --build",
     "demo:node1": "tsx swarm/node_simulator.ts",
-    "demo:node2": "tsx swarm/node_simulator.ts"
+    "demo:node2": "tsx swarm/node_simulator.ts",
+    "demo:resurrection": "tsx swarm/demo_resurrection.ts"
   },
   "husky": {
     "hooks": {

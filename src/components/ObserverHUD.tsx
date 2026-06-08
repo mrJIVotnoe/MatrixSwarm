@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine, WasmDSP } from '../core/wasm_bridge';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine, WasmDSP, WasmIdentity } from '../core/wasm_bridge';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -46,6 +46,35 @@ export const ObserverHUD: React.FC = () => {
   const [sandboxIsolations, setSandboxIsolations] = useState<string[]>([]);
   const [sandboxActive, setSandboxActive] = useState<boolean>(true);
   const [isSandboxVerifying, setIsSandboxVerifying] = useState<boolean>(false);
+  const [showCommunionModal, setShowCommunionModal] = useState<boolean>(false);
+  const [communionSeedInput, setCommunionSeedInput] = useState<string>('');
+
+  // 📚 БИБЛИОТЕКА АЛЕКСАНДРИИ (L5) & Quantum Entanglement
+  const [zimQuery, setZimQuery] = useState('');
+  const [zimResults, setZimResults] = useState<any[]>([]);
+  const [entanglementState, setEntanglementState] = useState<'DISCONNECTED' | 'SYNCHRONIZING' | 'ENTANGLED'>('ENTANGLED');
+  const [entangledMsgsCount, setEntangledMsgsCount] = useState<number>(4);
+
+  const handleZimSearch = (query: string) => {
+    setZimQuery(query);
+    if (!query.trim()) {
+      setZimResults([]);
+      return;
+    }
+    try {
+      const s = new WasmArkStorage();
+      const resultsJson = s.search_articles(query);
+      if (resultsJson) {
+        const parsed = JSON.parse(resultsJson);
+        setZimResults(parsed);
+      } else {
+        setZimResults([]);
+      }
+    } catch (e) {
+      console.error("[ZIM Search Error]", e);
+      setZimResults([]);
+    }
+  };
 
   const activateKinopsis = () => {
      if (ethicsCameraShield) {
@@ -76,36 +105,37 @@ export const ObserverHUD: React.FC = () => {
    // L1 - Acoustic Nabat: Generation of ultrasonic pheromones (18kHz - 20kHz) via Web Audio API
    const emitUltrasonicNabat = () => {
      try {
-       // Create Web Audio context, synthesize ultrasound frequencies based on Rust AcousticAnalyzer
        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
        if (!AudioCtx) {
          setIntentStatus("WEB AUDIO ERROR: Browser does not support Audio Synthesis.");
          return;
        }
        const ctx = new AudioCtx();
-       const osc = ctx.createOscillator();
-       const gain = ctx.createGain();
+       const sampleRate = 44100;
        
-       // Emit a sequence or clean sine wave within 18500Hz - 19500Hz (the FSK frequencies of the Rust core)
-       osc.type = 'sine';
-       osc.frequency.setValueAtTime(19000, ctx.currentTime); // 19kHz center pheromone
+       const rawSamples = WasmDSP.encodeAcousticPayload("CELL_CONNECT", sampleRate);
+       const audioBuffer = ctx.createBuffer(1, rawSamples.length, sampleRate);
+       const channelData = audioBuffer.getChannelData(0);
+       channelData.set(rawSamples);
        
-       gain.gain.setValueAtTime(0.01, ctx.currentTime); // keep whisper safe and quiet, but present
-       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+       const bufferSource = ctx.createBufferSource();
+       bufferSource.buffer = audioBuffer;
        
-       osc.connect(gain);
-       gain.connect(ctx.destination);
-       osc.start();
-       osc.stop(ctx.currentTime + 1.2);
+       const gainNode = ctx.createGain();
+       gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+       gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + Math.max(1.2, rawSamples.length / sampleRate));
+       
+       bufferSource.connect(gainNode);
+       gainNode.connect(ctx.destination);
+       bufferSource.start();
 
-       // Add a visual sync beacon detection list
-       const mockBeacons = ["CELL_BEACON_ALPHA (19.0kHz)", "CELL_BEACON_WEST (18.5kHz)"];
+       const mockBeacons = ["CELL_BEACON_ALPHA (19.0kHz)", "CELL_BEACON_WEST (18.5kHz)", "DISCOVERED_NEIGHBOR_NODE (FSK: 'CELL_CONNECT')"];
        setAcousticBeacons(prev => {
          const added = mockBeacons[Math.floor(Math.random() * mockBeacons.length)];
          return prev.includes(added) ? prev : [...prev, added];
        });
 
-       setIntentStatus("🔈 АКУСТИЧЕСКИЙ НАБАТ ИЗЛУЧЕН (19.0 кГц). Члены соты координируют физическое соседство!");
+       setIntentStatus("🔈 АКУСТИЧЕСКИЙ НАБАТ ИЗЛУЧЕН (FSK-ультразвук 18.5кГц - 20.0кГц сгенерирован в Rust). Члены соты координируют физическое соседство!");
      } catch (e: any) {
        console.error(e);
        setIntentStatus(`Acoustic error: ${e.message}`);
@@ -218,10 +248,30 @@ export const ObserverHUD: React.FC = () => {
   };
 
   const handleEnergyCommunion = () => {
-      // User allows authorized power via USB
-      GlobalAgentState.detect_usb(true);
-      setIsPowered(true);
-      setIntentStatus("ЭНЕРГЕТИЧЕСКОЕ ПРИЧАСТИЕ: Node detected as charging. Ascended to MAGISTRATE State under the Grid Covenant!");
+      setShowCommunionModal(true);
+  };
+
+  const processCryptoCommunion = async () => {
+     try {
+        const phrase = communionSeedInput.trim().toLowerCase();
+        if (!phrase) return;
+        const passport = await WasmIdentity.recoverFromSeed(phrase);
+        const message = "I_CONSECRATE_THIS_NODE_POWER_GRID_COVENANT";
+        const signature = await WasmIdentity.signMessage(phrase, message);
+        
+        const is_valid = WasmIdentity.verifySignature(passport.public_key, message, signature);
+        if (is_valid) {
+            GlobalAgentState.detect_usb(true);
+            setIsPowered(true);
+            setIntentStatus(`✅ ЭНЕРГЕТИЧЕСКОЕ ПРИЧАСТИЕ: Подпись верифицирована. Канал питания USB доверен. Узищный ID ${passport.node_id.substring(0,8)}... повышен до МАГИСТРАТА-ЯКОРЯ!`);
+            setShowCommunionModal(false);
+            setCommunionSeedInput('');
+        } else {
+            setIntentStatus("❌ ОШИБКА: Спецификация подписи завалена. Узел в Карантине.");
+        }
+     } catch(e: any) {
+        setIntentStatus("❌ ОШИБКА: Подлинный Паспорт души не обнаружен. Автообмен жестко заблокирован.");
+     }
   };
 
   useEffect(() => {
@@ -382,9 +432,21 @@ export const ObserverHUD: React.FC = () => {
       <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" style={{ backgroundImage: `radial-gradient(circle at 50% 50%, ${isAlert ? '#ef4444' : '#3b82f6'} 0%, transparent 60%)` }}></div>
       
       <div className="flex justify-between items-center mb-6 relative z-10">
-        <h3 className={`text-xl font-bold flex items-center ${isAlert ? 'text-red-400' : 'text-blue-400'}`}>
-          <Eye className={`mr-3 ${isAlert ? 'text-red-500 animate-bounce' : 'text-cyan-400 animate-pulse'}`} />
-          Quantum Observer Effect (L5 HUD)
+        <h3 className={`text-xl font-bold flex items-start gap-1 ${isAlert ? 'text-red-400' : 'text-blue-400'}`}>
+          <Eye className={`mr-1 mt-1 ${isAlert ? 'text-red-500 animate-bounce' : 'text-cyan-400 animate-pulse'}`} />
+          <div className="flex flex-col">
+            <span className="text-xl font-bold">Quantum Observer Effect (L5 HUD)</span>
+            <div className="flex flex-wrap gap-2 items-center mt-1.5">
+              <span className="text-[10px] bg-cyan-500/10 border border-cyan-400/40 text-cyan-400 px-2 py-0.5 rounded font-semibold tracking-wider flex items-center gap-1 animate-pulse">
+                ⚛️ SYSTEM: QUANTUM RESONANT
+              </span>
+              {antennaMultiplier !== "x1.0" && (
+                <span className="text-[10px] bg-amber-500/10 border border-amber-500/40 text-amber-400 px-2 py-0.5 rounded font-semibold tracking-wider flex items-center gap-1">
+                  📡 ANTENNA GAIN: {antennaMultiplier}
+                </span>
+              )}
+            </div>
+          </div>
         </h3>
         <div className="flex gap-4 items-center">
           <button 
@@ -715,20 +777,55 @@ export const ObserverHUD: React.FC = () => {
           </div>
         </div>
 
-        {/* Holographic redundancy column */}
+        {/* Alexandria L5 offline ZIM search & Holographic redundancy column */}
         <div className="border border-blue-900/40 bg-blue-950/10 p-3 rounded flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-2 border-b border-blue-900/30 pb-1">
-              <span className="text-cyan-400 font-bold flex items-center gap-1.5">
-                🔮 ГОЛОГРАФИЧЕСКИЙ ПРИНЦИП
+              <span className="text-cyan-400 font-bold flex items-center gap-1.5 animate-pulse">
+                📚 БИБЛИОТЕКА АЛЕКСАНДРИИ (L5)
               </span>
-              <span className="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1 py-0.2 rounded">L5 DENSITY</span>
+              <span className="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1 py-0.2 rounded">ZIM REGISTRY</span>
             </div>
-            <p className="text-[11px] text-cyan-300/80 leading-relaxed mb-3">
-              Даже если 99% узлов погибнет, оставшийся 1% (Магистрат-Якорь) восстановит критические индексы нашего «Лувра» из локальных фрагментов.
-            </p>
             
-            <div className="h-1.5 bg-blue-950 overflow-hidden mb-2 rounded border border-blue-900/30">
+            <p className="text-[11px] text-cyan-300/80 leading-normal mb-2">
+              Запросы Разведчиков обрабатываются полностью оффлайн по локальным ZIM-архивам (Википедия в соте):
+            </p>
+
+            <div className="flex gap-1 mb-2">
+              <input 
+                type="text" 
+                placeholder="Поиск по архиву знаний..." 
+                value={zimQuery}
+                onChange={e => handleZimSearch(e.target.value)}
+                className="flex-1 bg-black/60 border border-cyan-900/50 outline-none p-1.5 rounded-sm text-[10px] text-cyan-200 font-mono focus:border-cyan-400"
+              />
+              {zimQuery && (
+                <button 
+                  onClick={() => handleZimSearch('')} 
+                  className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white px-2 border border-slate-700 text-xs rounded-sm"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="bg-slate-950/90 border border-blue-900/40 rounded p-2 max-h-[140px] overflow-y-auto custom-scrollbar mb-2 font-mono text-[9px] text-cyan-300 space-y-1.5">
+              {zimResults.length === 0 ? (
+                <div className="text-slate-600 italic leading-snug">
+                  Введите поисковый запрос (например: water, aid, agriculture, mesh...) для полнотекстовой выборки из Rust WASM-ядра.
+                </div>
+              ) : (
+                zimResults.map((art, idx) => (
+                  <div key={idx} className="border-b border-slate-900/50 pb-1.5 last:border-b-0">
+                    <span className="text-amber-400 font-bold uppercase block tracking-wider">{art.title}</span>
+                    <p className="text-slate-400 leading-normal mt-0.5">{art.content}</p>
+                    <span className="text-[7.5px] text-cyan-600 block mt-1">Offset: {art.index_offset} • Category: {art.category}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="h-1 bg-blue-950 overflow-hidden mb-2 rounded border border-blue-900/30">
               <div 
                 className={`h-full transition-all duration-1000 ${holoFailureSimulated ? 'bg-red-500 animate-pulse' : 'bg-cyan-500 shadow-[0_0_8px_#22d3ee]'}`} 
                 style={{ width: holoFailureSimulated ? '1%' : '100%' }}
@@ -932,9 +1029,16 @@ export const ObserverHUD: React.FC = () => {
            <span className="text-gray-500 block">ISOLATION BREACHES</span>
            <span className={metrics.isolation_breach_attempts > 0 ? "text-red-400" : "text-yellow-400"}>{metrics.isolation_breach_attempts}</span>
         </div>
-        <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
-           <span className="text-gray-500 block">TRUST / P2P STATUS</span>
-           <span className="text-purple-400">{agentState === 'RUNNING' ? 'VERIFIED' : 'AWAITING AUTH'}</span>
+        <div className="border border-blue-900/50 bg-black/45 p-2 rounded flex flex-col justify-between">
+           <span className="text-gray-500 block uppercase text-[10px]">КВАНТОВАЯ ЗАПУТАННОСТЬ</span>
+           <div className="flex flex-col text-left font-mono mt-1 space-y-0.5">
+              <span className={`font-bold text-[10px] ${entanglementState === 'ENTANGLED' ? 'text-purple-400 animate-pulse' : 'text-slate-500'}`}>
+                ● {entanglementState === 'ENTANGLED' ? 'ENTANGLED (DIRECT P2P)' : 'UNLINKED'}
+              </span>
+              <span className="text-[8.5px] text-purple-300">
+                {entangledMsgsCount} CRDT MSG SYNCED (Offline)
+              </span>
+           </div>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded">
            <span className="text-gray-500 block">DIGITAL PROPRIOCEPTION</span>
@@ -971,8 +1075,44 @@ export const ObserverHUD: React.FC = () => {
              <Archive className="w-3 h-3 mr-1" /> LOUVRE ZIM ACCESS
            </span>
            <span className="text-white text-[10px] break-words truncate">{arkContent ? arkContent : "AWAITING FRAGMENT..."}</span>
-        </div>
-      </div>
+         </div>
+       </div>
+
+       {showCommunionModal && (
+         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+           <div className="hud-panel p-6 max-w-sm w-full bg-slate-950 border border-purple-500/60 shadow-[0_0_25px_rgba(168,85,247,0.3)] space-y-4 font-mono select-none">
+             <h3 className="text-sm font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+                <BatteryCharging className="w-4 h-4 animate-pulse" /> ЭНЕРГЕТИЧЕСКОЕ ПРИЧАСТИЕ
+             </h3>
+             <p className="text-[10px] text-purple-300 leading-relaxed">
+                Внимание. Сеть обнаружила физическое USB-соединение. Автообмен заблокирован (Режим Карантина). Введите Сид-фразу (12 слов) вашего Паспорта души для криптографического Причастия и восхождения:
+             </p>
+             <textarea
+                value={communionSeedInput}
+                onChange={e => setCommunionSeedInput(e.target.value)}
+                placeholder="Ваши 12 секретных слов через пробел..."
+                className="w-full h-16 bg-black border border-purple-900/50 p-2 text-[11px] text-purple-400 font-mono focus:outline-none focus:border-purple-500 resize-none text-center"
+             />
+             <div className="flex gap-2">
+                <button 
+                   onClick={() => { setShowCommunionModal(false); setCommunionSeedInput(''); }}
+                   type="button"
+                   className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold cursor-pointer font-mono"
+                >
+                   ОТМЕНА
+                </button>
+                <button 
+                   onClick={processCryptoCommunion}
+                   type="button"
+                   disabled={communionSeedInput.trim().split(/\s+/).length !== 12}
+                   className="flex-1 py-1 bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-300 text-[10px] font-bold cursor-pointer font-mono disabled:opacity-40"
+                >
+                   ПРИЧАСТИТЬСЯ
+                </button>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 };

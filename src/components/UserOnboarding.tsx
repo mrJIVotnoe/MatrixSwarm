@@ -8,7 +8,7 @@ import { globalEntropyPool } from '../core/entropy';
 export type UserMode = 'ark' | 'symbiote' | 'magistrate';
 
 interface UserOnboardingProps {
-  onComplete: (alias: string, mode: UserMode, seedPhrase: string, publicKey: string) => void;
+  onComplete: (alias: string, mode: UserMode, seedPhrase: string, publicKey: string, karma: number, rank: string) => void;
 }
 
 export function UserOnboarding({ onComplete }: UserOnboardingProps) {
@@ -20,14 +20,18 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
   const [importKeyVal, setImportKeyVal] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [inheritedKarma, setInheritedKarma] = useState<number>(150);
+  const [inheritedRank, setInheritedRank] = useState<string>('Adept');
 
   const generateKeys = async () => {
     try {
       // Rust WASM-Hardened Ed25519 "Soul Passport" Generation
       const humanEntropy = await globalEntropyPool.generateSeed();
-      const passport = await WasmIdentity.forgePassport(humanEntropy);
+      const passport: any = await WasmIdentity.forgePassport(humanEntropy);
       setSeedPhrase(passport.seed_phrase);
       setPublicKeyStr(passport.public_key);
+      setInheritedKarma(passport.karma || 150);
+      setInheritedRank(passport.rank || 'Adept');
       setStep(4); // Move to key backup step
     } catch (e) {
       console.error(e);
@@ -48,7 +52,9 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
       const passport: any = await WasmIdentity.recoverFromSeed(phrase);
       setSeedPhrase(passport.seed_phrase);
       setPublicKeyStr(passport.public_key);
-      setErrorMsg("QUANTUM REINCARNATION: Soul Passport recovered via Rust Core. Karma linked.");
+      setInheritedKarma(passport.karma || 5000);
+      setInheritedRank(passport.rank || 'Guard');
+      setErrorMsg(`QUANTUM REINCARNATION: Soul Passport recovered via Rust Core. Inherited Karma: ${(passport.karma || 5000).toFixed(0)} (${passport.rank || 'Guard'}).`);
       setTimeout(() => {
           setStep(2); // continue to role selection
       }, 1500);
@@ -68,7 +74,7 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
     } else if (step === 2) {
       setStep(3);
     } else if (step === 3) {
-      onComplete(alias, mode, seedPhrase, publicKeyStr);
+      onComplete(alias, mode, seedPhrase, publicKeyStr, inheritedKarma, inheritedRank);
     } else if (step === 4) {
       // User copied their key
       setStep(2);

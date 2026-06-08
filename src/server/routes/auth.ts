@@ -11,7 +11,7 @@ const router = Router();
 
 router.post("/register", async (req, res) => {
   try {
-    const { alias, public_key, user_mode } = req.body;
+    const { alias, public_key, user_mode, karma, rank } = req.body;
     // PBKDF2 Key Derivation instead of SHA-256
     let id = crypto.pbkdf2Sync(public_key, 'swarm_salt', 10000, 32, 'sha256').toString('hex').substring(0, 16);
     
@@ -23,11 +23,13 @@ router.post("/register", async (req, res) => {
 
     const created_at = Date.now();
     const mode = user_mode || 'symbiote';
+    const initial_reputation = karma !== undefined ? Math.floor(karma) : 0;
+    const initial_trust_level = rank || 'newbie';
     
     await db.run(`
-      INSERT INTO observers (id, alias, public_key, user_mode, created_at)
-      VALUES (?, ?, ?, ?, ?)
-    `, [id, alias, public_key, mode, created_at]);
+      INSERT INTO observers (id, alias, public_key, user_mode, created_at, reputation, trust_level)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [id, alias, public_key, mode, created_at, initial_reputation, initial_trust_level]);
     
     res.json({ id, message: "Observer registered successfully" });
   } catch (e: any) {
@@ -110,10 +112,16 @@ router.post("/nodes/register", async (req, res) => {
            initial_trust = highestKarma;
            console.info(`[INFO] [SWARM] Soul Reincarnation successful for owner ${owner_id}. Inherited Karma: ${initial_trust}. Quarantine lifted.`);
         }
-      } else if (deviceTrustLevel === TrustLevel.QUARANTINE) {
-        // If no past karma but cryptographically authorized
-        initial_trust = is_purified ? 50 : 10;
-        console.info(`[INFO] [SWARM] Cryptographic authorization for new owner ${owner_id}. USB Quarantine lifted.`);
+      } else {
+        const observer = await db.get('SELECT reputation FROM observers WHERE id = ?', [owner_id]);
+        if (observer && observer.reputation > initial_trust) {
+           initial_trust = observer.reputation;
+           console.info(`[INFO] [SWARM] Soul Reincarnation from Observer Passport successful. Inherited Karma: ${initial_trust}. Quarantine lifted.`);
+        } else if (deviceTrustLevel === TrustLevel.QUARANTINE) {
+          // If no past karma but cryptographically authorized
+          initial_trust = is_purified ? 50 : 10;
+          console.info(`[INFO] [SWARM] Cryptographic authorization for new owner ${owner_id}. USB Quarantine lifted.`);
+        }
       }
     }
 

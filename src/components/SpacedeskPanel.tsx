@@ -114,10 +114,10 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
         {mode === 'select' && (
           <div className="flex-1 flex flex-col items-center justify-center space-y-8 p-4">
              <div className="text-center space-y-2 max-w-lg mb-4">
-               <h3 className="text-purple-400 font-bold text-lg">ФИЛОСОФИЯ ПРЯМОГО ПОДКЛЮЧЕНИЯ</h3>
-               <p className="text-xs text-purple-600/80 leading-relaxed">
-                 Прямая кабельная связь (USB-A/USB-C) создает неразрывную иерархию между устройствами. Мощный узел (PC) транслирует картинку, слейв-узел (Смартфон) становится внешним сенсором или дисплеем. Без задержек, без посредников, чистый data-поток.
-               </p>
+                <h3 className="text-purple-400 font-bold text-lg">ФИЛОСОФИЯ ПРЯМОГО ПОДКЛЮЧЕНИЯ</h3>
+                <p className="text-xs text-purple-600/80 leading-relaxed">
+                  Прямая кабельная связь (USB-A/USB-C) создает неразрывную иерархию между устройствами. Мощный узел (PC) транслирует картинку, слейв-узел (Смартфон) становится внешним сенсором или дисплеем. Без задержек, без посредников, чистый data-поток.
+                </p>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
@@ -147,13 +147,13 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
              <div className="flex gap-4 mt-8">
                <button 
                  onClick={() => setConnectionType('usb')}
-                 className={`flex items-center gap-2 px-4 py-2 border text-xs font-bold \${connectionType === 'usb' ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'border-slate-700 text-slate-500'}`}
+                 className={`flex items-center gap-2 px-4 py-2 border text-xs font-bold ${connectionType === 'usb' ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'border-slate-700 text-slate-500'}`}
                >
                  <Cable className="w-4 h-4" /> USB КАБЕЛЬ (КАНАЛ СВЯЗИ)
                </button>
                <button 
                  onClick={() => setConnectionType('wifi')}
-                 className={`flex items-center gap-2 px-4 py-2 border text-xs font-bold \${connectionType === 'wifi' ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'border-slate-700 text-slate-500'}`}
+                 className={`flex items-center gap-2 px-4 py-2 border text-xs font-bold ${connectionType === 'wifi' ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'border-slate-700 text-slate-500'}`}
                >
                  <Wifi className="w-4 h-4" /> P2P WIFI (БЕСПРОВОДНОЙ ЭФИР)
                </button>
@@ -372,21 +372,46 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1555680202-c86f0e12f086?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center opacity-40 blur-[1px]"></div>
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/20"></div>
                     
-                    <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-amber-400/80 bg-black/60 p-2 backdrop-blur-md border border-amber-500/20">
+                    {/* Slave-Sensor Status Overlay */}
+                    <div className="absolute top-4 left-4 right-4 bg-black/85 p-3 border border-amber-500/40 text-[10px] sm:text-xs font-mono text-amber-300 backdrop-blur-sm z-10 flex flex-col sm:flex-row justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] text-amber-500 block uppercase tracking-wider font-bold">💎 РЕЖИМ SPACEDESK: СЛЕЙВ-СЕНСОР («КИНОПСИС»)</span>
+                        <span className="text-white">Смартфон перешел во внешнее управление ПК по USB-шине</span>
+                      </div>
+                      <div className="flex flex-col text-right justify-center">
+                        <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest self-end animate-pulse">Touch Routing: АКТИВНО</span>
+                        <span className="text-[8px] text-emerald-400 mt-0.5 font-bold">ОСВОБОЖДЕНО: 90% ЦП</span>
+                      </div>
+                    </div>
+
+                    <div className="absolute inset-x-4 top-20 bg-purple-950/85 p-3 border border-purple-500/35 rounded text-[10px] sm:text-[11px] text-purple-300 font-mono leading-relaxed z-10">
+                      <span className="text-yellow-400 font-bold uppercase block text-[9.5px] tracking-wide mb-1">🧘 СВОБОДНЫЙ ВРЕМЕННОЙ ФОКС (SWARM FORAGING):</span>
+                      Так как Смартфон работает только как слейв-дисплей («Кинопсис»), его освобожденные процессоры перенаправлены на **индексацию локальных ZIM-архивов Kiwix** и обсчет навигационной координатной сетки соты без начисления Кармы.
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-amber-400/80 bg-black/60 p-2 backdrop-blur-md border border-amber-500/20 z-10">
                       <span>INCOMING: 1920x1080 @ 60FPS</span>
                       <span>LINK: {connectionType === 'usb' ? 'CABLE (0ms latency)' : 'WIFI (23ms latency)'}</span>
                       <span>{Math.floor(Math.random() * 5 + 12)} Mbps</span>
                     </div>
 
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 p-4 border border-amber-500 text-amber-400 font-mono text-xs flex flex-col gap-2">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 p-4 border border-amber-500 text-amber-400 font-mono text-xs flex flex-col gap-2 z-20">
                       <div className="font-bold flex items-center gap-2 mb-2 border-b border-amber-500/30 pb-2">
-                        <Settings className="w-4 h-4" /> KVM CONTROLS
+                        <Settings className="w-4 h-4" /> KVM CONTROLS: СЛЕЙВ-СЕНСОР («КИНОПСИС»)
                       </div>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="accent-amber-500" defaultChecked /> Enable Touch Input Routing
+                      <div className="text-[10px] text-amber-500 bg-amber-950/50 p-2 mb-2 border border-amber-500/30 leading-relaxed font-mono">
+                        ● КАНАЛ СВЯЗИ: USB CABLE (KVM)<br />
+                        ● Touch Routing STATUS: АКТИВНО<br />
+                        ● Swarm Foraging: АКТИВЕН (90% ЦП Свободно)<br />
+                        ● Task: Индексация Kiwix ZIM и Обсчет сетки
+                      </div>
+                      <label className="flex items-center gap-2 cursor-not-allowed opacity-80">
+                        <input type="checkbox" className="accent-amber-500 cursor-not-allowed" defaultChecked disabled /> 
+                        <span className="text-amber-300">Touch Input Routing (🔒 АКТИВНО / ZERO-TRUST)</span>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="accent-amber-500" /> Audio Forwarding
+                      <label className="flex items-center gap-2 cursor-not-allowed opacity-80">
+                        <input type="checkbox" className="accent-amber-500 cursor-not-allowed" defaultChecked disabled /> 
+                        <span className="text-amber-300 text-glow-cyan">Swarm Foraging Proxy (🔒 АКТИВНО)</span>
                       </label>
                     </div>
                  </div>
