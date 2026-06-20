@@ -24,7 +24,7 @@ export const KarmaLedger: React.FC = () => {
     // Synchronize Karma and Soul Passport across cell instantly
     const pullFromP2P = () => {
        // Simulate receiving WebRTC push from another peer with a new CRDT state
-       if (Math.random() > 0.7 && crdtRef.current) {
+       if (false && crdtRef.current) {
           const fakeBlock = {
              id: "block_" + Date.now(),
              node_id: "peer_" + Math.floor(Math.random()*1000),

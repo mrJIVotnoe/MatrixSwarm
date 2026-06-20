@@ -392,7 +392,7 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
                     <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-amber-400/80 bg-black/60 p-2 backdrop-blur-md border border-amber-500/20 z-10">
                       <span>INCOMING: 1920x1080 @ 60FPS</span>
                       <span>LINK: {connectionType === 'usb' ? 'CABLE (0ms latency)' : 'WIFI (23ms latency)'}</span>
-                      <span>{Math.floor(Math.random() * 5 + 12)} Mbps</span>
+                      <span>[WAITING_CORE_SYNC] Mbps</span>
                     </div>
 
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 p-4 border border-amber-500 text-amber-400 font-mono text-xs flex flex-col gap-2 z-20">

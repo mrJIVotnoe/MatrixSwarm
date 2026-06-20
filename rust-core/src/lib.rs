@@ -15,6 +15,7 @@ mod visual_kinopsis;
 mod caste;
 mod crdt;
 mod stegano;
+mod discovery;
 
 mod reverse_starlink;
 mod planetary_shield;

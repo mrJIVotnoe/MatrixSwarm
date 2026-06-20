@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity, Share2 } from 'lucide-react';
 import { WasmGlobalKnowledge, WasmArkManager, WasmArkStorage } from '../core/wasm_bridge';
+import { WorkerBus } from '../core/worker_bus';
 
 // ... other constants ...
 const ZIM_LIBRARIES = [
@@ -33,17 +34,21 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
 
   const handlePollinate = (knowledgeType: string) => {
      // Simulating node role 'Magistrate' for demo
-     const fragmentPayload = arkRef.current.pollinate("PEER_" + Math.random());
+     const peerId = symbiote?.nodeId || "PEER_ACTIVE_MAGISTRATE_NODE";
+     const fragmentPayload = arkRef.current.pollinate(peerId);
      const added = arkRef.current.receive_pollination(fragmentPayload);
      const available = arkRef.current.get_available_knowledge();
      setPollinationLog(`[L5 RK] Pollinated Knowledge. Received ${added} fragments. Keys: ${available}`);
   };
 
   useEffect(() => {
-    // Populate initial search results from WasmArkStorage (ZIM parser)
+    // Populate initial search results from WasmArkStorage (ZIM parser) asynchronously
     try {
-      const allStr = storageRef.current.search_articles("");
-      setSearchResults(JSON.parse(allStr));
+      WorkerBus.executeZimQuery("").then(allStr => {
+        setSearchResults(JSON.parse(allStr));
+      }).catch(err => {
+        console.error(err);
+      });
     } catch (e) {
       console.error(e);
     }
@@ -51,16 +56,7 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
 
   useEffect(() => {
     // Initialize Web Worker for Sandboxing archive reads (L4/L5 Isolation)
-    workerRef.current = new Worker(new URL('../workers/sandboxWorker.ts', import.meta.url), { type: 'module' });
-    
-    workerRef.current.onmessage = (e) => {
-       if (e.data.type === 'ZIM_QUERY_RESULT') {
-          setSandboxLog(e.data.result);
-          setIsSearching(false);
-       }
-    };
-    
-    return () => workerRef.current?.terminate();
+    WorkerBus.init();
   }, [searchQuery]);
 
   const startDownload = (id: string) => {
@@ -70,39 +66,27 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
   };
 
   useEffect(() => {
-    const iv = setInterval(() => {
-      setLibraries(libs => libs.map(lib => {
-        if (lib.status === 'downloading') {
-          const newProgress = lib.progress + (Math.random() * 5);
-          if (newProgress >= 100) {
-            return { ...lib, status: 'downloaded', progress: 100 };
-          }
-          return { ...lib, progress: newProgress };
-        }
-        return lib;
-      }));
-    }, 1000);
-    return () => clearInterval(iv);
+    // Audit Clean: No simulated download progress increments in pure client preview.
+    // Suspended fake progress loops.
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSearching(true);
     setViewMode('reader');
     setSelectedArticle(null);
     setSandboxLog(null);
-    setTimeout(() => {
-        try {
-            const resultsStr = storageRef.current.search_articles(searchQuery);
-            const parsed = JSON.parse(resultsStr);
-            setSearchResults(parsed);
-            setSandboxLog(`Queries routed to Rust WasmArkStorage context inside worker boundary. Found ${parsed.length} items.`);
-        } catch (err: any) {
-            setSandboxLog(`Search failed: ${err.message}`);
-        } finally {
-            setIsSearching(false);
-        }
-    }, 400);
+    
+    try {
+        const resultsStr = await WorkerBus.executeZimQuery(searchQuery);
+        const parsed = JSON.parse(resultsStr);
+        setSearchResults(parsed);
+        setSandboxLog(`Queries routed securely to Rust WasmArkStorage inside Worker Sandbox boundary. Found ${parsed.length} items.`);
+    } catch (err: any) {
+        setSandboxLog(`Search failed: ${err.message}`);
+    } finally {
+        setIsSearching(false);
+    }
   };
 
   return (
@@ -175,7 +159,7 @@ export function KiwixArchive({ symbiote }: { symbiote: any }) {
                          <div className="w-full max-w-[150px]">
                            <div className="flex justify-between text-[10px] text-emerald-400 mb-1">
                              <span>ЗАГРУЗКА ИЗ РОЯ</span>
-                             <span>{Math.floor(lib.progress)}%</span>
+                             <span>"[AWAITING_CORE]"</span>
                            </div>
                            <div className="h-1 bg-emerald-950 overflow-hidden">
                              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${lib.progress}%` }}></div>

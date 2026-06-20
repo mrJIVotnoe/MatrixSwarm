@@ -16,7 +16,58 @@ export const IdentityCore = {
     return { old_node_id: "WASM", new_node_id: "WASM", migrated_karma: k, signature: "SIG" };
   },
   export_legacy_container: (p, k, isGuard) => `ENCRYPTED_LEGACY_CONTAINER[mock]`,
-  import_legacy_container: (enc, newPhrase) => ({ original_node_id: "OLD", new_node_id: "NEW", restored_karma: 100, restored_guard_status: true, verification: "SUCCESS" })
+  import_legacy_container: (enc, newPhrase) => ({ original_node_id: "OLD", new_node_id: "NEW", restored_karma: 100, restored_guard_status: true, verification: "SUCCESS" }),
+  derive_hkdf_key: (masterSecret, info) => {
+    // Basic JS simulation of HKDF
+    return "HKDF_" + masterSecret.substring(0,6) + "_" + info.substring(0,6);
+  }
+};
+
+export const SdpDiscovery = {
+  encode_sdp_to_qr: (node_id, sdp_type, sdp_raw) => {
+    const exchange = {
+      node_id,
+      sdp_type,
+      sdp_data: sdp_raw,
+      timestamp: Date.now()
+    };
+    const serialized = JSON.stringify(exchange);
+    let hex = "";
+    for (let i = 0; i < serialized.length; i++) {
+      hex += serialized.charCodeAt(i).toString(16).padStart(2, "0");
+    }
+    return `SWARMQR://${hex}`;
+  },
+  decode_sdp_from_qr: (qr_payload) => {
+    if (!qr_payload.startsWith("SWARMQR://")) {
+      throw new Error("INVALID_SWARM_QR_PREFIX");
+    }
+    const hex = qr_payload.slice("SWARMQR://".length);
+    let str = "";
+    for (let i = 0; i < hex.length; i += 2) {
+      str += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+    }
+    return JSON.parse(str);
+  },
+  scan_local_mdns_peers: () => {
+    const peers = [
+      {
+        id: "LAN_ROUTER_NODE",
+        ip: "192.168.1.1",
+        device_type: "router",
+        karma: 99.0,
+        status: "online"
+      },
+      {
+        id: "LAN_SMART_TV_NODE",
+        ip: "192.168.1.45",
+        device_type: "smart_tv",
+        karma: 75.0,
+        status: "online"
+      }
+    ];
+    return JSON.stringify(peers);
+  }
 };
 
 export const AikidoCore = {

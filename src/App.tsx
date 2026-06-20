@@ -22,7 +22,7 @@ import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
 import { ObserverHUD } from './components/ObserverHUD';
 import { SpacedeskPanel } from './components/SpacedeskPanel';
-import { getKeysFromSeed, validateSeedPhrase } from './lib/crypto';
+import { getKeysFromSeed, validateSeedPhrase, encryptSeed, decryptSeed } from './lib/crypto';
 import { GlobalAgentState } from './core/wasm_bridge';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { useTranslation } from 'react-i18next';
@@ -195,16 +195,23 @@ function MainDashboard() {
     if (!localStorage.getItem('soul_passport')) return null;
     return localStorage.getItem('observerId') || null;
   });
+  const [decryptedPassport, setDecryptedPassport] = useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [unlockError, setUnlockError] = useState('');
   const [observerData, setObserverData] = useState<any>(null);
   const [cellData, setCellData] = useState<any>(null);
 
   useEffect(() => {
     const passport = localStorage.getItem('soul_passport');
     if (passport && !observerId) {
+       if (passport.startsWith("PBKDF2-GCM:") && !decryptedPassport) {
+          return;
+       }
+       const activePassport = decryptedPassport || passport;
        (async () => {
          try {
-            if (await validateSeedPhrase(passport)) {
-               const keys = await getKeysFromSeed(passport);
+            if (await validateSeedPhrase(activePassport)) {
+               const keys = await getKeysFromSeed(activePassport);
                const id = keys.nodeId;
                localStorage.setItem('observerId', id);
                setObserverId(id);
@@ -216,15 +223,19 @@ function MainDashboard() {
                   console.error("Agent Contract violation:", e);
                }
             } else {
-               localStorage.removeItem('soul_passport');
+               if (!passport.startsWith("PBKDF2-GCM:")) {
+                  localStorage.removeItem('soul_passport');
+               }
             }
          } catch (e) {
             console.error("Failed to derive ID from passport", e);
-            localStorage.removeItem('soul_passport');
+            if (!passport.startsWith("PBKDF2-GCM:")) {
+               localStorage.removeItem('soul_passport');
+            }
          }
        })();
     }
-  }, [observerId]);
+  }, [observerId, decryptedPassport]);
 
   const fetchObserverData = async (id: string) => {
     try {
@@ -269,7 +280,7 @@ function MainDashboard() {
     }
   }, [(symbiote as any)?.cellId]);
 
-  const handleOnboardingComplete = async (alias: string, user_mode: string, privateKeyBase64: string, publicKeyBase64: string, karma: number, rank: string) => {
+  const handleOnboardingComplete = async (alias: string, user_mode: string, privateKeyBase64: string, publicKeyBase64: string, karma: number, rank: string, masterPassword?: string) => {
     try {
       const res = await fetch('/api/v1/observers/register', {
         method: 'POST',
@@ -278,7 +289,11 @@ function MainDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem('soul_passport', privateKeyBase64);
+        let finalPassportStore = privateKeyBase64;
+        if (masterPassword) {
+          finalPassportStore = await encryptSeed(privateKeyBase64, masterPassword);
+        }
+        localStorage.setItem('soul_passport', finalPassportStore);
         localStorage.setItem('observerId', data.id);
         setObserverId(data.id);
       }
@@ -296,6 +311,72 @@ function MainDashboard() {
   const handleConsent = () => {
     if (symbiote && observerId) symbiote.grantConsent(observerId, selectedMagistrateId);
   };
+
+  const hasSavedPassport = localStorage.getItem('soul_passport');
+  const isEncryptedPassport = hasSavedPassport && hasSavedPassport.startsWith("PBKDF2-GCM:");
+
+  if (isEncryptedPassport && !decryptedPassport) {
+     const handleUnlock = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+           const decrypted = await decryptSeed(hasSavedPassport, passwordInput);
+           if (await validateSeedPhrase(decrypted)) {
+              setDecryptedPassport(decrypted);
+              setUnlockError('');
+           } else {
+              setUnlockError('Ошибка: неверный мастер-пароль.');
+           }
+        } catch (err) {
+           setUnlockError('Ошибка: неверный мастер-пароль.');
+        }
+     };
+
+     return (
+        <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-50 text-cyan-400 font-mono">
+           <form onSubmit={handleUnlock} className="hud-panel p-8 max-w-md w-full space-y-6 border border-cyan-500/40 relative bg-slate-950 rounded-sm">
+              <div className="text-center space-y-2">
+                 <Lock className="w-12 h-12 text-cyan-400 mx-auto animate-pulse" />
+                 <h2 className="text-xl font-bold tracking-widest uppercase">РАЗБЛОКИРОВКА СЕЙФА</h2>
+                 <p className="text-xs text-cyan-600/80 uppercase">Паспорт защищен через PBKDF2 + AES-GCM</p>
+              </div>
+              
+              <div>
+                 <label className="block text-[10px] text-cyan-500 font-bold mb-2 uppercase tracking-widest text-center">ВВЕДИТЕ МАСТЕР-ПАРОЛЬ</label>
+                 <input 
+                    type="password" 
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="Ваш пароль..."
+                    required
+                    className="w-full bg-slate-900 border border-cyan-500/30 p-3 text-cyan-400 focus:outline-none focus:border-cyan-400 font-mono text-center transition-all focus:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                 />
+              </div>
+
+              {unlockError && <p className="text-xs text-red-500 font-bold text-center">{unlockError}</p>}
+
+              <button 
+                 type="submit"
+                 className="w-full py-3 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+              >
+                 АКТИВИРОВАТЬ ПАСПОРТ
+              </button>
+
+              <button 
+                 type="button"
+                 onClick={() => {
+                    if (confirm("Вы уверены, что хотите сбросить профиль? Все данные будут стёрты!")) {
+                       localStorage.clear();
+                       window.location.reload();
+                    }
+                 }}
+                 className="w-full text-[10px] text-red-500/60 hover:text-red-500 transition-colors uppercase tracking-wider text-center pt-2 cursor-pointer"
+              >
+                 Сбросить сейф и создать новый
+              </button>
+           </form>
+        </div>
+     );
+  }
 
   if (!observerId) {
     return <UserOnboarding onComplete={handleOnboardingComplete} />;
@@ -556,7 +637,7 @@ function MainDashboard() {
                   Защищенная связь внутри локальной соты по P2P WebRTC DataChannel. Если прямой канал недоступен, сообщение маршрутизируется через Доверенные Узлы.
                 </p>
                 <div className="flex-1 flex min-h-0">
-                  <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} />
+                  <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} decryptedPassport={decryptedPassport} />
                 </div>
               </div>
             </div>

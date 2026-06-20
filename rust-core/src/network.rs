@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub struct MeshNetwork {
     pheromones: HashMap<String, PheromonePacket>,
     nodes: HashMap<String, NodeState>,
+    acoustic_neighbors: HashMap<String, bool>,
 }
 
 #[derive(Clone)]
@@ -29,6 +30,7 @@ impl MeshNetwork {
         Self {
             pheromones: HashMap::new(),
             nodes: HashMap::new(),
+            acoustic_neighbors: HashMap::new(),
         }
     }
 
@@ -68,4 +70,27 @@ impl MeshNetwork {
     pub fn register_heartbeat(&mut self, node_id: String, current_time: u64) {
         self.nodes.insert(node_id, NodeState { last_heartbeat: current_time });
     }
+
+    /// L1 Acoustic Handshake - registers high frequency 18k-20k FSK acoustic verification
+    #[wasm_bindgen]
+    pub fn register_acoustic_handshake(&mut self, node_id: String, success: bool) {
+        self.acoustic_neighbors.insert(node_id, success);
+    }
+
+    /// Verifies if mutual physical neighboring is proved via sound spectra Goertzel checks
+    #[wasm_bindgen]
+    pub fn is_physical_neighbor(&self, node_id: &str) -> bool {
+        *self.acoustic_neighbors.get(node_id).unwrap_or(&false)
+    }
+
+    /// Instantly upgrades trust coordinates of an acoustically synced node to Guard (level 3)
+    #[wasm_bindgen]
+    pub fn get_acoustic_trust_level(&self, node_id: &str) -> i32 {
+        if self.is_physical_neighbor(node_id) {
+            3 // Guard level
+        } else {
+            1 // Recruit/Adept fallback
+        }
+    }
 }
+

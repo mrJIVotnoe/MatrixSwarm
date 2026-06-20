@@ -9,7 +9,7 @@
     "build": "npm run build:wasm && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "lint": "npm run build:wasm && tsc --noEmit",
     "test": "vitest run",
     "start": "tsx server.ts",
     "prepare": "husky install",

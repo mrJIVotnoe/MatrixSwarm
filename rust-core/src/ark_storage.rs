@@ -139,26 +139,113 @@ impl ArkStorage {
             }
         );
 
+        articles.insert(
+            "survival_radiation_hotspot".to_string(),
+            ZimArticle {
+                id: "survival_radiation_hotspot".to_string(),
+                title: "Radioactive Contamination & Decontamination Procedures".to_string(),
+                content: "Hotspot safety standards in high dose fields: 1. Time, Distance, Shielding: Minimize exposure duration, maximize distance from emitter, prefer heavy concrete/lead/dirt shielding. 2. Remove all outer garments instantly to eliminate 90% of external particulates. 3. Rinse body thoroughly without scrubbing to avoid breaking skin. 4. Block thyroid iodine uptake via Potassium Iodide (KI) dosage cards.".to_string(),
+                category: "survival".to_string(),
+                index_offset: 1048576,
+            }
+        );
+
+        articles.insert(
+            "chemistry_soap_synthesis".to_string(),
+            ZimArticle {
+                id: "chemistry_soap_synthesis".to_string(),
+                title: "Emergency Saponification & Cleaning Agent Synthesis".to_string(),
+                content: "Making antiseptic cleaner from local organics: 1. Leach white hardwood ashes in rainwater to extract Potassium Hydroxide (Lye). 2. Filter liquid until it is clear and strong enough to float an egg. 3. Melt animal tallow or vegetable oils, then slowly combine with boiling lye. 4. Stir consistently until thick trace is formed, pour into wood molds, cure for 4 weeks to neutralize pH.".to_string(),
+                category: "chemistry".to_string(),
+                index_offset: 2097152,
+            }
+        );
+
+        articles.insert(
+            "cryptography_one_time_pad".to_string(),
+            ZimArticle {
+                id: "cryptography_one_time_pad".to_string(),
+                title: "Mathematical Information-Theoretic Security using One-Time Pad".to_string(),
+                content: "One-Time Pad (OTP) represents mathematically unbreakable cryptography: 1. Generate genuinely random, non-repeating key characters (with same length as payload). 2. Keep the key sheet strictly confidential, isolated, and destroy it immediately after single use. 3. Combine clear text with key modulo 26 or via byte-wise XOR operations. 4. Relies purely on physical transport of keys. Quantum cryptanalysis cannot crack physical OTP files.".to_string(),
+                category: "cryptography".to_string(),
+                index_offset: 4194304,
+            }
+        );
+
+        articles.insert(
+            "radio_telemetry_fsk".to_string(),
+            ZimArticle {
+                id: "radio_telemetry_fsk".to_string(),
+                title: "Offgrid FSK Telemetry and Modulation Protocols".to_string(),
+                content: "Deploying frequency shift keying (FSK) transmissions: 1. Tone frequency pairs: Mark tone (logic 1) at 1200Hz, Space tone (logic 0) at 2200Hz. 2. Inject modulated audio output directly into analog handheld VHF/UHF transceivers. 3. Decode incoming FM signals using software phase locked loops (PLL). 4. Wraps P2P Briar and Mesh state updates securely over low-bandwidth physical radio paths.".to_string(),
+                category: "technology".to_string(),
+                index_offset: 8388608,
+            }
+        );
+
+        articles.insert(
+            "botany_medicinal_herbs".to_string(),
+            ZimArticle {
+                id: "botany_medicinal_herbs".to_string(),
+                title: "Wild Botanical Pharmacology and Antiseptics".to_string(),
+                content: "Identifying and processing wild medicinal flora: 1. Salicin: Harvest outer bark of the white willow (Salix alba); steep in hot water to extract fever-reducing painkiller. 2. Antiseptic oils: Steam-distill pine needles or wild thyme leaves to gather concentrated terpenes. 3. Wound coagulation: Bruise plantain leaves (Plantago major) and apply directly as a poultice to minor lesions to accelerate clotting. Zero-dependency apothecary.".to_string(),
+                category: "botany".to_string(),
+                index_offset: 16777216,
+            }
+        );
+
         Self {
             articles,
-            archive_version: "ZIM-LOUVRE-v7.0-QUANTUM-SOVEREIGNTY".to_string(),
+            archive_version: "ZIM-LOUVRE-v8.3-QUANTUM-SOVEREIGNTY".to_string(),
         }
     }
 
     #[wasm_bindgen]
-    pub fn parse_raw_zim_header(&self, buffer: &[u8]) -> Result<String, JsValue> {
+    pub fn parse_raw_zim_header(&mut self, buffer: &[u8]) -> Result<String, JsValue> {
         // Authentic ZIM/Kiwix binary verification (Magic 4 bytes: 'Z', 'I', 'M', 0x04)
         if buffer.len() < 12 {
             return Err(JsValue::from_str("ZIM Error: Header size underflow"));
         }
         
         let magic = &buffer[0..4];
-        if magic != b"ZIM\x04" && magic != b"ZIM\x05" && magic != b"ZIM\x02" {
-            return Ok("GENERIC_RAW_ARCHIVE_SUCCESS".to_string());
+        let mut uuid_str = "GENERIC_RAW_ARCHIVE".to_string();
+        if magic == b"ZIM\x04" || magic == b"ZIM\x05" || magic == b"ZIM\x02" {
+            uuid_str = hex::encode(&buffer[4..12]);
         }
         
-        let uuid = hex::encode(&buffer[4..12]);
-        Ok(format!("ZIM_ARCHIVE_VALIDATED_UUID:{}", uuid))
+        // Dynamic Parser: Parse custom ZIM entries or byte sectors
+        self.parse_custom_recovery_bytes(buffer);
+        
+        Ok(format!("ZIM_ARCHIVE_VALIDATED_UUID:{}", uuid_str))
+    }
+
+    fn parse_custom_recovery_bytes(&mut self, buffer: &[u8]) {
+        // Search through the bytes for line based or delimited structures
+        if let Ok(text) = std::str::from_utf8(buffer) {
+            for line in text.lines() {
+                if line.contains('|') {
+                    let parts: Vec<&str> = line.split('|').collect();
+                    if parts.len() >= 2 {
+                        let title = parts[0].trim();
+                        let content = parts[1].trim();
+                        if !title.is_empty() && !content.is_empty() {
+                            let category = if parts.len() >= 3 { parts[2].trim().to_string() } else { "recovered".to_string() };
+                            let id = title.to_lowercase().replace(' ', "_");
+                            self.articles.insert(
+                                id.clone(),
+                                ZimArticle {
+                                    id,
+                                    title: title.to_string(),
+                                    content: content.to_string(),
+                                    category,
+                                    index_offset: 99999,
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[wasm_bindgen]

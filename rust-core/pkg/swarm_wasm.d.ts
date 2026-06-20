@@ -1,5 +1,6 @@
 export default function init(): Promise<any>;
 export const IdentityCore: any;
+export const SdpDiscovery: any;
 export const AikidoCore: any;
 export const SwarmNetwork: any;
 export const EntropyBridge: any;

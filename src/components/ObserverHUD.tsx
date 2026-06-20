@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones } from 'lucide-react';
 import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine, WasmDSP, WasmIdentity } from '../core/wasm_bridge';
+import { WorkerBus } from '../core/worker_bus';
 
 export const ObserverHUD: React.FC = () => {
   const [waveState, setWaveState] = useState<'superposition' | 'collapsed'>('superposition');
@@ -55,15 +56,14 @@ export const ObserverHUD: React.FC = () => {
   const [entanglementState, setEntanglementState] = useState<'DISCONNECTED' | 'SYNCHRONIZING' | 'ENTANGLED'>('ENTANGLED');
   const [entangledMsgsCount, setEntangledMsgsCount] = useState<number>(4);
 
-  const handleZimSearch = (query: string) => {
+  const handleZimSearch = async (query: string) => {
     setZimQuery(query);
     if (!query.trim()) {
       setZimResults([]);
       return;
     }
     try {
-      const s = new WasmArkStorage();
-      const resultsJson = s.search_articles(query);
+      const resultsJson = await WorkerBus.executeZimQuery(query);
       if (resultsJson) {
         const parsed = JSON.parse(resultsJson);
         setZimResults(parsed);
@@ -92,13 +92,21 @@ export const ObserverHUD: React.FC = () => {
      }, 1000);
   };
 
-   const activateSurrogateAntenna = () => {
-      if (acousticSyncOn) {
-        setAntennaMultiplier("x2.0");
-        setIntentStatus("⚡ СВЯЗЬ УСТАНОВЛЕНА: Антенна + Акустический набат активны одновременно! Статус «РАЗВЕДЧИК-АВАНГАРД» разблокирован (Множитель Кармы x2.0).");
-      } else {
-        setAntennaMultiplier("x1.5");
-        setIntentStatus("СУРРОГАТНАЯ АНТЕННА (Mini-jack) ПОДКЛЮЧЕНА! Кармический множитель х1.5 активирован успешно.");
+   const activateSurrogateAntenna = async () => {
+      try {
+        await WorkerBus.calculateSoulPassport('REGISTER_MINI_JACK', { present: true });
+        await WorkerBus.calculateSoulPassport('ADD_KARMA', { amount: 15, role: "Recruit" });
+        
+        if (acousticSyncOn) {
+          setAntennaMultiplier("x2.0");
+          setIntentStatus("⚡ СВЯЗЬ УСТАНОВЛЕНА: Антенна (Mini-jack) + Акустический набат активны одновременно! Статус «РАЗВЕДЧИК-АВАНГАРД» (Множитель x2.0) активирован.");
+        } else {
+          setAntennaMultiplier("x1.5");
+          setIntentStatus("СУРРОГАТНАЯ АНТЕННА (Mini-jack) ПОДКЛЮЧЕНА! Режим «Эфирного шёпота» активирован. Кармический множитель х1.5 применён.");
+        }
+      } catch (err: any) {
+        console.error(err);
+        setIntentStatus(`Surrogate Antenna Error: ${err.message}`);
       }
    };
 
@@ -145,6 +153,16 @@ export const ObserverHUD: React.FC = () => {
    const toggleAcousticSync = () => {
      const nextVal = !acousticSyncOn;
      setAcousticSyncOn(nextVal);
+     WorkerBus.calculateSoulPassport('REGISTER_ACOUSTIC', { active: nextVal })
+       .then(() => {
+         if (nextVal) {
+           WorkerBus.calculateSoulPassport('ADD_KARMA', { amount: 50, role: "Guard" }).catch((e: any) => console.error(e));
+           setAcousticBeacons(["АКУСТИЧЕСКИЙ РЕЗОНАНС L1 (19.5kHz) ● PHY-NEIGHBORHOOD", "Acoustic Trust: Verified"]);
+         } else {
+           setAcousticBeacons([]);
+         }
+       })
+       .catch((e: any) => console.error(e));
      if (nextVal) {
        emitUltrasonicNabat();
        if (antennaMultiplier !== "x1.0") {

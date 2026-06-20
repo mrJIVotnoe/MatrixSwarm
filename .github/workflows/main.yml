@@ -22,6 +22,15 @@ jobs:
     - name: Install dependencies
       run: npm install
 
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+    - name: Build Rust WebAssembly
+      run: wasm-pack build ./rust-core --target web
+
     - name: Lint
       run: npm run lint
 

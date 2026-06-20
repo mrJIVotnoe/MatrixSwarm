@@ -4,7 +4,7 @@
 // Мы не строим витрину. Мы куем Инфраструктуру Последнего Шанса
 
 // @ts-ignore
-import init, { IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkManager as _ArkManager, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer, AgentStateMachine as _AgentStateMachine, MetricsEngine as _MetricsEngine, ProprioceptionCore as _ProprioceptionCore, CondorCluster as _CondorCluster, VisionCore as _VisionCore, MeshSurrogate as _MeshSurrogate, ArkStorage as _ArkStorage, CondorEngine as _CondorEngine } from '../../rust-core/pkg/swarm_wasm';
+import init, { SdpDiscovery, IdentityCore, AikidoCore, AikidoMath, AcousticAnalyzer, SwarmNetwork, EntropyBridge, SwarmCore, CasteAutonomy, CrdtRegister, HolographicCore, VisualKinopsis, ReverseStarlink, PlanetaryShield, GlobalKnowledge, TrustEngine, MessageQueue, NativeNetworkLayer as _NativeNetworkLayer, NativeP2PMesh as _NativeP2PMesh, KarmaCRDT, MessageCRDT as _MessageCRDT, TaskScheduler as _TaskScheduler, ArkManager as _ArkManager, SeismicSensor as _SeismicSensor, GlobalIntentDecomposer, AgentStateMachine as _AgentStateMachine, MetricsEngine as _MetricsEngine, ProprioceptionCore as _ProprioceptionCore, CondorCluster as _CondorCluster, VisionCore as _VisionCore, MeshSurrogate as _MeshSurrogate, ArkStorage as _ArkStorage, CondorEngine as _CondorEngine } from '../../rust-core/pkg/swarm_wasm';
 
 export async function initRustCore() {
   try {
@@ -132,6 +132,15 @@ export const WasmReverseStarlink = {
 
 export const WasmPlanetaryShield = {
   analyzeSeismicActivity: (sensorBatchJson: string, nodeLocationHash: string) => PlanetaryShield.analyze_seismic_activity(sensorBatchJson, nodeLocationHash)
+};
+
+export const WasmSdpDiscovery = {
+  encodeSdpToQr: (nodeId: string, sdpType: string, sdpRaw: string): string => 
+    SdpDiscovery.encode_sdp_to_qr(nodeId, sdpType, sdpRaw),
+  decodeSdpFromQr: (qrPayload: string): any => 
+    SdpDiscovery.decode_sdp_from_qr(qrPayload),
+  scanLocalMdnsPeers: (): string => 
+    SdpDiscovery.scan_local_mdns_peers()
 };
 
 export const WasmGlobalKnowledge = {

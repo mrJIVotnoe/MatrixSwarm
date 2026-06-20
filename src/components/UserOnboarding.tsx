@@ -8,11 +8,12 @@ import { globalEntropyPool } from '../core/entropy';
 export type UserMode = 'ark' | 'symbiote' | 'magistrate';
 
 interface UserOnboardingProps {
-  onComplete: (alias: string, mode: UserMode, seedPhrase: string, publicKey: string, karma: number, rank: string) => void;
+  onComplete: (alias: string, mode: UserMode, seedPhrase: string, publicKey: string, karma: number, rank: string, masterPassword?: string) => void;
 }
 
 export function UserOnboarding({ onComplete }: UserOnboardingProps) {
   const [alias, setAlias] = useState('');
+  const [masterPassword, setMasterPassword] = useState('');
   const [mode, setMode] = useState<UserMode>('ark');
   const [step, setStep] = useState(1);
   const [seedPhrase, setSeedPhrase] = useState('');
@@ -22,6 +23,7 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
   const [errorMsg, setErrorMsg] = useState('');
   const [inheritedKarma, setInheritedKarma] = useState<number>(150);
   const [inheritedRank, setInheritedRank] = useState<string>('Adept');
+
 
   const generateKeys = async () => {
     try {
@@ -74,7 +76,7 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
     } else if (step === 2) {
       setStep(3);
     } else if (step === 3) {
-      onComplete(alias, mode, seedPhrase, publicKeyStr, inheritedKarma, inheritedRank);
+      onComplete(alias, mode, seedPhrase, publicKeyStr, inheritedKarma, inheritedRank, masterPassword);
     } else if (step === 4) {
       // User copied their key
       setStep(2);
@@ -128,6 +130,17 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
               />
             </div>
 
+            <div>
+              <label className="block text-[10px] text-cyan-500 font-bold mb-2 uppercase tracking-widest">МАСТЕР-ПАРОЛЬ ДЛЯ ЗАЩИТЫ ПАСПОРТА (НЕ МЕНЕЕ 6 СИМВОЛОВ)</label>
+              <input 
+                type="password" 
+                value={masterPassword}
+                onChange={(e) => setMasterPassword(e.target.value)}
+                placeholder="Введите надежный пароль..."
+                className="w-full bg-slate-900 border border-cyan-500/30 p-3 text-cyan-400 focus:outline-none focus:border-cyan-400 font-mono transition-colors focus:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+              />
+            </div>
+
             {isImporting && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
                 <label className="block text-[10px] text-amber-500 font-bold mb-2 uppercase tracking-widest mt-4">СИД-ФРАЗА (12 СЛОВ)</label>
@@ -144,7 +157,7 @@ export function UserOnboarding({ onComplete }: UserOnboardingProps) {
 
             <button 
               onClick={handleNext}
-              disabled={alias.trim().length < 3 || (isImporting && importKeyVal.trim().split(/\s+/).length !== 12)}
+              disabled={alias.trim().length < 3 || masterPassword.trim().length < 6 || (isImporting && importKeyVal.trim().split(/\s+/).length !== 12)}
               className="w-full py-3 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 text-cyan-400 font-bold tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isImporting ? 'ИМПОРТИРОВАТЬ И ПРОДОЛЖИТЬ' : 'СГЕНЕРИРОВАТЬ ПАСПОРТ'}
