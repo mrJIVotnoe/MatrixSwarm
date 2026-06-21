@@ -76,4 +76,60 @@ export class WorkerBus {
   public static runAikidoDistance(lat1: number, lon1: number, lat2: number, lon2: number): Promise<number> {
     return this.send('RUN_AIKIDO_MATH', { lat1, lon1, lat2, lon2 });
   }
+
+  /**
+   * Forges a new soul passport securely inside the sandbox worker
+   */
+  public static forgePassport(entropy: string): Promise<any> {
+    return this.send('FORGE_PASSPORT', { entropy });
+  }
+
+  /**
+   * Recovers soul passport from a seed phrase securely inside the worker
+   */
+  public static recoverPassport(phrase: string): Promise<any> {
+    return this.send('RECOVER_PASSPORT', { phrase });
+  }
+
+  /**
+   * Signs a message inside the sandboxed background worker
+   */
+  public static signMessage(phrase: string, message: string): Promise<string> {
+    return this.send('SIGN_MESSAGE', { phrase, message });
+  }
+
+  /**
+   * Derives a subkey securely inside the background worker
+   */
+  public static deriveHkdfKey(master_secret: string, info: string): Promise<string> {
+    return this.send('DERIVE_HKDF_KEY', { master_secret, info });
+  }
+
+  /**
+   * Securely migrates soul containers in wasm worker context
+   */
+  public static soulMigration(oldPhrase: string, newPhrase: string, legacyKarma: number): Promise<string> {
+    return this.send('SOUL_MIGRATION', { oldPhrase, newPhrase, legacyKarma });
+  }
+
+  /**
+   * Exports an encrypted legacy container fully isolated
+   */
+  public static exportLegacyContainer(phrase: string, karma: number, isGuard: boolean): Promise<any> {
+    return this.send('EXPORT_LEGACY_CONTAINER', { phrase, karma, isGuard });
+  }
+
+  /**
+   * Imports an encrypted legacy container fully isolated
+   */
+  public static importLegacyContainer(encryptedHex: string, newPhrase: string): Promise<string> {
+    return this.send('IMPORT_LEGACY_CONTAINER', { encryptedHex, newPhrase });
+  }
+
+  /**
+   * Verifies signature safely inside wasm context
+   */
+  public static verifySignature(publicKeyHex: string, message: string, signatureHex: string): Promise<boolean> {
+    return this.send('VERIFY_SIGNATURE', { publicKeyHex, message, signatureHex });
+  }
 }

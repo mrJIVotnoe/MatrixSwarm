@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 pub struct ProprioceptionCore {
     current_cell: Option<String>,
     known_cells: Vec<String>, // format peer_id:cell_id:channel
+    verified_peers: Vec<String>, // acoustically verified peer nodes
 }
 
 #[wasm_bindgen]
@@ -15,6 +16,7 @@ impl ProprioceptionCore {
         Self {
             current_cell: None,
             known_cells: Vec::new(),
+            verified_peers: Vec::new(),
         }
     }
 
@@ -53,6 +55,18 @@ impl ProprioceptionCore {
         }
     }
 
+    /// Register acoustic verification between neighboring nodes through ultrasonic handshake
+    #[wasm_bindgen]
+    pub fn register_acoustic_verification(&mut self, peer_id: &str, heard: bool) {
+        if heard {
+            if !self.verified_peers.contains(&peer_id.to_string()) {
+                self.verified_peers.push(peer_id.to_string());
+            }
+        } else {
+            self.verified_peers.retain(|x| x != peer_id);
+        }
+    }
+
     /// Retrieve the serialized JSON list of known peer cell divisions across Ground Mesh network
     #[wasm_bindgen]
     pub fn get_known_mesh_cells_json(&self) -> String {
@@ -60,9 +74,11 @@ impl ProprioceptionCore {
         for entry in &self.known_cells {
             let tokens: Vec<&str> = entry.split(':').collect();
             if tokens.len() >= 3 {
+                let peer_id = tokens[0];
+                let is_verified = self.verified_peers.contains(&peer_id.to_string());
                 parts.push(format!(
-                    "{{\"peer_id\":\"{}\",\"cell_id\":\"{}\",\"channel\":\"{}\"}}",
-                    tokens[0], tokens[1], tokens[2]
+                    "{{\"peer_id\":\"{}\",\"cell_id\":\"{}\",\"channel\":\"{}\",\"is_verified\":{}}}",
+                    peer_id, tokens[1], tokens[2], is_verified
                 ));
             }
         }

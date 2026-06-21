@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 mod network;
+pub mod geneva;
 mod sandbox;
 mod swarm_core;
 mod identity;

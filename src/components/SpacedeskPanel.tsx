@@ -356,7 +356,7 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
                         <div>{'>'} connection_state: PENDING_AUTH</div>
                         <div>{'>'} stream_service: BLOCKED</div>
                         <div>{'>'} worker_process: RUNNING</div>
-                        <div className="animate-pulse">{'>'} background_tasks: hash_compute, relay_packet</div>
+                        <div className="animate-pulse">{'>'} background_tasks: [AWAITING_ROOT_SYNC]</div>
                      </div>
                    </div>
                  </div>
@@ -380,7 +380,7 @@ export function SpacedeskPanel({ symbiote }: { symbiote: any }) {
                       </div>
                       <div className="flex flex-col text-right justify-center">
                         <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest self-end animate-pulse">Touch Routing: АКТИВНО</span>
-                        <span className="text-[8px] text-emerald-400 mt-0.5 font-bold">ОСВОБОЖДЕНО: 90% ЦП</span>
+                        <span className="text-[8px] text-emerald-400 mt-0.5 font-bold">ОСВОБОЖДЕНО: [AWAITING_ROOT_SYNC]</span>
                       </div>
                     </div>
 

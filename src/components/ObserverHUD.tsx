@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones } from 'lucide-react';
-import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine, WasmDSP, WasmIdentity } from '../core/wasm_bridge';
+import { Network, Activity, Eye, Combine, Globe, RefreshCcw, BatteryCharging, Archive, Cpu, Camera, Headphones, Zap } from 'lucide-react';
+import { WasmHolographicCore, WasmReverseStarlink, WasmTaskScheduler, WasmGlobalIntentDecomposer, WasmMetricsEngine, GlobalAgentState, WasmProprioceptionCore, WasmArkManager, WasmCondorCluster, WasmVisionCore, WasmArkStorage, WasmCondorEngine, WasmDSP, WasmIdentity, NativeMeshNetwork, GenevaPacket, GenevaStrategy, GenevaEngine } from '../core/wasm_bridge';
 import { WorkerBus } from '../core/worker_bus';
 
 export const ObserverHUD: React.FC = () => {
@@ -20,6 +20,7 @@ export const ObserverHUD: React.FC = () => {
   const proprioceptionRef = useRef(new WasmProprioceptionCore());
   const arkStorageRef = useRef(new WasmArkManager());
   const condorRef = useRef(new WasmCondorCluster());
+  const meshNetworkRef = useRef(new NativeMeshNetwork());
 
   const [agentState, setAgentState] = useState<string>('INIT');
   const [isPowered, setIsPowered] = useState(false);
@@ -55,6 +56,182 @@ export const ObserverHUD: React.FC = () => {
   const [zimResults, setZimResults] = useState<any[]>([]);
   const [entanglementState, setEntanglementState] = useState<'DISCONNECTED' | 'SYNCHRONIZING' | 'ENTANGLED'>('ENTANGLED');
   const [entangledMsgsCount, setEntangledMsgsCount] = useState<number>(4);
+  const [isIndexingKiwix, setIsIndexingKiwix] = useState<boolean>(false);
+
+  // 🕸️ ГЕОМЕТРИЯ УЛЬЯ (v9.1 — Hive Geometry)
+  const [hiveCells, setHiveCells] = useState<any[]>([
+    { id: "Cell Alpha-9", region: "North Sector", nodes: 24, latency: "14ms", status: "Active" },
+    { id: "Cell Beta-3", region: "Transit Node", nodes: 12, latency: "28ms", status: "Active" },
+    { id: "Cell Gamma-7", region: "Deep Redoubt", nodes: 44, latency: "42ms", status: "Faded" },
+  ]);
+  const [federatedBridges, setFederatedBridges] = useState<any[]>([
+    { from: "Magistrate_Sovereign_1", to: "Cell_Beta_Bridge_A", rate: "250 pkts/s", type: "L3 Bridge" },
+    { from: "Magistrate_Stabil_8", to: "Decentralized_TV_Relay", rate: "80 pkts/s", type: "P2P Mesh" },
+  ]);
+  const [plowingNodes, setPlowingNodes] = useState<any[]>([
+    { name: "Node_PC_Brain_01", caste: "PC-Brain", workload: "LibZim Indexing", karma: "95.2", state: "Plowing 🌾" },
+    { name: "Node_Smart_TV_12", caste: "Smart-TV", workload: "Reserve Storage", karma: "45.0", state: "Routing 🕸️" },
+    { name: "Node_Phone_04", caste: "Smartphone", workload: "P2P Beaconing", karma: "31.5", state: "Routing 🕸️" },
+    { name: "Node_Dormant_PC_9", caste: "PC-Brain", workload: "Idle/Unplugged", karma: "12.4", state: "Withering 🥀" },
+  ]);
+
+  // Interactive Federated Mesh States
+  const [greetMagistrateId, setGreetMagistrateId] = useState<string>("Magistrate_ZenITH_7");
+  const [greetCellId, setGreetCellId] = useState<string>("Cell Beta-3");
+  const [routeDestId, setRouteDestId] = useState<string>("Node_Phone_04");
+  const [honeyPayload, setHoneyPayload] = useState<string>("SECURE_COVENANT_INTENT");
+  const [isDirectDest, setIsDirectDest] = useState<boolean>(true);
+  const [routeLog, setRouteLog] = useState<string[]>([
+    "System initialized. Ready for ad-hoc pathing.",
+  ]);
+
+  // 🧬 PROTOCOL GENEVA: GENETIC EVOLUTION (v9.2)
+  const genevaRef = useRef<GenevaEngine | null>(null);
+  const [genevaGeneration, setGenevaGeneration] = useState<number>(1);
+  const [genevaStrategies, setGenevaStrategies] = useState<any[]>([]);
+  const [genevaHallOfFame, setGenevaHallOfFame] = useState<any[]>([]);
+  const [scoutKarmaMultiplier, setScoutKarmaMultiplier] = useState<number>(3.0);
+  const [activeStrategyName, setActiveStrategyName] = useState<string>("Fragment-Sdp-Signaling");
+  
+  // Simulated Geneva evolution states
+  const [webrtcLatencyMs, setWebrtcLatencyMs] = useState<number>(120);
+  const [kiwixSearchSuccess, setKiwixSearchSuccess] = useState<boolean>(true);
+  const [genevaPacketLog, setGenevaPacketLog] = useState<string[]>([
+    "Geneva engine online. Standing by for mutation triggers."
+  ]);
+
+  useEffect(() => {
+    // Lazy initialisation of Geneva evolutionary engine
+    if (!genevaRef.current) {
+      const engine = new GenevaEngine();
+      genevaRef.current = engine;
+      try {
+        const pool = JSON.parse(engine.get_strategies_json());
+        setGenevaStrategies(pool);
+        const hof = JSON.parse(engine.get_hall_of_fame_json());
+        setGenevaHallOfFame(hof);
+        setScoutKarmaMultiplier(engine.get_scout_multiplier());
+      } catch (e) {
+        console.error("Geneva wasm link failed:", e);
+      }
+    }
+  }, []);
+
+  const triggerGenevaCrossoverAndMutation = () => {
+    if (!genevaRef.current) return;
+    try {
+      const logMsg = genevaRef.current.evolve_generation();
+      const currentGen = genevaGeneration + 1;
+      setGenevaGeneration(currentGen);
+      
+      const strategiesJson = genevaRef.current.get_strategies_json();
+      const pool = JSON.parse(strategiesJson);
+      setGenevaStrategies(pool);
+      
+      setGenevaPacketLog(prev => [
+        `[EVOLUTION] ${logMsg}`,
+        `[EVOLUTION] New strategy space generated. Active pools mutated to accommodate anti-censorship parameters.`,
+        ...prev
+      ]);
+      setIntentStatus(`GENEVA: Mutated and crossed over generation to ${currentGen}`);
+    } catch (e: any) {
+      setGenevaPacketLog(prev => [`[ERROR] Evolution stalled: ${e.message}`, ...prev]);
+    }
+  };
+
+  const evaluateActiveStrategySurvival = () => {
+    if (!genevaRef.current) return;
+    try {
+      const score = genevaRef.current.evaluate_fitness(activeStrategyName, webrtcLatencyMs, kiwixSearchSuccess);
+      
+      // Update local state copy
+      const pool = JSON.parse(genevaRef.current.get_strategies_json());
+      setGenevaStrategies(pool);
+      
+      const hof = JSON.parse(genevaRef.current.get_hall_of_fame_json());
+      setGenevaHallOfFame(hof);
+
+      // Reward Scout for discovering / verifying a strategy
+      if (score > 40.0) {
+        setPlowingNodes(prev => prev.map(node => {
+          if (node.caste === 'Smartphone') { // Smartphone is standard scout role
+            const rewardedKarma = (parseFloat(node.karma) * scoutKarmaMultiplier).toFixed(1);
+            return { ...node, karma: rewardedKarma, state: "Scouting (X3 Karma) 🎖️" };
+          }
+          return node;
+        }));
+        setIntentStatus(`SCOUT BONUS: Verified Strategy '${activeStrategyName}' with fitness ${score.toFixed(1)}. Scout received x3.0 Карма reward!`);
+      }
+
+      setGenevaPacketLog(prev => [
+        `[FITNESS EVAL] Verified '${activeStrategyName}': Fitness score is ${score.toFixed(1)}. Status: ${score > 50.0 ? "Survival confirmed" : "Discarding genotype"}.`,
+        ...prev
+      ]);
+    } catch (e: any) {
+      setGenevaPacketLog(prev => [`[ERROR] Fitness evaluation error: ${e.message}`, ...prev]);
+    }
+  };
+
+  const testPacketManipulation = (action: 'drop' | 'tamper' | 'duplicate' | 'fragment') => {
+    if (!genevaRef.current) return;
+    try {
+      const dummyPkt = new GenevaPacket(1001, 50, "SYN", "v=0\r\no=alice 2890844526\r\ns=MatrixSwarm-WebRTC-SDP\r\nc=IN IP4 127.0.0.1");
+      
+      let debugOutput = "";
+      if (action === 'drop') {
+        const dropped = genevaRef.current.primitive_drop(dummyPkt);
+        debugOutput = `[DROP] Packet ${dropped.seq} was silented. is_dropped = ${dropped.is_dropped}`;
+      } else if (action === 'tamper') {
+        const tampered = genevaRef.current.primitive_tamper(dummyPkt, "SYN-ACK-DESYNC", 100);
+        debugOutput = `[TAMPER] Packet flags mutated to '${tampered.flags}', seq offset incremented. is_tampered = ${tampered.is_tampered}`;
+      } else if (action === 'duplicate') {
+        const duplicatedVal = genevaRef.current.primitive_duplicate(dummyPkt);
+        const list: any[] = JSON.parse(JSON.stringify(duplicatedVal));
+        debugOutput = `[DUPLICATE] Cloned TCP packets in memory window: ${list.length} segments. Original seq: ${list[0].seq}, clone seq: ${list[1].seq}`;
+      } else if (action === 'fragment') {
+        const fragmentsVal = genevaRef.current.primitive_fragment(dummyPkt, 16);
+        const list: any[] = JSON.parse(JSON.stringify(fragmentsVal));
+        debugOutput = `[FRAGMENT] Segmented SDP WebRTC Payload into ${list.length} micro-packets: ` + list.map(f => `[seq:${f.seq} off:${f.fragment_offset} payload:"${f.payload}"]`).join(", ");
+      }
+
+      setGenevaPacketLog(prev => [
+        `[TCB-DESYNC] Applied '${action}' primitive manually to SDP signaling packet:`,
+        `  ${debugOutput}`,
+        ...prev
+      ]);
+    } catch (e: any) {
+      setGenevaPacketLog(prev => [`[ERROR] Packet manipulation failed: ${e.message}`, ...prev]);
+    }
+  };
+
+  const syncCollectiveHallOfFame = () => {
+    if (!genevaRef.current) return;
+    try {
+      // Simulate remote CRDT synced state of successful mutations from an independent cell (e.g. Magistrate_Stabil_8)
+      const remoteCrdtData = JSON.stringify({
+        "TCP-Desync-ACK": "{\"name\": \"TCP-Desync-ACK\", \"fitness\": 89.2, \"generation\": 2}",
+        "Out-of-Order-Syn": "{\"name\": \"Out-of-Order-Syn\", \"fitness\": 77.4, \"generation\": 3}",
+        "Scout-Silent-Bypass": "{\"name\": \"Scout-Silent-Bypass\", \"fitness\": 94.0, \"generation\": 4}"
+      });
+
+      const syncResult = genevaRef.current.sync_hall_of_fame(remoteCrdtData);
+      
+      const hof = JSON.parse(genevaRef.current.get_hall_of_fame_json());
+      setGenevaHallOfFame(hof);
+
+      setGenevaPacketLog(prev => [
+        `[CRDT SYNC] ${syncResult}`,
+        `[CRDT SYNC] Synchronized collective memory register containing ${hof.length} successful genetic blueprints.`,
+        ...prev
+      ]);
+      setIntentStatus("GENEVA CRDT: Synchronized anti-censorship hallmarks with Hall of Fame.");
+    } catch (e: any) {
+      setGenevaPacketLog(prev => [`[ERROR] CRDT sync failed: ${e.message}`, ...prev]);
+    }
+  };
+
+  const isSovereignNexusActive = isPowered && antennaMultiplier !== "x1.0" && isIndexingKiwix;
+  const displayAntennaMultiplier = isSovereignNexusActive ? "x2.0" : antennaMultiplier;
 
   const handleZimSearch = async (query: string) => {
     setZimQuery(query);
@@ -277,7 +454,7 @@ export const ObserverHUD: React.FC = () => {
         const message = "I_CONSECRATE_THIS_NODE_POWER_GRID_COVENANT";
         const signature = await WasmIdentity.signMessage(phrase, message);
         
-        const is_valid = WasmIdentity.verifySignature(passport.public_key, message, signature);
+        const is_valid = await WasmIdentity.verifySignature(passport.public_key, message, signature);
         if (is_valid) {
             GlobalAgentState.detect_usb(true);
             setIsPowered(true);
@@ -458,9 +635,19 @@ export const ObserverHUD: React.FC = () => {
               <span className="text-[10px] bg-cyan-500/10 border border-cyan-400/40 text-cyan-400 px-2 py-0.5 rounded font-semibold tracking-wider flex items-center gap-1 animate-pulse">
                 ⚛️ SYSTEM: QUANTUM RESONANT
               </span>
-              {antennaMultiplier !== "x1.0" && (
+              {displayAntennaMultiplier !== "x1.0" && (
                 <span className="text-[10px] bg-amber-500/10 border border-amber-500/40 text-amber-400 px-2 py-0.5 rounded font-semibold tracking-wider flex items-center gap-1">
-                  📡 ANTENNA GAIN: {antennaMultiplier}
+                  📡 ANTENNA GAIN: {displayAntennaMultiplier}
+                </span>
+              )}
+              {isSovereignNexusActive && (
+                <span className="text-[10px] bg-yellow-500/10 border border-yellow-500 text-yellow-400 px-2 py-0.5 rounded font-bold tracking-wider flex items-center gap-1 animate-pulse shadow-[0_0_12px_rgba(234,179,8,0.4)]">
+                  ⚡ Sovereign Nexus: Active
+                </span>
+              )}
+              {acousticSyncOn && (
+                <span className="text-[10px] bg-emerald-500/15 border border-emerald-400/40 text-emerald-400 px-2 py-0.5 rounded font-semibold tracking-wider flex items-center gap-1 animate-pulse">
+                  🔈 ВЕРИФИЦИРОВАННОЕ СОСЕДСТВО (х1.5 Karma Bonus)
                 </span>
               )}
             </div>
@@ -827,6 +1014,24 @@ export const ObserverHUD: React.FC = () => {
               )}
             </div>
 
+            <div className="mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextVal = !isIndexingKiwix;
+                  setIsIndexingKiwix(nextVal);
+                  if (nextVal) {
+                    setIntentStatus("📚 ИНДЕКСАЦИЯ KIWIX: Запуск полнотекстового индексирования Wikipedia в песочнице.");
+                  } else {
+                    setIntentStatus("Индексация Kiwix перешла в спящий режим.");
+                  }
+                }}
+                className={`w-full py-1 border rounded text-[9px] font-bold cursor-pointer transition-all ${isIndexingKiwix ? 'bg-cyan-950/60 text-cyan-400 border-cyan-500/50 shadow-[0_0_8px_rgba(34,211,238,0.3)]' : 'bg-slate-900/40 text-slate-400 border-slate-800 hover:border-slate-700'}`}
+              >
+                {isIndexingKiwix ? '▓ АКТИВНОЕ ИНДЕКСИРОВАНИЕ KIWIX (ACTIVE) ▓' : 'ЗАПУСТИТЬ ИНДЕКСАЦИЮ KIWIX'}
+              </button>
+            </div>
+
             <div className="bg-slate-950/90 border border-blue-900/40 rounded p-2 max-h-[140px] overflow-y-auto custom-scrollbar mb-2 font-mono text-[9px] text-cyan-300 space-y-1.5">
               {zimResults.length === 0 ? (
                 <div className="text-slate-600 italic leading-snug">
@@ -1002,6 +1207,339 @@ export const ObserverHUD: React.FC = () => {
         </div>
       </div>
 
+      {/* 🕸️ ГЕОМЕТРИЯ УЛЬЯ: ФЕДЕРАТИВНАЯ СЕТЬ И ВСПАШКА ПОЧВЫ (v9.1 — The Federated Hive) */}
+      <div className="mt-6 border border-cyan-500/30 bg-slate-950/80 p-4 rounded-lg font-mono z-10 relative">
+        <div className="flex justify-between items-center mb-3 border-b border-cyan-500/20 pb-2">
+          <span className="text-cyan-400 font-bold flex items-center gap-2 text-sm uppercase">
+            <Network className="w-4 h-4 text-cyan-400 animate-pulse" />
+            🕸️ ГЕОМЕТРИЯ УЛЬЯ: ФЕДЕРАТИВНЫЕ СВЯЗИ (v9.1)
+          </span>
+          <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800/60 px-2 py-0.5 rounded uppercase font-bold text-right">
+            L3 Mesh Architecture
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          {/* Column 1: Connected Cells */}
+          <div className="bg-black/50 border border-cyan-900/40 p-3 rounded space-y-2">
+            <span className="text-cyan-300 font-bold block border-b border-cyan-950 pb-1">🌍 СВЯЗАННЫЕ СОТЫ (CELLS)</span>
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+              {hiveCells.map((cell, idx) => (
+                <div key={idx} className="flex justify-between items-center bg-slate-900/40 p-1.5 border border-slate-900 rounded">
+                  <div>
+                    <span className="text-amber-400 font-bold uppercase block text-[10px]">{cell.id}</span>
+                    <span className="text-[9px] text-slate-500">{cell.region} • {cell.nodes} Peels</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-cyan-300 block font-bold">{cell.latency}</span>
+                    <span className={`text-[8px] font-bold px-1 rounded ${cell.status === 'Active' ? 'bg-emerald-950 text-emerald-400' : 'bg-slate-950 text-slate-500'}`}>
+                      {cell.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => {
+                const nextId = `Cell Delta-${Math.floor(Math.random() * 90) + 10}`;
+                const newCell = { id: nextId, region: "Dynamic Peer", nodes: Math.floor(Math.random() * 50) + 5, latency: `${Math.floor(Math.random() * 60) + 10}ms`, status: "Active" };
+                setHiveCells([...hiveCells, newCell]);
+                setIntentStatus(`🕸️ СЕТЬ: Зарегистрирована новая сота ${nextId} ad-hoc через mDNS.`);
+              }}
+              className="w-full py-1 bg-cyan-950 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-800/40 text-[9.5px] font-bold rounded cursor-pointer transition-colors"
+            >
+              + ДОБАВИТЬ СОТУ mDNS
+            </button>
+          </div>
+
+          {/* Column 2: Federated Bridges */}
+          <div className="bg-black/50 border border-cyan-900/40 p-3 rounded space-y-2">
+            <span className="text-cyan-300 font-bold block border-b border-cyan-950 pb-1">⚓ ФЕДЕРАТИВНЫЕ МОСТЫ L3</span>
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+              {federatedBridges.map((bridge, idx) => (
+                <div key={idx} className="bg-slate-900/40 p-1.5 border border-slate-900 rounded text-[9.5px] space-y-0.5">
+                  <div className="flex justify-between font-bold text-purple-400">
+                    <span>{bridge.from.substring(0, 16)}</span>
+                    <span>→</span>
+                    <span className="text-yellow-400">{bridge.to.substring(0, 16)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500 text-[8.5px]">
+                    <span>Rate: {bridge.rate}</span>
+                    <span className="text-cyan-600 uppercase font-black">{bridge.type}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Input Greet Form */}
+            <div className="space-y-1 bg-slate-900/80 p-2 rounded border border-slate-800">
+              <div className="flex gap-1 bg-transparent">
+                <input 
+                  type="text" 
+                  value={greetMagistrateId} 
+                  onChange={e => setGreetMagistrateId(e.target.value)} 
+                  className="w-1/2 bg-black border border-cyan-900/30 p-1 text-[9px] text-cyan-300 font-mono outline-none"
+                  placeholder="Magistrate ID..."
+                />
+                <input 
+                  type="text" 
+                  value={greetCellId} 
+                  onChange={e => setGreetCellId(e.target.value)} 
+                  className="w-1/2 bg-black border border-cyan-900/30 p-1 text-[9px] text-cyan-300 font-mono outline-none"
+                  placeholder="Cell ID..."
+                />
+              </div>
+              <button
+                onClick={() => {
+                  try {
+                    const result = meshNetworkRef.current.greet_federated_magistrate(greetMagistrateId, greetCellId);
+                    setRouteLog(prev => [...prev, `[GREET] ${result}`]);
+                    const newBridge = { from: greetMagistrateId, to: greetCellId + "_Bridge", rate: "120 p/s", type: "L3 Bridge" };
+                    setFederatedBridges(prev => [...prev, newBridge]);
+                    setIntentStatus(`L3 BRIDGE: Greeted core endpoint ${greetMagistrateId}`);
+                  } catch (err: any) {
+                    setRouteLog(prev => [...prev, `[ERROR] Greet fail: ${err.message}`]);
+                  }
+                }}
+                className="w-full py-1 bg-purple-950 hover:bg-purple-900/60 text-purple-300 border border-purple-800/40 text-[9.5px] font-bold rounded cursor-pointer transition-colors"
+              >
+                🤝 ПРИВЕТСТВОВАТЬ МАГИСТРАТ (L3 GREET)
+              </button>
+            </div>
+          </div>
+
+          {/* Column 3: Plowing Status & Load Balancing (Caste Roles) */}
+          <div className="bg-black/50 border border-cyan-900/40 p-3 rounded space-y-2">
+            <span className="text-cyan-300 font-bold block border-b border-cyan-950 pb-1">🌾 ВСПАШКА ПОЧВЫ / КАСТЫ</span>
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+              {plowingNodes.map((node, idx) => (
+                <div key={idx} className="bg-slate-900/40 p-1.5 border border-slate-900 rounded text-[9.5px]">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-300">{node.name}</span>
+                    <span className={`text-[8px] font-bold px-1 rounded ${
+                      node.caste === 'PC-Brain' ? 'bg-red-950 text-red-400' :
+                      node.caste === 'Smart-TV' ? 'bg-sky-950 text-sky-400' :
+                      'bg-emerald-950 text-emerald-400'
+                    }`}>{node.caste}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500 text-[8.5px] mt-0.5">
+                    <span>Task: {node.workload}</span>
+                    <span className="text-yellow-500 font-mono">K: {node.karma}</span>
+                  </div>
+                  <div className="text-right text-[8px] text-cyan-400 mt-0.5 italic">{node.state}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Honey Routing Test Panel */}
+            <div className="bg-slate-900/80 p-2 rounded border border-slate-800 space-y-1">
+              <div className="flex items-center justify-between text-[8px] text-slate-400 mb-1">
+                <span>КАТЕГОРИЯ: IP-ХОПЫ</span>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={isDirectDest} 
+                    onChange={e => setIsDirectDest(e.target.checked)} 
+                    className="accent-cyan-500"
+                  />
+                  <span>ПРЯМАЯ СВЯЗЬ QR</span>
+                </label>
+              </div>
+              <button
+                onClick={() => {
+                  try {
+                    const timestamp = Date.now();
+                    const msgId = "honey_" + Math.random().toString(16).slice(2, 8);
+                    const result = meshNetworkRef.current.route_honey_packet(
+                      msgId,
+                      "Local_Node_Architect",
+                      routeDestId,
+                      honeyPayload,
+                      isDirectDest,
+                      "Magistrate_Sovereign_1",
+                      timestamp
+                    );
+                    setRouteLog(prev => [...prev, `[ROUTING] ${result}`]);
+                    setIntentStatus(`HONEY_PACKET_ROUTED: ${msgId} status: ${result}`);
+                    
+                    if (!isDirectDest) {
+                      setPlowingNodes(prev => prev.map(n => n.name === "Node_Smart_TV_12" ? { ...n, karma: (parseFloat(n.karma) + 0.5).toFixed(1), state: "Relaying L3 ⚡" } : n));
+                    } else {
+                      setPlowingNodes(prev => prev.map(n => n.name === "Node_Phone_04" ? { ...n, karma: (parseFloat(n.karma) + 0.2).toFixed(1), state: "Direct transfer 🕸️" } : n));
+                    }
+                  } catch (err: any) {
+                    setRouteLog(prev => [...prev, `[ERROR] Routing failed: ${err.message}`]);
+                  }
+                }}
+                className="w-full py-1 bg-emerald-950 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/40 text-[9.5px] font-bold rounded cursor-pointer transition-colors"
+              >
+                🍯 СИМУЛИРОВАТЬ МАРШРУТ («МЁД»)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Console / Routing logs for Federated actions */}
+        <div className="mt-3 bg-black/90 border border-cyan-950 rounded p-2 text-[9px] text-cyan-400/90 font-mono space-y-1">
+          <div className="flex justify-between text-slate-500 font-bold border-b border-cyan-950/40 pb-0.5 mb-1 select-none">
+            <span>ЖУРНАЛ ФЕДЕРАТИВНОГО МАРШРУТА L3</span>
+            <button onClick={() => setRouteLog(["Route log cleared."])} className="text-[8px] hover:text-white uppercase font-bold">Очистить</button>
+          </div>
+          <div className="max-h-[60px] overflow-y-auto custom-scrollbar space-y-0.5 leading-tight text-left">
+            {routeLog.map((log, idx) => (
+              <div key={idx} className="border-b border-slate-900 last:border-0 pb-0.5">
+                <span className="text-slate-600">[{idx}]</span> {log}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 🧬 ГЕНЕТИЧЕСКАЯ ЭВОЛЮЦИЯ РОЯ (v9.2 — Geneva anti-censorship) */}
+      <div className="mt-6 border border-amber-500/30 bg-slate-950/80 p-4 rounded-lg font-mono z-10 relative">
+        <div className="flex justify-between items-center mb-3 border-b border-amber-500/20 pb-2">
+          <span className="text-amber-400 font-bold flex items-center gap-2 text-sm uppercase">
+            <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
+            🧬 ПРОТОКОЛ «ЖЕНЕВА»: ГЕНЕТИЧЕСКАЯ ЭВОЛЮЦИЯ РОЯ (v9.2)
+          </span>
+          <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded uppercase font-bold text-right animate-pulse">
+            Geneva Engine: Evolving
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          {/* Col 1: Geneva Strategies & Evolutionary Pool */}
+          <div className="bg-black/50 border border-amber-900/40 p-3 rounded space-y-2">
+            <span className="text-amber-300 font-bold block border-b border-amber-950 pb-1 flex justify-between">
+              <span>🧬 ГЕНОТИПЫ СТРАТЕГИЙ</span>
+              <span className="text-[10px] text-amber-400">Gen {genevaGeneration}</span>
+            </span>
+            <div className="space-y-1.5 max-h-[160px] overflow-y-auto custom-scrollbar">
+              {genevaStrategies.map((strat, idx) => (
+                <div key={idx} className={`p-1.5 border rounded cursor-pointer transition-colors ${activeStrategyName === strat.name ? 'bg-amber-950/40 border-amber-500/70 text-amber-200' : 'bg-slate-900/45 border-slate-800 text-slate-400 hover:text-amber-300'}`} onClick={() => setActiveStrategyName(strat.name)}>
+                  <div className="flex justify-between items-center text-[10.5px]">
+                    <span className="font-bold text-yellow-400 truncate">{strat.name}</span>
+                    <span className="text-amber-500 font-bold font-mono">F: {strat.fitness.toFixed(1)}</span>
+                  </div>
+                  <div className="flex justify-between text-[9px] text-slate-500 mt-1">
+                    <span>Type: <strong className="text-cyan-400 uppercase">{strat.action_type}</strong></span>
+                    <span>Trigger: <strong className="text-purple-400 font-mono">{strat.target_flag}</strong></span>
+                  </div>
+                  {strat.is_tcb_desync && (
+                    <div className="text-[8px] bg-red-950/60 text-red-400 px-1 py-0.2 mt-1 rounded inline-block font-bold">TCB DESYNC ACTIVE</div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={triggerGenevaCrossoverAndMutation}
+              className="w-full py-1.5 bg-amber-950 hover:bg-amber-900/70 text-amber-300 border border-amber-800/40 text-[9.5px] font-bold rounded cursor-pointer transition-colors uppercase animate-pulse"
+            >
+              🧬 Запустить кроссовер и мутацию
+            </button>
+          </div>
+
+          {/* Col 2: Tactical Packets Tester & Primitives */}
+          <div className="bg-black/50 border border-amber-900/40 p-3 rounded space-y-2">
+            <span className="text-amber-300 font-bold block border-b border-amber-950 pb-1">⚙️ ПРИМИТИВЫ МУТАЦИИ ТСР</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button onClick={() => testPacketManipulation('drop')} className="p-1 px-2 text-[9px] bg-slate-900 border border-red-500/30 hover:border-red-500 hover:bg-red-950/20 text-red-400 rounded font-bold cursor-pointer transition-colors uppercase">
+                💧 Drop
+              </button>
+              <button onClick={() => testPacketManipulation('tamper')} className="p-1 px-2 text-[9px] bg-slate-900 border border-cyan-500/30 hover:border-cyan-500 hover:bg-cyan-950/20 text-cyan-400 rounded font-bold cursor-pointer transition-colors uppercase">
+                🔧 Tamper
+              </button>
+              <button onClick={() => testPacketManipulation('duplicate')} className="p-1 px-2 text-[9px] bg-slate-900 border border-yellow-500/30 hover:border-yellow-500 hover:bg-yellow-950/20 text-yellow-400 rounded font-bold cursor-pointer transition-colors uppercase">
+                👥 Duplicate
+              </button>
+              <button onClick={() => testPacketManipulation('fragment')} className="p-1 px-2 text-[9px] bg-slate-900 border border-purple-500/30 hover:border-purple-500 hover:bg-purple-950/20 text-purple-400 rounded font-bold cursor-pointer transition-colors uppercase">
+                ✂️ Fragment
+              </button>
+            </div>
+
+            <div className="border border-slate-900 p-2 rounded bg-slate-900/30 space-y-2 text-[9.5px]">
+              <span className="text-slate-400 font-bold block uppercase border-b border-slate-900 pb-0.5">Метрики выживания</span>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Задержка WebRTC:</span>
+                <input 
+                  type="number" 
+                  value={webrtcLatencyMs} 
+                  onChange={e => setWebrtcLatencyMs(parseInt(e.target.value) || 100)} 
+                  className="w-16 bg-black border border-amber-950 text-amber-400 p-0.5 font-mono text-center outline-none"
+                />
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Успех Kiwix ZIM:</span>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={kiwixSearchSuccess} 
+                    onChange={e => setKiwixSearchSuccess(e.target.checked)} 
+                    className="accent-amber-500 text-amber-500 pointer-events-auto"
+                  />
+                  <span className="text-amber-500 font-bold font-mono">OK</span>
+                </label>
+              </div>
+
+              <button
+                onClick={evaluateActiveStrategySurvival}
+                className="w-full py-1 bg-green-950 hover:bg-green-900 text-green-300 border border-green-800 text-[9.5px] font-bold rounded cursor-pointer transition-colors uppercase"
+              >
+                ⚖️ Оценить выживаемость
+              </button>
+            </div>
+          </div>
+
+          {/* Col 3: Hall of Fame (L5 Collective Sync Memory via LWW-CRDT) */}
+          <div className="bg-black/50 border border-amber-900/40 p-3 rounded space-y-2">
+            <span className="text-amber-300 font-bold block border-b border-amber-950 pb-1">🏆 ЗАЛ СЛАВЫ РОЯ (HOF CRDT)</span>
+            <div className="space-y-1 max-h-[120px] overflow-y-auto custom-scrollbar">
+              {genevaHallOfFame.length === 0 ? (
+                <div className="text-slate-600 text-[10px] italic py-3 text-center">Ожидание успешных мутаций (&gt;65.0)...</div>
+              ) : (
+                genevaHallOfFame.map((winner, idx) => (
+                  <div key={idx} className="bg-slate-900/80 p-1.5 border border-amber-950 rounded text-[9.5px] flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-green-400 block truncate">{winner.name}</span>
+                      <span className="text-[8px] text-slate-500">Generation {winner.generation}</span>
+                    </div>
+                    <span className="text-[10px] bg-amber-950 border border-amber-500/20 py-0.5 px-1.5 text-amber-400 font-black rounded">
+                      F: {winner.fitness.toFixed(1)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={syncCollectiveHallOfFame}
+              className="w-full py-1 bg-purple-950 hover:bg-purple-900/60 text-purple-300 border border-purple-800/40 text-[9.5px] font-bold rounded cursor-pointer transition-colors uppercase"
+            >
+              🌀 Синхронизировать Зал Славы (L5-CRDT)
+            </button>
+          </div>
+        </div>
+
+        {/* Packet Evolution Terminal Logs */}
+        <div className="mt-3 bg-black/90 border border-amber-950 rounded p-2 text-[9px] text-amber-400/90 font-mono space-y-1">
+          <div className="flex justify-between text-slate-500 font-bold border-b border-amber-950/40 pb-0.5 mb-1 select-none">
+            <span>ЖУРНАЛ КАТАЛИЗАТОРА ЭВОЛЮЦИИ ТСР (GENEVA MUTATIONS)</span>
+            <button onClick={() => setGenevaPacketLog([])} className="text-[8px] hover:text-white uppercase font-bold">Очистить</button>
+          </div>
+          <div className="max-h-[80px] overflow-y-auto custom-scrollbar space-y-0.5 leading-tight text-left">
+            {genevaPacketLog.map((log, idx) => (
+              <div key={idx} className="border-b border-slate-900 last:border-0 pb-0.5 whitespace-pre-wrap">
+                <span className="text-slate-600">[{idx}]</span> {log}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-4 text-xs font-mono text-center">
         <div className="col-span-full mb-2">
             <form onSubmit={handleGlobalIntent} className="flex flex-col gap-2 bg-black/60 border border-cyan-900/50 p-3 rounded">
@@ -1084,8 +1622,8 @@ export const ObserverHUD: React.FC = () => {
            <span className="text-gray-500 block cursor-pointer hover:text-white transition-colors flex items-center">
              <Headphones className="w-3 h-3 mr-1" /> MESH SURROGATE
            </span>
-           <span className={antennaMultiplier === "x1.5" ? "text-yellow-400 font-bold text-[11px]" : "text-gray-600 text-xs"}>
-             {antennaMultiplier === "x2.0" ? "AVANGARD (х2.0)" : antennaMultiplier === "x1.5" ? "ANTENNA (х1.5)" : "KARMA " + antennaMultiplier}
+           <span className={displayAntennaMultiplier !== "x1.0" ? "text-yellow-400 font-bold text-[11px]" : "text-gray-600 text-xs"}>
+             {displayAntennaMultiplier === "x2.0" ? "AVANGARD & NEXUS (х2.0)" : displayAntennaMultiplier === "x1.5" ? "ANTENNA (х1.5)" : "KARMA " + displayAntennaMultiplier}
            </span>
         </div>
         <div className="border border-blue-900/50 bg-black/40 p-2 rounded flex flex-col justify-between" onClick={handleArkStorageTest}>

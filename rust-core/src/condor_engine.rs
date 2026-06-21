@@ -143,6 +143,30 @@ impl CondorEngine {
     }
 
     #[wasm_bindgen]
+    pub fn harmony_delegate_task(&self, task_type: &str, device_type: &str) -> String {
+        // "ПК-Мозг" (desktop / pc) should handle heavy tasks like Kiwix index and Crypto calculations.
+        // "Смартфоны" (mobile) and "Смарт-ТВ" (smart_tv) are for storage and routing support.
+        let is_heavy = task_type == "KiwixIndex" || task_type == "CryptoCompute" || task_type == "HeavyCalculations" || task_type == "ZimParser";
+        let is_pc_brain = device_type == "desktop" || device_type == "pc_brain" || device_type == "pc";
+        
+        if is_heavy {
+            if is_pc_brain {
+                "DELEGATE_TO_PC_BRAIN:OPTIMAL_HARMONY".to_string()
+            } else {
+                "REJECT_HEAVY:DELEGATE_TO_PC_BRAIN".to_string()
+            }
+        } else {
+            if device_type == "mobile" || device_type == "smartphone" {
+                "DELEGATE_TO_SENSES_MOBILE:STORAGE_AND_ROUTING_ONLY".to_string()
+            } else if device_type == "smart_tv" {
+                "DELEGATE_TO_RESERVE_TV:STORAGE_AND_ROUTING_ONLY".to_string()
+            } else {
+                "DELEGATE_TO_GENERIC:STANDARD".to_string()
+            }
+        }
+    }
+
+    #[wasm_bindgen]
     pub fn reincarnate_task_from_dying_node(&mut self, task_id: &str, failing_node: &str, candidate_node: &str) -> bool {
         let mut reincarnated = false;
         if let Some(list) = self.completed_shards.get_mut(task_id) {

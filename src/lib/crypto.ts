@@ -32,7 +32,7 @@ function getCryptoWorker(): Worker | null {
   return cryptoWorker;
 }
 
-function runInWorker(type: 'encrypt' | 'decrypt', payload: any): Promise<any> {
+function runInWorker(type: 'encrypt' | 'decrypt' | 'save_db_passport' | 'load_db_passport' | 'check_db_passport' | 'clear_db_passport' | 'get_in_memory_passport', payload?: any): Promise<any> {
   const worker = getCryptoWorker();
   if (!worker) {
     return Promise.reject(new Error("Worker not available"));
@@ -42,6 +42,26 @@ function runInWorker(type: 'encrypt' | 'decrypt', payload: any): Promise<any> {
     pendingWorkerRequests.set(id, { resolve, reject });
     worker.postMessage({ id, type, payload });
   });
+}
+
+export async function savePassportToWorkerStorage(phrase: string, password: string): Promise<boolean> {
+  return await runInWorker('save_db_passport', { phrase, password });
+}
+
+export async function loadPassportFromWorkerStorage(password: string): Promise<string> {
+  return await runInWorker('load_db_passport', { password });
+}
+
+export async function checkPassportExistsInWorkerStorage(): Promise<boolean> {
+  return await runInWorker('check_db_passport');
+}
+
+export async function clearPassportFromWorkerStorage(): Promise<boolean> {
+  return await runInWorker('clear_db_passport');
+}
+
+export async function getInMemoryPassport(): Promise<string | null> {
+  return await runInWorker('get_in_memory_passport');
 }
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {

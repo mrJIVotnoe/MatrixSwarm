@@ -58,6 +58,7 @@ pub enum SwarmRole {
     Magistrate,
     Scout,
     StableGuardian,
+    Forager,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -167,9 +168,14 @@ impl AikidoCore {
                 let is_powerful = input.logical_cores >= 8 && input.memory_mb >= 4096;
                 
                 if out.mobility_score == 0.0 {
-                    if input.hours_in_same_cell > 24.0 {
+                    if input.hours_in_same_cell >= 48.0 {
+                        out.role = SwarmRole::Forager;
                         out.aikido_status = "FORCED_FORAGER".to_string();
                         out.karma = 0.0;
+                    } else if input.hours_in_same_cell >= 24.0 {
+                        out.role = SwarmRole::Scout;
+                        out.aikido_status = "BOT_FARM_NODE".to_string();
+                        out.karma = out.karma.min(50.0);
                     } else if input.is_charging {
                         // "Смартфон в режиме зарядки: Rust начисляет Карму за аптайм, игнорируя отсутствие перемещения"
                         if input.hours_in_same_cell > 72.0 {
@@ -181,9 +187,11 @@ impl AikidoCore {
                         out.karma += (input.hours_in_same_cell * 1.5).min(50.0);
                     } else {
                         if out.gps_updates_count > 10 {
+                            out.role = SwarmRole::Scout;
                             out.aikido_status = "BOT_FARM_NODE".to_string();
                             out.karma = out.karma.min(50.0);
                         } else {
+                            out.role = SwarmRole::Scout;
                             out.aikido_status = "Static Suspect".to_string();
                         }
                     }
@@ -292,6 +300,68 @@ impl AikidoCore {
         true
     }
 
+    /// L2 - Mobility Index and Stationary Compute Harvesting
+    #[wasm_bindgen]
+    pub fn evaluate_mobility_and_harvest(
+        device_type: &str,
+        distance_meters: f32,
+        elapsed_minutes: f32,
+        current_mobility_score: f32,
+        current_karma: f32,
+    ) -> Result<JsValue, JsValue> {
+        #[derive(Serialize)]
+        struct MobilityEvaluation {
+            pub new_mobility_score: f32,
+            pub new_karma: f32,
+            pub is_bot_farm: bool,
+            pub cpu_harvested: bool,
+            pub status: String,
+        }
+
+        let mut new_score = current_mobility_score;
+        let mut new_karma = current_karma;
+        let mut is_bot_farm = false;
+        let mut cpu_harvested = false;
+        let mut status = String::new();
+
+        if device_type == "smartphone" || device_type == "tablet" || device_type == "Smartphone" || device_type == "Tablet" {
+            if distance_meters > 10.0 {
+                // Moving! High mobility score growth and karma bonus as kinetic PoW
+                new_score = (new_score + 15.0).min(100.0);
+                new_karma = (new_karma + 5.0).min(1000.0);
+                status = format!("ORGANIC MOVEMENT: +15.0 Mobility, +5.0 Kinetic Karma. Shift detected: {:.1}m.", distance_meters);
+            } else {
+                // Stationary mobile device
+                if elapsed_minutes >= 1.0 {
+                    new_score = (new_score - 10.0).max(0.0);
+                }
+                
+                if new_score == 0.0 {
+                    is_bot_farm = true;
+                    cpu_harvested = true;
+                    // No karma accrue! Power is harvested for Kiwix indexing
+                    status = "STATIONARY SMARTPHONE DETECTED (POTENTIAL BOT-FARM). CPU power is fully absorbed for Kiwix indexing without Karma reward.".to_string();
+                } else {
+                    status = "Stationary Mobile Node. Decreasing mobility index.".to_string();
+                }
+            }
+        } else {
+            // Stationary PC anchor represents a fixed magistrate/guardian.
+            // Doesn't decay mobility unless pretending to be a phone
+            status = "Fixed Infrastructure Anchor. Operational status nominal.".to_string();
+        }
+
+        let eval = MobilityEvaluation {
+            new_mobility_score: new_score,
+            new_karma,
+            is_bot_farm,
+            cpu_harvested,
+            status,
+        };
+
+        Ok(serde_wasm_bindgen::to_value(&eval)?)
+    }
+
     /// L2 - Local bot farm 51% attack detector
     #[wasm_bindgen]
     pub fn detect_bot_farm(static_nodes: u32, _mobile_nodes: u32, total_nodes: u32) -> bool {
@@ -307,5 +377,55 @@ impl AikidoCore {
         // Encase the real payload in fake generic metadata mimicking bot farm noise
         // This hides our P2P signal within the 51% attack.
         format!("{{\"bot_signature\": \"{bot_noise_seed}\", \"dummy_metrics\": [0.0, 1.2], \"__hidden_payload\": \"{real_payload}\"}}")
+    }
+
+    /// L1 - "Plowing the Soil" & Karma Decay / Seeding Rewards
+    #[wasm_bindgen]
+    pub fn plow_soil(is_active_routing: bool, is_active_seeding: bool, current_karma: f32, elapsed_hours: f32, is_powerful_resource: bool) -> Result<JsValue, JsValue> {
+        let mut new_karma = current_karma;
+        let mut debug_status = String::new();
+        let is_withering;
+        
+        if is_active_routing || is_active_seeding {
+            // Seeding rewards (начисление Кармы за сидирование оффлайн-знаний и маршрутизацию)
+            let mut hourly_rate = 0.0;
+            if is_active_seeding {
+                hourly_rate += 4.5; // +4.5 Karma per hour of active seeding / ZIM indexing
+            }
+            if is_active_routing {
+                hourly_rate += 2.5; // +2.5 Karma per hour of active routing
+            }
+            
+            let reward = elapsed_hours * hourly_rate;
+            new_karma = (new_karma + reward).min(1000.0);
+            debug_status = format!("PLOWING ACTIVE: Earned +{:.2} Karma for active Swarm operations.", reward);
+            is_withering = false;
+        } else {
+            // Decay / "Withering" of Karma if not plowing (не участвует в маршрутизации или хранении ZIM-архивов)
+            // Это наш Proof of Work — право голоса, заработанное делом
+            let base_decay = elapsed_hours * 8.0; // -8.0 Karma per hour of idling
+            let decay = if is_powerful_resource { base_decay * 2.0 } else { base_decay }; // PC, charger, strong node withers 2x faster!
+            new_karma = (new_karma - decay).max(10.0);
+            debug_status = if is_powerful_resource {
+                "NO PLOWING - DENT: High-end resource anchor is idle! Guardian elite status withering 2x faster.".to_string()
+            } else {
+                "NO PLOWING - WARNING: Node is idle. Karma is withering. Seed ZIMs or active routing required.".to_string()
+            };
+            is_withering = true;
+        }
+        
+        #[derive(Serialize)]
+        struct PlowResult {
+            pub new_karma: f32,
+            pub status: String,
+            pub is_withering: bool,
+        }
+        
+        let res = PlowResult {
+            new_karma,
+            status: debug_status,
+            is_withering,
+        };
+        Ok(serde_wasm_bindgen::to_value(&res)?)
     }
 }

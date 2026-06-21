@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Upload, Play, Pause, Trash2, Link, File, HardDrive, Activity, Plus } from 'lucide-react';
+import { Download, Upload, Play, Pause, Trash2, Link, File, HardDrive, Activity, Plus, AlertTriangle } from 'lucide-react';
 import { WasmMetricsEngine } from '../core/wasm_bridge';
 
 interface Torrent {
@@ -54,7 +54,19 @@ const MOCK_TORRENTS: Torrent[] = [
   }
 ];
 
-export function TorrentManager({ symbiote }: { symbiote: any }) {
+export function TorrentManager({ symbiote, isSynced }: { symbiote: any, isSynced?: boolean }) {
+  if (!isSynced) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-black/60 border border-red-500/30 text-center space-y-4 rounded font-mono">
+        <AlertTriangle className="w-16 h-16 text-red-500 animate-pulse" />
+        <h3 className="text-xl font-bold text-red-400">[ROOT_NOT_SYNCED]</h3>
+        <p className="text-xs text-red-600/90 max-w-md">
+          ХРАНИЛИЩЕ ЗАБЛОКИРОВАНА: Узел не синхронизирован с нативным Корнем Системы. Для активации P2P-обмена и сидирования сначала инициализируйте Паспорт Души (Этаж -7).
+        </p>
+      </div>
+    );
+  }
+
   const [torrents, setTorrents] = useState<Torrent[]>(MOCK_TORRENTS);
   const [magnetLink, setMagnetLink] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -69,23 +81,20 @@ export function TorrentManager({ symbiote }: { symbiote: any }) {
 
         setTorrents(current => current.map(t => {
           if (t.status === 'downloading') {
-            const nextProgress = Math.min(100, t.progress + (successRate > 90 ? 0.15 : 0.05));
-            const dlFloat = (successRate / 40.0) + 1.1;
             return {
               ...t,
-              progress: nextProgress,
-              downloadSpeed: `${dlFloat.toFixed(1)} MB/s`,
-              eta: nextProgress >= 100 ? '-' : `${Math.ceil((100.0 - nextProgress) * 4)}s`,
-              peers: Math.round(successRate / 2),
-              seeds: Math.round(successRate * 1.3)
+              downloadSpeed: '[AWAITING_ROOT_SYNC]',
+              eta: '[AWAITING_ROOT_SYNC]',
+              peers: 0,
+              seeds: 0
             };
           }
           if (t.status === 'seeding') {
-            const upFloat = (latency / 80.0) + 0.3;
             return {
               ...t,
-              uploadSpeed: `${upFloat.toFixed(1)} MB/s`,
-              peers: Math.round(latency / 12)
+              uploadSpeed: '[AWAITING_ROOT_SYNC]',
+              peers: 0,
+              seeds: 0
             };
           }
           return t;
@@ -222,11 +231,11 @@ export function TorrentManager({ symbiote }: { symbiote: any }) {
       
       <div className="flex justify-between items-center text-xs text-green-600 px-2 font-mono border-t border-green-500/20 pt-2 shrink-0">
         <div className="flex gap-4">
-          <span className="flex items-center gap-1"><Download className="w-3 h-3 text-green-400" /> D: 2.4 MB/s</span>
-          <span className="flex items-center gap-1"><Upload className="w-3 h-3 text-emerald-400" /> U: 1.3 MB/s</span>
+          <span className="flex items-center gap-1"><Download className="w-3 h-3 text-green-400" /> D: [AWAITING_ROOT_SYNC]</span>
+          <span className="flex items-center gap-1"><Upload className="w-3 h-3 text-emerald-400" /> U: [AWAITING_ROOT_SYNC]</span>
         </div>
         <div>
-          DHT Network: {torrents.reduce((acc, t) => acc + t.seeds + t.peers, 0)} Nodes
+          DHT Network: [AWAITING_ROOT_SYNC] Nodes
         </div>
       </div>
 

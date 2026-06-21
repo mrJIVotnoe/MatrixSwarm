@@ -2,7 +2,7 @@
 // Isolated from DOM and main thread's local storage (so no access to soul_passport)
 
 // @ts-ignore
-import init, { TrustEngine, AikidoCore, ArkStorage, AikidoMath } from '../../rust-core/pkg/swarm_wasm';
+import init, { TrustEngine, AikidoCore, ArkStorage, AikidoMath, IdentityCore } from '../../rust-core/pkg/swarm_wasm';
 
 let wasmLoaded = false;
 let trustEngine: any = null;
@@ -123,6 +123,142 @@ self.onmessage = async (e: MessageEvent) => {
         type: 'AIKIDO_MATH_ERROR',
         jobId,
         error: err.message
+      });
+    }
+  }
+
+  if (type === 'FORGE_PASSPORT') {
+    try {
+      const passport = IdentityCore.forge_passport(payload.entropy || "");
+      self.postMessage({
+        type: 'FORGE_PASSPORT_RESULT',
+        jobId,
+        result: passport
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'FORGE_PASSPORT_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'RECOVER_PASSPORT') {
+    try {
+      const passport = IdentityCore.recover_from_seed(payload.phrase || "");
+      self.postMessage({
+        type: 'RECOVER_PASSPORT_RESULT',
+        jobId,
+        result: passport
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'RECOVER_PASSPORT_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'SIGN_MESSAGE') {
+    try {
+      const signature = IdentityCore.sign_message(payload.phrase || "", payload.message || "");
+      self.postMessage({
+        type: 'SIGN_MESSAGE_RESULT',
+        jobId,
+        result: signature
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'SIGN_MESSAGE_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'DERIVE_HKDF_KEY') {
+    try {
+      const okm = IdentityCore.derive_hkdf_key(payload.master_secret || "", payload.info || "");
+      self.postMessage({
+        type: 'DERIVE_HKDF_KEY_RESULT',
+        jobId,
+        result: okm
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'DERIVE_HKDF_KEY_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'SOUL_MIGRATION') {
+    try {
+      const result = IdentityCore.soul_migration(payload.oldPhrase || "", payload.newPhrase || "", payload.legacyKarma || 0);
+      self.postMessage({
+        type: 'SOUL_MIGRATION_RESULT',
+        jobId,
+        result
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'SOUL_MIGRATION_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'EXPORT_LEGACY_CONTAINER') {
+    try {
+      const result = IdentityCore.export_legacy_container(payload.phrase || "", payload.karma || 0, payload.isGuard || false);
+      self.postMessage({
+        type: 'EXPORT_LEGACY_CONTAINER_RESULT',
+        jobId,
+        result
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'EXPORT_LEGACY_CONTAINER_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'IMPORT_LEGACY_CONTAINER') {
+    try {
+      const result = IdentityCore.import_legacy_container(payload.encryptedHex || "", payload.newPhrase || "");
+      self.postMessage({
+        type: 'IMPORT_LEGACY_CONTAINER_RESULT',
+        jobId,
+        result
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'IMPORT_LEGACY_CONTAINER_RESULT',
+        jobId,
+        error: err.message || err.toString()
+      });
+    }
+  }
+
+  if (type === 'VERIFY_SIGNATURE') {
+    try {
+      const result = IdentityCore.verify_signature(payload.publicKeyHex || "", payload.message || "", payload.signatureHex || "");
+      self.postMessage({
+        type: 'VERIFY_SIGNATURE_RESULT',
+        jobId,
+        result
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'VERIFY_SIGNATURE_RESULT',
+        jobId,
+        error: err.message || err.toString()
       });
     }
   }

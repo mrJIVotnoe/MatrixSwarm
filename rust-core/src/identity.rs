@@ -236,29 +236,61 @@ impl IdentityCore {
     /// Derives a cryptographically strong, multi-purpose subkey from a master secret using HKDF-SHA256
     #[wasm_bindgen]
     pub fn derive_hkdf_key(master_secret: &str, info: &str) -> String {
+        use sha2::{Sha256, Digest};
+        
+        // HMAC-SHA256 implementation
+        let hmac_sha256 = |key: &[u8], message: &[u8]| -> [u8; 32] {
+            let mut padded_key = [0u8; 64];
+            if key.len() > 64 {
+                let hash = Sha256::digest(key);
+                padded_key[..32].copy_from_slice(&hash);
+            } else {
+                padded_key[..key.len()].copy_from_slice(key);
+            }
+            
+            let mut ipad = [0x36u8; 64];
+            let mut opad = [0x5cu8; 64];
+            for i in 0..64 {
+                ipad[i] ^= padded_key[i];
+                opad[i] ^= padded_key[i];
+            }
+            
+            let mut inner = Sha256::new();
+            inner.update(&ipad);
+            inner.update(message);
+            let inner_hash = inner.finalize();
+            
+            let mut outer = Sha256::new();
+            outer.update(&opad);
+            outer.update(&inner_hash);
+            
+            let mut result = [0u8; 32];
+            result.copy_from_slice(&outer.finalize());
+            result
+        };
+
+        // RFC 5869 HKDF-Extract (Extract entropy into pseudorandom key PRK)
         let salt = b"MATRIX_SWARM_EPOC_III_HKDF_SALT";
-        let mut prk = [0u8; 32];
+        let prk = hmac_sha256(salt, master_secret.as_bytes());
+
+        // RFC 5869 HKDF-Expand (Expand PRK with info into output key material OKM)
+        let mut okm = Vec::new();
+        let mut t = Vec::new();
+        let mut counter = 1u8;
         
-        // HKDF-Extract using pbkdf2 as a HMAC-SHA256 simulation with 1 iteration
-        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
-            master_secret.as_bytes(),
-            salt,
-            1, // 1 iteration produces stable, single HMAC HMAC-SHA256 feedback
-            &mut prk
-        );
+        while okm.len() < 32 {
+            let mut msg = Vec::new();
+            msg.extend_from_slice(&t);
+            msg.extend_from_slice(info.as_bytes());
+            msg.push(counter);
+            
+            let hash = hmac_sha256(&prk, &msg);
+            t = hash.to_vec();
+            okm.extend_from_slice(&t);
+            counter += 1;
+        }
         
-        // HKDF-Expand step utilizing custom info context to secure secondary layers (Acoustic link, database cells)
-        let mut okm = [0u8; 32];
-        let mut context = info.as_bytes().to_vec();
-        context.extend_from_slice(&prk);
-        
-        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
-            &context,
-            b"MATRIX_SWARM_EPOC_III_HKDF_EXPAND_SALT",
-            1,
-            &mut okm
-        );
-        
+        okm.truncate(32);
         hex::encode(okm)
     }
 }

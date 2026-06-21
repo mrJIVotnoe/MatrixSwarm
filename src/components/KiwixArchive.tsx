@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity, Share2 } from 'lucide-react';
+import { BookOpen, Download, Search, HardDrive, Database, WifiOff, FileText, CheckCircle2, ChevronRight, Activity, Share2, AlertTriangle } from 'lucide-react';
 import { WasmGlobalKnowledge, WasmArkManager, WasmArkStorage } from '../core/wasm_bridge';
 import { WorkerBus } from '../core/worker_bus';
 
@@ -18,7 +18,19 @@ const MOCK_ARTICLES = [
   { title: 'Deep packet inspection', abstract: 'A form of computer network packet filtering that examines the data part of a packet as it passes an inspection point...' }
 ];
 
-export function KiwixArchive({ symbiote }: { symbiote: any }) {
+export function KiwixArchive({ symbiote, isSynced }: { symbiote: any, isSynced?: boolean }) {
+  if (!isSynced) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-black/60 border border-red-500/30 text-center space-y-4 rounded font-mono">
+        <AlertTriangle className="w-16 h-16 text-red-500 animate-pulse" />
+        <h3 className="text-xl font-bold text-red-400">[ROOT_NOT_SYNCED]</h3>
+        <p className="text-xs text-red-600/90 max-w-md">
+          БАЗА ЗНАНИЙ ЗАБЛОКИРОВАНА: Узел не синхронизирован с нативным Корнем Системы. Для активации оффлайн-знаний и ZIM-хранилища сначала инициализируйте Паспорт Души (Этаж -7).
+        </p>
+      </div>
+    );
+  }
+
   const [libraries, setLibraries] = useState(ZIM_LIBRARIES);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);

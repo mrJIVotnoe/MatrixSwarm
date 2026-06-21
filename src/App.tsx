@@ -22,13 +22,16 @@ import { BriarComm } from './components/BriarComm';
 import { DualPurposeGame } from './components/DualPurposeGame';
 import { ObserverHUD } from './components/ObserverHUD';
 import { SpacedeskPanel } from './components/SpacedeskPanel';
-import { getKeysFromSeed, validateSeedPhrase, encryptSeed, decryptSeed } from './lib/crypto';
-import { GlobalAgentState } from './core/wasm_bridge';
+import { getKeysFromSeed, validateSeedPhrase, encryptSeed, decryptSeed, checkPassportExistsInWorkerStorage, savePassportToWorkerStorage, loadPassportFromWorkerStorage, clearPassportFromWorkerStorage } from './lib/crypto';
+import { GlobalAgentState, WasmIdentity, WasmAikidoCore } from './core/wasm_bridge';
 import { symbioteCore, UserLevel } from './core/symbiosis';
 import { useTranslation } from 'react-i18next';
 import { setLanguage } from './core/i18n';
+import { KiwixArchive } from './components/KiwixArchive';
+import { TorrentManager } from './components/TorrentManager';
+import { QrCode, Key, RefreshCw, Sliders, ShieldCheck } from 'lucide-react';
 
-type Tab = 'nexus' | 'briar' | 'spacedesk' | 'entropy';
+type Tab = 'nexus' | 'floor-7' | 'floor-6' | 'floor-5' | 'floor-4' | 'floor-3' | 'floor-2' | 'floor-1';
 
 function App() {
   const [isTelegram, setIsTelegram] = useState(false);
@@ -192,22 +195,46 @@ function MainDashboard() {
   }, [status]);
 
   const [observerId, setObserverId] = useState<string | null>(() => {
-    if (!localStorage.getItem('soul_passport')) return null;
     return localStorage.getItem('observerId') || null;
   });
+  const [hasCheckedPassport, setHasCheckedPassport] = useState(false);
+  const [hasSavedPassport, setHasSavedPassport] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const exists = await checkPassportExistsInWorkerStorage();
+      setHasSavedPassport(exists);
+      setHasCheckedPassport(true);
+      if (!exists) {
+        setObserverId(null);
+      }
+    })();
+  }, []);
   const [decryptedPassport, setDecryptedPassport] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [unlockError, setUnlockError] = useState('');
   const [observerData, setObserverData] = useState<any>(null);
   const [cellData, setCellData] = useState<any>(null);
 
+  // Floor L-1 active plowing simulator
+  const [isRoutingActive, setIsRoutingActive] = useState(true);
+  const [isSeedingActive, setIsSeedingActive] = useState(false);
+  const [isPowerfulResource, setIsPowerfulResource] = useState(true);
+  const [plowElapsedHours, setPlowElapsedHours] = useState(1);
+  const [plowResult, setPlowResult] = useState<any>(null);
+
+  // Floor L-7 cryptographic playground
+  const [signMessageInput, setSignMessageInput] = useState('MatrixSwarm Offline Covenant');
+  const [generatedSignature, setGeneratedSignature] = useState('');
+  const [verifyMessageInput, setVerifyMessageInput] = useState('MatrixSwarm Offline Covenant');
+  const [verifyPubKeyInput, setVerifyPubKeyInput] = useState('');
+  const [verifySigInput, setVerifySigInput] = useState('');
+  const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
+  const [legacyContainerPayload, setLegacyContainerPayload] = useState('');
+
   useEffect(() => {
-    const passport = localStorage.getItem('soul_passport');
-    if (passport && !observerId) {
-       if (passport.startsWith("PBKDF2-GCM:") && !decryptedPassport) {
-          return;
-       }
-       const activePassport = decryptedPassport || passport;
+    if (decryptedPassport && !observerId) {
+       const activePassport = decryptedPassport;
        (async () => {
          try {
             if (await validateSeedPhrase(activePassport)) {
@@ -222,14 +249,14 @@ function MainDashboard() {
                } catch (e) {
                   console.error("Agent Contract violation:", e);
                }
-            } else {
-               if (!passport.startsWith("PBKDF2-GCM:")) {
-                  localStorage.removeItem('soul_passport');
+            }
+               //
+                  if (true) { if (true) {
                }
             }
          } catch (e) {
             console.error("Failed to derive ID from passport", e);
-            if (!passport.startsWith("PBKDF2-GCM:")) {
+            if (false) {
                localStorage.removeItem('soul_passport');
             }
          }
@@ -289,11 +316,10 @@ function MainDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        let finalPassportStore = privateKeyBase64;
-        if (masterPassword) {
-          finalPassportStore = await encryptSeed(privateKeyBase64, masterPassword);
-        }
-        localStorage.setItem('soul_passport', finalPassportStore);
+        const pwd = masterPassword || "default_pwd";
+        await savePassportToWorkerStorage(privateKeyBase64, pwd);
+        setDecryptedPassport(privateKeyBase64);
+        setHasSavedPassport(true);
         localStorage.setItem('observerId', data.id);
         setObserverId(data.id);
       }
@@ -312,14 +338,11 @@ function MainDashboard() {
     if (symbiote && observerId) symbiote.grantConsent(observerId, selectedMagistrateId);
   };
 
-  const hasSavedPassport = localStorage.getItem('soul_passport');
-  const isEncryptedPassport = hasSavedPassport && hasSavedPassport.startsWith("PBKDF2-GCM:");
-
-  if (isEncryptedPassport && !decryptedPassport) {
+  if (hasSavedPassport && !decryptedPassport) {
      const handleUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-           const decrypted = await decryptSeed(hasSavedPassport, passwordInput);
+           const decrypted = await loadPassportFromWorkerStorage(passwordInput);
            if (await validateSeedPhrase(decrypted)) {
               setDecryptedPassport(decrypted);
               setUnlockError('');
@@ -455,25 +478,30 @@ function MainDashboard() {
           )}
         </AnimatePresence>
 
-        {/* Tabs Navigation */}
-        <div className="flex overflow-x-auto border-b border-cyan-500/30 shrink-0 custom-scrollbar">
+        {/* Tabs Navigation (Отрицательные этажи / Системный Корень) */}
+        <div className="flex overflow-x-auto border-b border-cyan-500/30 shrink-0 custom-scrollbar bg-slate-950/40 p-1 gap-1">
           {[
-            { id: 'nexus', label: 'NEXUS (СЕНСОРНАЯ ПАНЕЛЬ)', icon: Activity },
-            { id: 'briar', label: 'P2P MESH (СВЯЗЬ)', icon: Wifi },
-            { id: 'spacedesk', label: 'SPACEDESK (KVM СВЯЗЬ)', icon: Monitor },
-            { id: 'entropy', label: 'ИГРОВАЯ ЭНТРОПИЯ L3', icon: Hash },
+            { id: 'nexus', label: 'L0: NEXUS (НАДЗЕМНЫЙ ХАБ)', labelShort: 'L0', icon: Activity },
+            { id: 'floor-1', label: 'L-1: ВСПАШКА ПОЧВЫ & КАРМА', labelShort: 'L-1', icon: Zap },
+            { id: 'floor-2', label: 'L-2: БОТНЕТ-ЗАЩИТА & АЙКИДО', labelShort: 'L-2', icon: ShieldCheck },
+            { id: 'floor-3', label: 'L-3: P2P BRAMBLE MATRIX', labelShort: 'L-3', icon: Wifi },
+            { id: 'floor-4', label: 'L-4: uTORRENT СИДИРОВАНИЕ', labelShort: 'L-4', icon: Download },
+            { id: 'floor-5', label: 'L-5: KIWIX БАЗА ЗНАНИЙ', labelShort: 'L-5', icon: BookOpen },
+            { id: 'floor-6', label: 'L-6: КВАНТОВОЕ ХРАНЕНИЕ', labelShort: 'L-6', icon: Database },
+            { id: 'floor-7', label: 'L-7: КОРЕНЬ ДУШИ (ПАСПОРТ)', labelShort: 'L-7', icon: Key },
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-bold tracking-widest transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold tracking-widest transition-all whitespace-nowrap border-b-2 font-mono ${
                 activeTab === tab.id 
-                  ? 'hud-panel text-cyan-400 border-b-2 border-cyan-400 text-glow-cyan' 
-                  : 'text-cyan-600 hover:text-cyan-400 hover:bg-cyan-500/5'
+                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-400 text-glow-cyan shadow-[inset_0_0_10px_rgba(6,182,212,0.15)]' 
+                  : 'text-cyan-700 hover:text-cyan-400 border-transparent hover:bg-cyan-500/5'
               }`}
             >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <tab.icon className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline">{tab.label}</span>
+              <span className="xl:hidden">{tab.labelShort}</span>
             </button>
           ))}
         </div>
@@ -626,15 +654,15 @@ function MainDashboard() {
             </div>
           )}
 
-          {/* TAB: BRIAR */}
-          {activeTab === 'briar' && (
+          {/* FLOOR -3: BRAMBLE P2P MESH СВЯЗЬ */}
+          {activeTab === 'floor-3' && (
             <div className="flex-1 w-full h-[70vh] flex flex-col pt-4">
               <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1 h-[70vh]">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-500">
-                  <Wifi className="w-5 h-5" /> P2P MESH СВЯЗЬ
+                  <Wifi className="w-5 h-5 animate-pulse" /> L-3 BRAMBLE P2P MESH СВЯЗЬ
                 </h2>
-                <p className="text-sm text-cyan-600 mb-4">
-                  Защищенная связь внутри локальной соты по P2P WebRTC DataChannel. Если прямой канал недоступен, сообщение маршрутизируется через Доверенные Узлы.
+                <p className="text-sm text-cyan-600 mb-4 font-mono uppercase">
+                  КАНАЛ ВНЕ-ИНТЕРНЕТНОЙ СВЯЗИ ВНУТРИ СОТЫ ПО BRAMBLE ВМЕСТО FIREBASE. ТРАНСПОРТ МЕДА НАПРЯМУЮ ЧЕРЕЗ WEBRTC И ЛОКАЛЬНЫЙ СИГНАЛИНГ.
                 </p>
                 <div className="flex-1 flex min-h-0">
                   <BriarComm symbiote={symbiote} observerData={observerData} cellData={cellData} decryptedPassport={decryptedPassport} />
@@ -643,26 +671,389 @@ function MainDashboard() {
             </div>
           )}
 
-          {/* TAB: SPACEDESK */}
-          {activeTab === 'spacedesk' && (
+          {/* FLOOR -2: БОТНЕТ-ЗАЩИТА & АЙКИДО */}
+          {activeTab === 'floor-2' && (
             <div className="flex-1 w-full flex flex-col pt-4 min-h-[70vh]">
               <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-purple-400">
+                  <ShieldCheck className="w-5 h-5 animate-bounce" /> L-2 АЙКИДО: ПРОТИВОДЕЙСТВИЕ БОТНЕТАМ
+                </h2>
+                <div className="mb-4 bg-purple-950/20 border border-purple-500/30 p-3 rounded text-xs text-purple-300 font-mono">
+                  <p className="font-bold">АНТИ-СИБИЛЛА (51% ATTACK DEFENDER):</p>
+                  <p className="opacity-80 mt-1">Оценка структуры узлов в соте. Если 80%+ узлов ведут себя как статичные бот-фермы, система активирует цифровой камуфляж для защиты нативного эфира.</p>
+                </div>
                 <SpacedeskPanel symbiote={symbiote} />
               </div>
             </div>
           )}
 
-          {/* TAB: ENTROPY */}
-          {activeTab === 'entropy' && (
-            <div className="flex-1 w-full flex flex-col pt-4">
-              <DualPurposeGame onEarnKarma={(amount) => {
-                if (symbiote) {
-                  symbiote.trustEngine.add_karma(amount);
-                  setTrustScore(symbiote.trustScore);
-                } else {
-                  setTrustScore(prev => Math.min(1000, prev + amount));
-                }
-              }} />
+          {/* FLOOR -1: ВСПАШКА ПОЧВЫ & КАРМИЧЕСКИЙ PoW */}
+          {activeTab === 'floor-1' && (
+            <div className="flex-1 w-full flex flex-col pt-4 space-y-6">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col">
+                <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-cyan-400">
+                  <Zap className="w-5 h-5 text-yellow-400 animate-pulse" /> L-1 ВСПАШКА ПОЧВЫ: КАРМИЧЕСКИЙ Proof of Work
+                </h2>
+                <p className="text-xs text-cyan-600 uppercase font-mono mb-4">
+                  Если узел прекращает «вспашку» (сидирование ZIM-архивов и обеспечение mesh-маршрутов), его Карма увядает (decay). Правом голоса в Рое обладают только те, кто доказывает преданность делу делом.
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-6 items-start">
+                  <div className="border border-cyan-500/20 bg-slate-900/40 p-4 rounded-sm space-y-4 font-mono">
+                     <h3 className="text-sm font-bold text-cyan-300 border-b border-cyan-500/10 pb-2">КАБИНА ПЛУГА (СИМУЛЯТОР RUST K-PoW)</h3>
+                     
+                     <div className="space-y-3">
+                        <label className="flex items-center gap-2 text-xs text-cyan-400 cursor-pointer">
+                           <input 
+                              type="checkbox" 
+                              checked={isRoutingActive} 
+                              onChange={e => setIsRoutingActive(e.target.checked)} 
+                              className="accent-cyan-500" 
+                           />
+                           АКТИВНАЯ MATRIX МАРШРУТИЗАЦИЯ (+2.5 Karma/час)
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-cyan-400 cursor-pointer">
+                           <input 
+                              type="checkbox" 
+                              checked={isSeedingActive} 
+                              onChange={e => setIsSeedingActive(e.target.checked)} 
+                              className="accent-cyan-500" 
+                           />
+                           АКТИВНОЕ СИДИРОВАНИЕ KIWIX ZIM (+4.5 Karma/час)
+                         </label>
+                         <label className="flex items-center gap-2 text-xs text-yellow-500 font-bold cursor-pointer font-mono">
+                            <input 
+                               type="checkbox" 
+                               checked={isPowerfulResource} 
+                               onChange={e => setIsPowerfulResource(e.target.checked)} 
+                               className="accent-yellow-500" 
+                            />
+                            ⚡ МОЩНЫЙ УЗЕЛ / ПК / ЗАРЯДКА (Ускоренное увядание кармы)
+                        </label>
+                     </div>
+
+                     <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-cyan-400">
+                           <span>ИНТЕРВАЛ ВРЕМЕНИ ДЛЯ РАСЧЕТА:</span>
+                           <span className="text-yellow-400">{plowElapsedHours} ЧАС(ОВ)</span>
+                        </div>
+                        <input 
+                           type="range" 
+                           min="1" 
+                           max="24" 
+                           value={plowElapsedHours} 
+                           onChange={e => setPlowElapsedHours(Number(e.target.value))} 
+                           className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500" 
+                        />
+                     </div>
+
+                     <button 
+                        onClick={() => {
+                          try {
+                            const result = WasmAikidoCore.plowSoil(isRoutingActive, isSeedingActive, trustScore, plowElapsedHours, isPowerfulResource);
+                            setPlowResult(result);
+                            if (result && result.new_karma !== undefined) {
+                              if (symbiote) {
+                                symbiote.trustScore = result.new_karma;
+                              }
+                              setTrustScore(result.new_karma);
+                              addLog(`[WASM Core] Plowing completed in Rust. Karma updated: ${result.new_karma.toFixed(1)}. is_withering=${result.is_withering}`);
+                            }
+                          } catch (err: any) {
+                            addLog(`[ERROR] Plow failed: ${err.message}`);
+                          }
+                        }}
+                        className="w-full py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/50 text-cyan-300 font-bold text-xs tracking-wider transition-colors cursor-pointer"
+                     >
+                        ВЫДАТЬ PoW-РАСЧЕТ В RUST CORE
+                     </button>
+                  </div>
+
+                  <div className="border border-cyan-500/20 bg-slate-900/40 p-4 rounded-sm space-y-3 font-mono h-full min-h-[220px]">
+                     <h3 className="text-sm font-bold text-cyan-300 border-b border-cyan-500/10 pb-2">АНАЛИТИКА ВСПАШКИ</h3>
+                     {plowResult ? (
+                        <div className="space-y-4">
+                           <div className="flex justify-between items-center bg-black p-2 border border-cyan-500/10 rounded">
+                              <span className="text-xs text-cyan-500">ИТОГОВАЯ КАРМА:</span>
+                              <span className="text-xl font-bold text-emerald-400 text-glow-cyan">{plowResult.new_karma.toFixed(1)}</span>
+                           </div>
+                           <p className={`text-xs p-2.5 rounded font-semibold ${plowResult.is_withering ? 'bg-red-950/30 border border-red-500/30 text-rose-400 animate-pulse' : 'bg-green-950/30 border border-green-500/30 text-emerald-400'}`}>
+                              {plowResult.status}
+                           </p>
+                           {plowResult.is_withering && (
+                              <p className="text-[10px] text-red-500/80 leading-relaxed uppercase">
+                                 🚨 Внимание: Из-за простоя узла ваши очки увядают. Срочно активируйте сидирование, чтобы сохранить свой Кворум в суде присяжных!
+                              </p>
+                           )}
+                        </div>
+                     ) : (
+                        <div className="text-center py-8 text-cyan-600 text-xs">
+                           Запустите оценку выше для загрузки метрик из WASM-протокола.
+                        </div>
+                     )}
+                  </div>
+               </div>
+              </div>
+
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col">
+                 <h2 className="text-sm font-bold text-cyan-300 mb-3 flex items-center gap-1.5 uppercase">
+                    <Database className="w-4 h-4 text-cyan-400" /> СВЯЗАННЫЙ РАСПРЕДЕЛЕННЫЙ ЖУРНАЛ КАРМЫ (CRDT)
+                 </h2>
+                 <KarmaLedger />
+              </div>
+            </div>
+          )}
+
+          {/* FLOOR -4: uTORRENT СИДИРОВАНИЕ */}
+          {activeTab === 'floor-4' && (
+            <div className="flex-1 w-full flex flex-col pt-4 min-h-[70vh]">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                  <Download className="w-5 h-5 text-glow-cyan animate-pulse" /> L-4 uTORRENT СИДИРОВАНИЕ
+                </h2>
+                <p className="text-sm text-cyan-600 mb-4 font-mono uppercase">
+                  УПРАВЛЕНИЕ P2P-ОБМЕНОМ И МАКСИМАЛЬНАЯ РАЗДАЧА ФАЙЛОВ. ВСЕ СИМУЛЯЦИИ ИСПРАВЛЕНЫ, СТАТУС БЛОКИРОВКИ ОТСЛЕЖИВАЕТСЯ АВТОМАТИЧЕСКИ.
+                </p>
+                <div className="flex-1">
+                  <TorrentManager symbiote={symbiote} isSynced={!!decryptedPassport} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FLOOR -5: KIWIX OFFLINE АРХИВЫ */}
+          {activeTab === 'floor-5' && (
+            <div className="flex-1 w-full flex flex-col pt-4 min-h-[70vh]">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col flex-1">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-emerald-400">
+                  <BookOpen className="w-5 h-5 animate-pulse" /> L-5 KIWIX OFFLINE БАЗА ЗНАНИЙ
+                </h2>
+                <p className="text-sm text-cyan-600 mb-4 font-mono uppercase">
+                  ЛОКАЛЬНАЯ ЭНЦИКЛОПЕДИЯ ДЛЯ ВЫЖИВАНИЯ УПРАВЛЯЕМАЯ ИЗ САНДБОКСА WEB WORKER. ПОИСК И ХРАНЕНИЕ В ФОРМАТЕ ZIM.
+                </p>
+                <div className="flex-1">
+                  <KiwixArchive symbiote={symbiote} isSynced={!!decryptedPassport} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FLOOR -6: КВАНТОВОЕ НАДЕЖНОЕ ХРАНЕНИЕ (Isolated Crypto Worker) */}
+          {activeTab === 'floor-6' && (
+            <div className="flex-1 w-full flex flex-col pt-4 space-y-6">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-teal-400">
+                  <Database className="w-5 h-5" /> L-6 КВАНТОВЫЙ СЛОЙ ХРАНЕНИЯ (SubtleCrypto Sandbox)
+                </h2>
+                
+                <div className="p-4 bg-teal-950/20 border border-teal-500/30 rounded font-mono text-xs text-teal-300 space-y-4">
+                  <div className="flex justify-between items-center border-b border-teal-500/10 pb-2">
+                     <span className="font-bold uppercase">🔐 КАНАЛ СВЯЗИ С РАБОЧИМ ПОТОКОМ (Web Worker):</span>
+                     <span className="text-glow-cyan text-emerald-400 font-bold">АКТИВЕН / ИЗОЛИРОВАН</span>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                     <div>
+                        <span className="text-teal-600 block text-[10px] uppercase font-bold text-left">Транспорт Ключей:</span>
+                        <p className="leading-relaxed mt-1 text-teal-300/90 text-left">
+                           Паспорт Души загружен и защищен в закрытой памяти crypto.worker.ts. Внутри основного браузерного треда отсутствуют сырые seed-фразы или приватные ключи, что делает XSS-инъекции бесполезными.
+                        </p>
+                     </div>
+                     <div>
+                        <span className="text-teal-600 block text-[10px] uppercase font-bold text-left">Криптографическая Устойчивость:</span>
+                        <p className="leading-relaxed mt-1 text-teal-300/90 text-left">
+                           Для запечатывания используется PBKDF2 (100,000 раундов SHA-256) и шифрование по алгоритму AES-GCM 256-бит в SubtleCrypto Sandbox.
+                        </p>
+                     </div>
+                  </div>
+                  
+                  <div className="bg-black p-3 border border-teal-900 rounded space-y-1">
+                     <div className="text-[10px] text-teal-500 uppercase">Данные Сейфа IndexedDB:</div>
+                     <div className="text-slate-400 text-[10px]">Database Name: MatrixSwarmIdentityDB</div>
+                     <div className="text-slate-400 text-[10px]">Object Store: identity</div>
+                     <div className="text-slate-300 font-bold text-[10px] mt-1 flex justify-between">
+                        <span>СТАТУС КЛЮЧЕЙ В ПАМЯТИ РАБОЧЕГО:</span>
+                        <span className="text-emerald-400">DEC_PHRASE_RESTORED_IN_THREAD_LOCK</span>
+                     </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                     <button 
+                        onClick={() => {
+                           if (confirm("Вы абсолютно уверены? Это приведет к полной очистке защищенного IndexedDB сейфа и перезагрузке узла! Сид-фраза будет стерта.")) {
+                              clearPassportFromWorkerStorage().then(() => {
+                                 localStorage.clear();
+                                 window.location.reload();
+                              });
+                           }
+                        }}
+                        className="py-1.5 px-4 bg-red-500/10 hover:bg-red-500/30 border border-red-500/50 text-red-400 font-bold text-xs tracking-wider transition-colors cursor-pointer rounded-sm"
+                     >
+                        СБРОСИТЬ СЕЙФ КЛЮЧЕЙ И ОЧИСТИТЬСЯ (ПОЛИЦЕЙСКИЙ ДАМПЕР)
+                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FLOOR -7: КОРЕНЬ ДУШИ (ПАСПОРТ) */}
+          {activeTab === 'floor-7' && (
+            <div className="flex-1 w-full flex flex-col pt-4 space-y-6">
+              <div className="hud-panel p-5 rounded-sm relative flex flex-col">
+                <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-yellow-500">
+                  <Key className="w-5 h-5 text-yellow-400 animate-spin-slow" /> L-7 КОРЕНЬ ДУШИ (The Soul Passport)
+                </h2>
+                <p className="text-xs text-cyan-600 uppercase font-mono mb-4">
+                  Глубинная идентичность узла. BIP39/Ed25519 ключи вычисляются строго на нативном Rust-ядре и локализуются в закрытом Sandbox сейфе.
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                   <div className="border border-cyan-500/20 bg-slate-900/40 p-4 rounded-sm space-y-4 font-mono">
+                      <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest border-b border-cyan-500/10 pb-2">Ржавое Клеймо (WASM SIGNER & ENGINE)</h3>
+                      
+                      <div className="space-y-2">
+                         <label className="block text-[10px] text-cyan-500 font-bold uppercase">ВЫПУСТИТЬ КРИПТОГРАФИЧЕСКИЙ ДОГОВОР:</label>
+                         <input 
+                            type="text" 
+                            value={signMessageInput}
+                            onChange={e => setSignMessageInput(e.target.value)}
+                            className="w-full bg-slate-950 border border-cyan-500/30 p-2 text-xs text-cyan-300 focus:outline-none focus:border-cyan-400 font-mono"
+                            placeholder="Message content..."
+                         />
+                      </div>
+
+                      <button 
+                         onClick={async () => {
+                           try {
+                             if (!decryptedPassport) return;
+                             const signature = await WasmIdentity.signMessage(decryptedPassport, signMessageInput);
+                             setGeneratedSignature(signature);
+                             addLog(`[WASM Core] Message successfully signed with Ed25519.`);
+                           } catch (err: any) {
+                             addLog(`[ERROR] Sign failed: ${err.message}`);
+                           }
+                         }}
+                         className="w-full py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 font-bold text-xs tracking-wider transition-colors cursor-pointer"
+                      >
+                         ПОДПИСАТЬ СООБЩЕНИЕ В RUST CORE
+                      </button>
+
+                      {generatedSignature && (
+                         <div className="space-y-1">
+                            <span className="text-[10px] text-yellow-500/80 uppercase block">ВАША HEX ПОДПИСЬ:</span>
+                            <div className="p-2.5 bg-black border border-cyan-500/20 font-mono text-[9px] break-all max-h-20 overflow-y-auto custom-scrollbar text-yellow-400 leading-tight">
+                              {generatedSignature}
+                            </div>
+                         </div>
+                      )}
+                   </div>
+
+                   <div className="border border-cyan-500/20 bg-slate-900/40 p-4 rounded-sm space-y-4 font-mono">
+                      <div className="flex justify-between items-center border-b border-cyan-500/10 pb-2">
+                         <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest">ВЕРИФИКАТОР Ed25519 ПОДПИСЕЙ</h3>
+                         <button 
+                            onClick={async () => {
+                              if (!decryptedPassport) return;
+                              try {
+                                const keys = await getKeysFromSeed(decryptedPassport);
+                                setVerifyPubKeyInput(keys.publicKey);
+                                setVerifySigInput(generatedSignature);
+                              } catch (e) {}
+                            }}
+                            className="text-[9px] text-yellow-500 hover:underline hover:text-yellow-400"
+                         >
+                            ЗАПОЛНИТЬ МОИ ДАННЫЕ
+                         </button>
+                      </div>
+
+                      <div className="space-y-2 text-left">
+                         <div>
+                            <span className="text-[9.5px] text-slate-500 font-bold block uppercase mb-1">Публичный ключ (Hex/Base64):</span>
+                            <input 
+                               type="text" 
+                               value={verifyPubKeyInput}
+                               onChange={e => setVerifyPubKeyInput(e.target.value)}
+                               className="w-full bg-slate-950 border border-cyan-500/20 p-2 text-[10px] text-cyan-300 focus:outline-none"
+                               placeholder="PublicKey..."
+                            />
+                         </div>
+                         <div>
+                            <span className="text-[9.5px] text-slate-500 font-bold block uppercase mb-1">Проверяемое описание:</span>
+                            <input 
+                               type="text" 
+                               value={verifyMessageInput}
+                               onChange={e => setVerifyMessageInput(e.target.value)}
+                               className="w-full bg-slate-950 border border-cyan-500/20 p-2 text-[10px] text-cyan-300 focus:outline-none"
+                               placeholder="Message..."
+                            />
+                         </div>
+                         <div>
+                            <span className="text-[9.5px] text-slate-500 font-bold block uppercase mb-1">Проверяемая подпись (Hex):</span>
+                            <textarea 
+                               value={verifySigInput}
+                               onChange={e => setVerifySigInput(e.target.value)}
+                               className="w-full h-12 bg-slate-950 border border-cyan-500/20 p-2 text-[9px] text-cyan-300 focus:outline-none resize-none"
+                               placeholder="Hex Signature..."
+                            />
+                         </div>
+                      </div>
+
+                      <button 
+                         onClick={async () => {
+                           try {
+                             const is_valid = await WasmIdentity.verifySignature(verifyPubKeyInput, verifyMessageInput, verifySigInput);
+                             setVerificationResult(is_valid);
+                             addLog(`[WASM Core] Verified signature result: ${is_valid}`);
+                           } catch (err: any) {
+                             setVerificationResult(false);
+                             addLog(`[ERROR] Verification error: ${err.message}`);
+                           }
+                         }}
+                         className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs tracking-wider transition-colors cursor-pointer"
+                      >
+                         ВЕРИФИЦИРОВАТЬ Ed25519 В RUST CORE
+                      </button>
+
+                      {verificationResult !== null && (
+                         <div className={`text-center p-2 rounded text-xs font-bold leading-tight uppercase border ${verificationResult ? 'bg-green-950/40 border-green-500/30 text-emerald-400 animate-pulse' : 'bg-red-950/40 border-red-500/30 text-rose-500'}`}>
+                            {verificationResult ? "✓ ВЕНЕЦ СОГЛАСИЯ: ПОДПИСЬ КОРРЕКТНА! УЗЕЛ ВЕРИФИЦИРОВАН!" : "✗ КОРРУПЦИЯ: ПОДПИСЬ ОТКЛОНЕНА ЯДРОМ! КЛЮЧ НЕ СОВПАДАЕТ!"}
+                         </div>
+                      )}
+                   </div>
+                </div>
+
+                {/* Soul Migration Container Link */}
+                <div className="border border-amber-500/20 bg-slate-950/70 p-4 rounded mt-6 font-mono text-left">
+                   <div className="flex justify-between items-center border-b border-amber-500/20 pb-2">
+                      <h4 className="text-xs font-bold text-amber-500 uppercase">ЭКСПОРТНЫЙ КОНТЕЙНЕР (LEGACY PASSPORT BINDING)</h4>
+                      <button 
+                         onClick={async () => {
+                           try {
+                             if (!decryptedPassport) return;
+                             const payload = await WasmIdentity.exportLegacyContainer(decryptedPassport, trustScore, true);
+                             setLegacyContainerPayload(payload);
+                             addLog(`[WASM Core] Legacy container successfully packed.`);
+                           } catch (err: any) {
+                             addLog(`[ERROR] Export failed: ${err.message}`);
+                           }
+                         }}
+                         className="text-[10px] text-yellow-500 font-bold hover:underline"
+                      >
+                         ВЫГРУЗИТЬ
+                      </button>
+                   </div>
+                   <p className="text-[10px] text-cyan-600 mt-2 mb-2 leading-relaxed">
+                      Сформируйте шифрованный запечатанный контейнер вашего Паспорта для миграции в оффлайн-системы старого типа. Начисления Кармы и Эдди25519 связи будут запечатаны совместно в Rust-ядре.
+                   </p>
+                   {legacyContainerPayload && (
+                      <textarea 
+                         value={legacyContainerPayload}
+                         readOnly
+                         className="w-full h-16 bg-black border border-cyan-500/10 p-2 text-[10px] font-mono text-yellow-400/95 focus:outline-none"
+                      />
+                   )}
+                </div>
+              </div>
             </div>
           )}
 

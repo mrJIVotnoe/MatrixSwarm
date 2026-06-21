@@ -24,7 +24,7 @@ export function BriarComm({ symbiote, observerData, cellData, decryptedPassport 
   const [radioFallback, setRadioFallback] = useState(false);
 
   const encryptionKey = React.useMemo(() => {
-    const rawSecret = decryptedPassport || localStorage.getItem('soul_passport') || '';
+    const rawSecret = decryptedPassport || '';
     if (!rawSecret) return "swarm_sec_secret";
     if (rawSecret.startsWith("PBKDF2-GCM:")) {
         return "swarm_sec_secret";
